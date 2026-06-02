@@ -1,8 +1,7 @@
 "use client";
 import FallbackImage from "../components/fallbackimg";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
 export default function SearchPage() {
   const params = useSearchParams();
@@ -10,13 +9,17 @@ export default function SearchPage() {
 
   const [movies, setMovies] = useState<any[]>([]);
   const [series, setSeries] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [showMovies, setShowMovies] = useState(true);
   const [showSeries, setShowSeries] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     if (!query) return;
 
     async function load() {
+      setLoading(true);
       try {
         const movieRes = await fetch(
           `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(query)}.json`
@@ -34,6 +37,8 @@ export default function SearchPage() {
       } catch (e) {
         setMovies([]);
         setSeries([]);
+      } finally {
+        setLoading(false);
       }
     }
 
@@ -44,63 +49,104 @@ export default function SearchPage() {
     <main className="p-8 bg-zinc-950 min-h-screen text-white">
       <h1 className="text-3xl font-bold mb-8">Results for "{query}"</h1>
 
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl">Movies</h2>
-        <button
-          onClick={() => setShowMovies((s) => !s)}
-          className="text-zinc-400 hover:text-white"
-        >
-          {showMovies ? "Hide" : "Show"}
-        </button>
-      </div>
+      <div className="space-y-8">
+        {/* Movies tab */}
+        <section onClick={() => setShowMovies((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer">
+          <h2 className="text-xl font-semibold mb-3">Movies</h2>
 
-      {showMovies && (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-12">
-          {movies.map((movie: any) => (
-            <div key={movie.id}>
-              <Link href={`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`}>
-                {/* <a className="block"> */}
-                  <div className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200">
-                    <FallbackImage
-                      src={movie.poster}
-                      width={200}
-                      height={300}
-                      alt={movie.name}
-                      className="poster"
-                    />
+          <div
+            className={`overflow-hidden transition-[max-height] duration-300 ease-in-out`} 
+            style={{ maxHeight: showMovies ? '70vh' : 0 }}
+          >
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="rounded-lg overflow-hidden bg-zinc-800 h-40 animate-pulse" />
+                    <div className="h-3 bg-zinc-800 rounded w-3/4 animate-pulse" />
                   </div>
-                  <p>{movie.name}</p>
-                {/* </a> */}
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl">Series</h2>
-        <button
-          onClick={() => setShowSeries((s) => !s)}
-          className="text-zinc-400 hover:text-white"
-        >
-          {showSeries ? "Hide" : "Show"}
-        </button>
-      </div>
-
-      {showSeries && (
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-          {series.map((show: any) => (
-            <div key={show.id}>
-              <Link href={`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`}>
-                {/* <a className="block"> */}
-                  <div className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200">
-                    <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
+                ))
+              ) : (
+                movies.length > 0 ? movies.map((movie: any) => (
+                  <div key={movie.id}>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPageLoading(true);
+                        router.push(`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`);
+                      }}
+                      className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
+                    >
+                      <FallbackImage
+                        src={movie.poster}
+                        width={200}
+                        height={300}
+                        alt={movie.name}
+                        className="poster"
+                      />
+                    </div>
+                    <p className="mt-2">{movie.name}</p>
                   </div>
-                  <p>{show.name}</p>
-                {/* </a> */}
-              </Link>
+                )) : (
+                  <div className="p-4 text-zinc-400">No movies found for "{query}"</div>
+                )
+              )}
             </div>
-          ))}
+          </div>
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-4 text-white rounded-full w-10 h-10 flex items-center justify-center shadow pointer-events-none">
+            <svg className={`w-5 h-5 transition-transform duration-200 ${showMovies ? 'rotate-180' : 'rotate-0'}`} viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+            </svg>
+          </div>
+        </section>
+
+        {/* Series tab */}
+        <section onClick={() => setShowSeries((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer">
+          <h2 className="text-xl font-semibold mb-3">Series</h2>
+
+          <div
+            className={`overflow-hidden transition-[max-height] duration-300 ease-in-out`} 
+            style={{ maxHeight: showSeries ? '70vh' : 0 }}
+          >
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
+              {loading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="rounded-lg overflow-hidden bg-zinc-800 h-40 animate-pulse" />
+                    <div className="h-3 bg-zinc-800 rounded w-3/4 animate-pulse" />
+                  </div>
+                ))
+              ) : (
+                series.length > 0 ? series.map((show: any) => (
+                  <div key={show.id}>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPageLoading(true);
+                        router.push(`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`);
+                      }}
+                      className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
+                    >
+                      <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
+                    </div>
+                    <p className="mt-2">{show.name}</p>
+                  </div>
+                )) : (
+                  <div className="p-4 text-zinc-400">No series found for "{query}"</div>
+                )
+              )}
+            </div>
+          </div>
+          <div className="absolute left-1/2 -translate-x-1/2 bottom-4 text-white rounded-full w-10 h-10 flex items-center justify-center shadow pointer-events-none">
+            <svg className={`w-5 h-5 transition-transform duration-200 ${showSeries ? 'rotate-180' : 'rotate-0'}`} viewBox="0 0 20 20" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+              <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+            </svg>
+          </div>
+        </section>
+      </div>
+      {pageLoading && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+          <span className="loader"></span>
         </div>
       )}
     </main>

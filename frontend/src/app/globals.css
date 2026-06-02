@@ -32,3 +32,81 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Styled scrollbar for search dropdown */
+.search-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+.search-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+.search-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.search-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #374151;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+.loader {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+  /* Rotate the entire system 45deg to match your image's axis */
+  transform: rotateZ(45deg); 
+  perspective: 1000px;
+}
+
+/* Base styles for both the white and orange rings */
+.loader::before,
+.loader::after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: inherit;
+  height: inherit;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+/* The White Ring (Rotated on X-axis) */
+.loader::before {
+  border-top: 3px solid #ffffff;
+  transform: rotateX(70deg);
+  animation: spinRingX 1.2s linear infinite;
+}
+
+/* The Orange/Red Ring (Rotated on Y-axis) */
+.loader::after {
+  border-right: 3px solid #2d1988; /* Adjusted to match your image's vibrant orange */
+  transform: rotateY(70deg);
+  animation: spinRingY 1.2s linear infinite;
+  animation-delay: -0.6s; /* Start halfway through the white ring's animation for a dynamic effect */
+}
+
+/* 3D Animations maintaining the correct spatial planes */
+@keyframes spinRingX {
+  0% {
+    transform: rotateX(70deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateX(70deg) rotateZ(360deg);
+  }
+}
+
+@keyframes spinRingY {
+  0% {
+    transform: rotateY(70deg) rotateZ(0deg);
+  }
+  100% {
+    transform: rotateY(70deg) rotateZ(360deg);
+  }
+}
+   
