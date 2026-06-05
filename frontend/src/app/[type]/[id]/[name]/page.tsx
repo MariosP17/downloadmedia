@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import FallbackImage from "../../../components/fallbackimg"
+import StreamActions from "./StreamActions";
+import SeasonsAccordion from "./SeasonsAccordion";
+
 
 type Props = {
   params: {
@@ -108,45 +111,12 @@ export default async function ItemPage({ params }: Props) {
         // ignore and try next
       }
     const seasons = normalizeSeasons(seriesData);
-  
     if (seasons.length > 0) {
       return (
         <main className="p-8 bg-zinc-950 min-h-screen text-white">
           <h1 className="text-2xl font-bold mb-6">Season results for {decodeURIComponent(name)}</h1>
   
-          <div className="space-y-4">
-            {seasons.map((season) => (
-              <details key={season.id} className="bg-zinc-900 rounded-lg" data-open={false}>
-                <summary className="p-4 flex items-center justify-between cursor-pointer">
-                  <div>
-                    <div className="text-white font-semibold">{season.name}</div>
-                    <div className="text-zinc-400 text-sm">{(season.episodes || []).length} episodes</div>
-                  </div>
-                  <div className="text-zinc-400">▸</div>
-                </summary>
-  
-                <div className="p-4 border-t border-zinc-800">
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                    {(season.episodes || []).map((ep: any) => {
-                      const eid = ep.id ?? ep._id ?? ep.imdb_id ?? ep.tvdb_id ?? ep.name ?? ep.title;
-                      const ename = ep.name ?? ep.title ?? `Episode ${ep.episode ?? ep.number ?? ""}`;
-                      return (
-                        <a key={eid} href={`/${encodeURIComponent(type)}/${encodeURIComponent(eid)}/${encodeURIComponent(String(ename))}`} className="block">
-                          <div className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-150">
-                            <FallbackImage src={ep.thumbnail || ep.poster || ep.cover || "/no-poster-16-9.jpg"} fallback="/no-poster-16-9.jpg" alt={ename} className="w-full h-40 object-cover rounded-lg" />
-                          </div>
-                          <p className="mt-2 text-sm text-white">{ename}</p>
-                          { (ep.description || ep.overview) && (
-                            <p className="mt-1 text-xs text-zinc-400">{ep.description || ep.overview}</p>
-                          ) }
-                        </a>
-                      );
-                    })}
-                  </div>
-                </div>
-              </details>
-            ))}
-          </div>
+          <SeasonsAccordion seasons={seasons} type={type} />
         </main>
       );
     }
@@ -184,41 +154,32 @@ export default async function ItemPage({ params }: Props) {
               const title = s.title || "";
               const infoHash = s.infoHash || "";
               const filename = s.behaviorHints?.filename || "";
-              const magnet = `magnet:?xt=urn:btih:${infoHash}&dn=${encodeURIComponent(filename || title)}`;
   
               return (
                 <div
                   key={`${infoHash}-${idx}`}
-                  className="flex items-center justify-between bg-zinc-900 rounded-lg p-4"
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-zinc-900 rounded-lg p-4 hover:bg-zinc-800 transition-colors gap-3"
                 >
-                  <div className="flex items-start gap-4">
-                    <div>
-                      <div className="text-zinc-300 text-sm whitespace-pre-line leading-tight">{sName}</div>
-                    </div>
-  
-                    <div>
-                      <div className="text-white font-semibold text-lg leading-tight">{title}</div>
-                      <div className="text-zinc-400 text-sm mt-1 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col gap-2">
+                      <div className="text-zinc-300 text-sm whitespace-pre-wrap break-words">{sName}</div>
+                      <div className={`text-white font-semibold text-lg leading-tight ${title.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{title}</div>
+                      <div className="text-zinc-400 text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
                         <span className="flex items-center gap-1">👤 <strong className="text-white">{title.match(/👤\s*(\d+)/)?.[1] ?? "-"}</strong></span>
                         <span className="flex items-center gap-1">💾 <strong className="text-white">{title.match(/💾\s*([^\s]+)/)?.[1] ?? (s.fileSize || "-")}</strong></span>
                         <span className="flex items-center gap-1">⚙️ <span className="text-white">{title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"}</span></span>
                         {title.includes("🇪🇸") && (<span className="ml-2">🇪🇸</span>)}
                       </div>
-  
-                      <div className="text-zinc-500 text-xs mt-2">{filename || infoHash}</div>
+                      <div className="text-zinc-500 text-xs break-all">{filename || infoHash}</div>
                     </div>
                   </div>
-  
-                  <div className="flex items-center gap-4">
-                    <a
-                      href={magnet}
-                      className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-500 hover:bg-green-600 transition-colors"
-                      title="Open in torrent client"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-4.586 2.573A1 1 0 018 12.82V7.18a1 1 0 011.166-.986l4.586 2.573a1 1 0 010 1.802z" />
-                      </svg>
-                    </a>
+
+                  <div className="w-full sm:w-auto flex items-center justify-end mt-3 sm:mt-0 gap-4 hover:bg-zinc-800 transition-colors rounded-md p-2">
+                    {/* Stream actions: Server | Your Device */}
+                    {/* Client component handles copy/download actions */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                
+                    <StreamActions hash={infoHash} filename={filename} title={title} id={s.fileIdx} />
                   </div>
                 </div>
               );

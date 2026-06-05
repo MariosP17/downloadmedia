@@ -51,12 +51,13 @@ export default function SearchPage() {
 
       <div className="space-y-8">
         {/* Movies tab */}
-        <section onClick={() => setShowMovies((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer">
+        <section onClick={() => setShowMovies((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer" style={{padding: "40px"}}>
           <h2 className="text-xl font-semibold mb-3">Movies</h2>
 
           <div
+            id = "movies-container"
             className={`overflow-hidden transition-[max-height] duration-300 ease-in-out`} 
-            style={{ maxHeight: showMovies ? '70vh' : 0 }}
+            style={{ maxHeight: showMovies ? `${document.getElementById('movies-container')?.scrollHeight ?? 0}px` : 0 }}
           >
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
               {loading ? (
@@ -101,12 +102,13 @@ export default function SearchPage() {
         </section>
 
         {/* Series tab */}
-        <section onClick={() => setShowSeries((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer">
+        <section onClick={() => setShowSeries((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer" style={{padding: "40px"}}>
           <h2 className="text-xl font-semibold mb-3">Series</h2>
 
           <div
+            id="series-container"
             className={`overflow-hidden transition-[max-height] duration-300 ease-in-out`} 
-            style={{ maxHeight: showSeries ? '70vh' : 0 }}
+            style={{ maxHeight: showSeries ? `${document.getElementById('series-container')?.scrollHeight ?? 0}px` : 0 }}
           >
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
               {loading ? (
