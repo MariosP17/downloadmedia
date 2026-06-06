@@ -3,6 +3,7 @@ import os
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from pathlib import Path
 
 app = Flask(__name__)
 CORS(app)
@@ -11,56 +12,64 @@ CORS(app)
 # Format: { "identifier_idx": percentage_float }
 progress_store = {}
 
-def download_stream_task(identifier: str, idx: str):
-    """
-    Downloads the file in chunks natively using requests 
-    and dynamically updates the global progress percentage.
-    """
+def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = ""):
     task_key = f"{identifier}_{idx}"
     progress_store[task_key] = 0.0
     
     url = f"http://127.0.0.1:11470/{identifier}/{idx}?external=1&download=1"
-    
+    filename = os.path.join(path, name if bool(Path(name).suffix) else name + ".mp4" if name else os.path.join(path, task_key + ".mp4"))
+    print(f"Starting download for {task_key} from URL: {url} to path: {filename}")
     try:
-        # Stream the request so we don't load the entire file into RAM at once
+        os.makedirs(path, exist_ok=True)
         response = requests.get(url, stream=True, timeout=30)
         response.raise_for_status()
         
-        # Get total file size from headers (if provided by the server)
         total_size = response.headers.get('content-length')
         
-        # Determine where to save the file locally
-        filename = f"download_{task_key}.tmp"
-        
-        if total_size is None:
-            # If the server doesn't provide content-length, we can't calculate exact %
-            print(f"Warning: No Content-Length header for {task_key}. Saving file blindly.")
-            with open(filename, 'wb') as f:
+        with open(filename, 'wb') as f:
+            if total_size is None:
                 for chunk in response.iter_content(chunk_size=8192):
+                    # --- CANCELLATION CHECK ---
+                    if progress_store.get(task_key) == -1.0:
+                        print(f"Download {task_key} canceled mid-flight.")
+                        f.close() # Explicitly close file handle before deleting
+                        if os.path.exists(filename): os.remove(filename)
+                        return # Exit the thread immediately
+
                     if chunk:
                         f.write(chunk)
-            progress_store[task_key] = 100.0
-        else:
-            total_size = int(total_size)
-            downloaded_bytes = 0
-            
-            with open(filename, 'wb') as f:
-                # Read file in 128KB chunks
-                for chunk in response.iter_content(chunk_size=131072): 
+                progress_store[task_key] = 100.0
+            else:
+                total_size = int(total_size)
+                downloaded_bytes = 0
+                
+                for chunk in response.iter_content(chunk_size=131072):
+                    # --- CANCELLATION CHECK ---
+                    if progress_store.get(task_key) == -1.0:
+                        print(f"Download {task_key} canceled mid-flight.")
+                        f.close() # Explicitly close file handle before deleting
+                        if os.path.exists(filename): os.remove(filename)
+                        return # Exit the thread immediately
+
                     if chunk:
                         f.write(chunk)
                         downloaded_bytes += len(chunk)
-                        
-                        # Calculate progress percentage
                         percentage = round((downloaded_bytes / total_size) * 100, 2)
                         progress_store[task_key] = percentage
                         
-            print(f"Download completed successfully for {task_key}")
-            progress_store[task_key] = 100.0
+                print(f"Download completed successfully for {task_key}")
+                progress_store[task_key] = 100.0
 
     except Exception as e:
-        print(f"Error downloading {task_key}: {e}")
-        progress_store[task_key] = -1.0  # -1.0 signifies an error state
+        # Only set to -1 if it wasn't deliberately canceled by the user
+        if progress_store.get(task_key) != -1.0:
+            print(f"Error downloading {task_key}: {e}")
+            progress_store[task_key] = -2.0 # Use -2.0 for organic network failures
+        
+        # Clean up partial file if a crash occurs
+        if os.path.exists(filename):
+            try: os.remove(filename)
+            except: pass
 
 @app.route('/download', methods=['POST'])
 def start_download():
@@ -70,7 +79,9 @@ def start_download():
     data = request.get_json() or {}
     identifier = data.get('identifier')
     idx = data.get('idx')
-    
+    path = data.get('path', '/media')
+    name = data.get('name', "")
+
     if not identifier or not idx:
         return jsonify({"error": "Both 'identifier' and 'idx' are required parameters."}), 400
     
@@ -81,7 +92,7 @@ def start_download():
         return jsonify({"message": "Download already in progress", "task_id": task_key}), 200
 
     # Start the download process in a separate background thread
-    thread = threading.Thread(target=download_stream_task, args=(identifier, idx))
+    thread = threading.Thread(target=download_stream_task, args=(identifier, idx, path, name))
     thread.daemon = True # Allows application to close cleanly
     thread.start()
     
@@ -90,6 +101,27 @@ def start_download():
         "task_id": task_key,
         "message": "Download initiated in background thread."
     }), 202
+
+@app.route('/cancel', methods=['POST'])
+def cancel_download():
+    """
+    POST Endpoint: Receives JSON payload and cancels the download.
+    """
+    data = request.get_json() or {}
+    identifier = data.get('identifier')
+    idx = data.get('idx')
+    path = data.get('path', '/media')
+    name = data.get('name', "")
+
+    if not identifier or not idx:
+        return jsonify({"error": "Both 'identifier' and 'idx' are required parameters."}), 400
+
+    task_key = f"{identifier}_{idx}"
+
+    if task_key in progress_store:
+        progress_store[task_key] = -1.0  # Mark as cancelled
+
+    return jsonify({"message": "Download cancellation requested.", "task_id": task_key}), 200
 
 @app.route('/progress/<identifier>/<idx>', methods=['GET'])
 def get_progress(identifier, idx):
@@ -109,6 +141,66 @@ def get_progress(identifier, idx):
         return jsonify({"progress": 100.0, "status": "Completed"}), 200
         
     return jsonify({"progress": current_progress, "status": "Downloading"}), 200
+
+@app.route('/getItems', methods=['GET'])
+def get_items():
+    """
+    GET Endpoint: Retrieve items from a specific folder.
+    """
+    folder = request.args.get('folder',"")
+    showFiles = request.args.get('showFiles', 'true').lower() == 'true'
+    folder_path = os.path.join('/media', folder)
+    if not os.path.exists(folder_path):
+        return jsonify({"error": "Folder not found"}), 404
+
+    items = []
+    for filename in os.listdir(folder_path):
+        filepath = os.path.join(folder_path, filename)
+        if os.path.isfile(filepath) and showFiles:
+            items.append(filename)
+        elif os.path.isdir(filepath):
+            if not filename == "stremio-server":  # Skip hidden folders
+                items.append(filename + "/")  # Append slash to indicate it's a folder
+
+    return jsonify({"items": items}), 200
+
+@app.route('/deleteFolder', methods=['POST'])
+def delete_folder():
+    data = request.get_json() or {}
+    folder = data.get('folder')
+
+    if not folder:
+        return jsonify({"error": "Folder name is required"}), 400
+
+    folder_path = os.path.join('/media', folder)
+    if folder_path == "/media/stremio-server" or folder_path == "/media":
+        return jsonify({"error": "Cannot delete protected folder"}), 403
+    if not os.path.exists(folder_path):
+        return jsonify({"error": "Folder not found"}), 404
+
+    try:
+        os.rmdir(folder_path)  # Only works for empty directories
+        return jsonify({"message": "Folder deleted successfully"}), 200
+    except OSError as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/createFolder', methods=['POST'])
+def create_folder():
+    data = request.get_json() or {}
+    folder = data.get('folder')
+
+    if not folder:
+        return jsonify({"error": "Folder name is required"}), 400
+
+    folder_path = os.path.join('/media', folder)
+    if os.path.exists(folder_path):
+        return jsonify({"error": "Folder already exists"}), 400
+
+    try:
+        os.makedirs(folder_path)
+        return jsonify({"message": "Folder created successfully"}), 200
+    except OSError as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     # Start the Flask app explicitly on Port 7000

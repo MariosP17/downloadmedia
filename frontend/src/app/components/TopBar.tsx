@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SearchDropdown from "./SearchDropdown";
 
-export default function TopBar() {
+export default function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const [query, setQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const router = useRouter();
@@ -21,11 +21,22 @@ export default function TopBar() {
     <header className="w-full bg-zinc-900 border-b border-zinc-800">
   <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
     
-    {/* Logo Container - Shrinks slightly if needed, never disappears */}
-    <div className="flex-shrink-0">
-      <Link href="/" className="flex items-center">
-        <img src="/stremio.png" alt="Stremio" className="h-8 w-8 object-contain" />
-      </Link>
+    {/* Logo + Sidebar Button Container */}
+    <div className="flex items-center gap-2 flex-shrink-0">
+      <button
+        aria-label="Open sidebar"
+        onClick={() => onToggleSidebar && onToggleSidebar()}
+        className="p-1 rounded-md hover:bg-zinc-800 hover:cursor-pointer text-zinc-200"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <div>
+        <Link href="/" className="flex items-center">
+          <img src="/stremio.png" alt="Stremio" className="h-8 w-8 object-contain" />
+        </Link>
+      </div>
     </div>
 
     {/* Search Container - Grows to fill space but respects the logo */}
