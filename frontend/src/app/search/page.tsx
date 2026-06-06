@@ -1,18 +1,27 @@
 "use client";
 import FallbackImage from "../components/fallbackimg";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 
-export default function SearchPage() {
+// 1. Child Component: Performs data fetching and hooks into search parameters safely
+function SearchResultsList() {
   const params = useSearchParams();
   const query = params.get("q") || "";
 
   const [movies, setMovies] = useState<any[]>([]);
   const [series, setSeries] = useState<any[]>([]);
+  const [maxMoviesHeight, setMaxMoviesHeight] = useState<number>(0);
+  const [maxSeriesHeight, setMaxSeriesHeight] = useState<number>(0);
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
+  
   const [showMovies, setShowMovies] = useState(true);
   const [showSeries, setShowSeries] = useState(true);
+  
+  // React elements mapping references replacing old document.getElementById selectors
+  const moviesContainerRef = useRef<HTMLDivElement>(null);
+  const seriesContainerRef = useRef<HTMLDivElement>(null);
+  
   const router = useRouter();
 
   useEffect(() => {
@@ -45,19 +54,32 @@ export default function SearchPage() {
     load();
   }, [query]);
 
+  useEffect(() => {
+    setMaxMoviesHeight(moviesContainerRef.current?.scrollHeight ?? 0);
+    setMaxSeriesHeight(seriesContainerRef.current?.scrollHeight ?? 0);
+  }, [movies, series]);
+
   return (
-    <main className="p-8 bg-zinc-950 min-h-screen text-white">
+    <>
       <h1 className="text-3xl font-bold mb-8">Results for "{query}"</h1>
 
       <div className="space-y-8">
-        {/* Movies tab */}
-        <section onClick={() => setShowMovies((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer" style={{padding: "40px"}}>
+        {/* Movies section */}
+        <section 
+          onClick={() => setShowMovies((s) => !s)} 
+          className="relative bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors cursor-pointer" 
+          style={{ padding: "40px" }}
+        >
           <h2 className="text-xl font-semibold mb-3">Movies</h2>
 
           <div
-            id = "movies-container"
-            className={`overflow-hidden transition-[max-height] duration-300 ease-in-out`} 
-            style={{ maxHeight: showMovies ? `${document.getElementById('movies-container')?.scrollHeight ?? 0}px` : 0 }}
+            ref={moviesContainerRef}
+            className="overflow-hidden transition-[max-height] duration-300 ease-in-out" 
+            style={{ 
+              maxHeight: showMovies 
+                ? `${maxMoviesHeight ?? 0}px` 
+                : "0px" 
+            }}
           >
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
               {loading ? (
@@ -67,8 +89,8 @@ export default function SearchPage() {
                     <div className="h-3 bg-zinc-800 rounded w-3/4 animate-pulse" />
                   </div>
                 ))
-              ) : (
-                movies.length > 0 ? movies.map((movie: any) => (
+              ) : movies.length > 0 ? (
+                movies.map((movie: any) => (
                   <div key={movie.id}>
                     <div
                       onClick={(e) => {
@@ -88,9 +110,9 @@ export default function SearchPage() {
                     </div>
                     <p className="mt-2">{movie.name}</p>
                   </div>
-                )) : (
-                  <div className="p-4 text-zinc-400">No movies found for "{query}"</div>
-                )
+                ))
+              ) : (
+                <div className="p-4 text-zinc-400 col-span-full">No movies found for "{query}"</div>
               )}
             </div>
           </div>
@@ -101,14 +123,22 @@ export default function SearchPage() {
           </div>
         </section>
 
-        {/* Series tab */}
-        <section onClick={() => setShowSeries((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer" style={{padding: "40px"}}>
+        {/* Series section */}
+        <section 
+          onClick={() => setShowSeries((s) => !s)} 
+          className="relative bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors cursor-pointer" 
+          style={{ padding: "40px" }}
+        >
           <h2 className="text-xl font-semibold mb-3">Series</h2>
 
           <div
-            id="series-container"
-            className={`overflow-hidden transition-[max-height] duration-300 ease-in-out`} 
-            style={{ maxHeight: showSeries ? `${document.getElementById('series-container')?.scrollHeight ?? 0}px` : 0 }}
+            ref={seriesContainerRef}
+            className="overflow-hidden transition-[max-height] duration-300 ease-in-out" 
+            style={{ 
+              maxHeight: showSeries 
+                ? `${maxSeriesHeight ?? 0}px` 
+                : "0px" 
+            }}
           >
             <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-4">
               {loading ? (
@@ -118,8 +148,8 @@ export default function SearchPage() {
                     <div className="h-3 bg-zinc-800 rounded w-3/4 animate-pulse" />
                   </div>
                 ))
-              ) : (
-                series.length > 0 ? series.map((show: any) => (
+              ) : series.length > 0 ? (
+                series.map((show: any) => (
                   <div key={show.id}>
                     <div
                       onClick={(e) => {
@@ -133,9 +163,9 @@ export default function SearchPage() {
                     </div>
                     <p className="mt-2">{show.name}</p>
                   </div>
-                )) : (
-                  <div className="p-4 text-zinc-400">No series found for "{query}"</div>
-                )
+                ))
+              ) : (
+                <div className="p-4 text-zinc-400 col-span-full">No series found for "{query}"</div>
               )}
             </div>
           </div>
@@ -146,12 +176,29 @@ export default function SearchPage() {
           </div>
         </section>
       </div>
+
       {pageLoading && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
           <span className="loader"></span>
           <span className="ml-4 text-lg">Loading...</span>
         </div>
       )}
+    </>
+  );
+}
+
+// 2. Export Layout Parent Boundary Shell
+// This ensures Next.js pre-renders your core structure cleanly while isolating search parameters.
+export default function SearchPage() {
+  return (
+    <main className="p-8 bg-zinc-950 min-h-screen text-white">
+      <Suspense fallback={
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <span className="text-zinc-500 animate-pulse text-lg font-medium">Mounting query layouts...</span>
+        </div>
+      }>
+        <SearchResultsList />
+      </Suspense>
     </main>
   );
 }
