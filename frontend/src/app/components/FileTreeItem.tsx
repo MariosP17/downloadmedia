@@ -78,7 +78,9 @@ export default function FileTreeItem({ name, currentPath }: TreeItemProps) {
           alt=""
           className="w-5 h-5 object-contain flex-shrink-0"
         />
-        <span className="text-sm truncate font-medium">{cleanName}</span>
+        <span className="text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-none">
+          {cleanName}
+        </span>
         {loading && <span className="text-xs text-zinc-500 animate-pulse">loading...</span>}
       </div>
 

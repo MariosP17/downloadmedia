@@ -82,14 +82,14 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
     <div className="select-none text-left">
       <div
         onClick={() => onSelectPath(itemPath)}
-        className={`flex items-center justify-between group py-1.5 px-2 rounded cursor-pointer transition-colors ${
+        className={`flex items-center justify-between group py-2 px-2 rounded cursor-pointer transition-colors ${
           isSelected ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-300"
         }`}
       >
-        <div className="flex items-center gap-2 truncate">
+        <div className="flex items-center gap-2 truncate min-w-0 flex-1">
           <button 
             onClick={handleToggleExpand} 
-            className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors"
+            className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors p-0.5"
           >
             {isOpen ? "▼" : "▶"}
           </button>
@@ -98,14 +98,17 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
             alt=""
             className="w-4 h-4 object-contain flex-shrink-0"
           />
-          <span className="text-sm truncate font-medium">{cleanName}</span>
+          <span className="text-sm font-medium break-words whitespace-normal">
+            {cleanName}
+          </span>
           {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
         </div>
 
-        {/* Delete Row Control Element */}
+        {/* --- TOUCH COMPATIBLE DELETE BUTTON --- */}
+        {/* Visible by default on touch screens, scales cleanly on desktop hover states */}
         <button
           onClick={handleDeleteFolder}
-          className="hidden group-hover:block text-xs text-red-400 hover:text-red-200 hover:cursor-pointer bg-zinc-950/40 px-1.5 py-0.5 rounded transition-all"
+          className="md:hidden group-hover:block text-xs text-red-400 hover:text-red-200 bg-zinc-950/60 active:bg-red-900/40 px-2.5 py-1 rounded ml-2 transition-all flex-shrink-0"
           title="Delete this directory (must be empty)"
         >
           Delete
@@ -212,10 +215,22 @@ export default function StreamActions({ hash, filename, title, id }: Props) {
 
       if (data.status === "Downloading" && serverStateRef.current !== "cancelling") {
         setServerState("downloading");
+        if (data.progress >= 0 && data.progress <= 100) {
         setServerProgress(data.progress);
+        }
+        else if (data.progress == -2.0) {
+          setServerState("failed");
+          setServerProgress(0);
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          toast.error("Download failed on server. Try another torrent");
+        }
       } else if (data.status === "Completed") {
         setServerState("completed");
         setServerProgress(100);
+        setTimeout(() => {
+          setServerState("idle");
+          setServerProgress(0);
+        }, 3000);
         if (intervalRef.current) clearInterval(intervalRef.current);
       }
     } catch (error) {
@@ -305,7 +320,7 @@ export default function StreamActions({ hash, filename, title, id }: Props) {
           identifier: hash,
           idx: String(id),
           path: destinationFolder,
-          name: targetName.trim().replace(/\.[^/.]+$/, "") // Strip manual trailing extension string if appended
+          name: targetName.trim() // Strip manual trailing extension string if appended
         }),
         signal: controller.signal,
       });
@@ -323,9 +338,55 @@ export default function StreamActions({ hash, filename, title, id }: Props) {
   };
 
   useEffect(() => {
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, []);
+    const checkInitialServerState = async () => {
+      try {
+        // Hit your progress route to check if the server is already processing this item
+        const res = await fetch(`http://${window.location.hostname}:7000/progress/${hash}/${id}`);
+        if (!res.ok) return; // If progress isn't found or server is down, leave it as "idle"
 
+        const data = await res.json();
+
+        // If the server tells us it's downloading or already has progress cached
+        if (data.status === "Downloading") {
+          setServerState("downloading");
+          setServerProgress(data.progress || 0);
+
+          // Fire up the polling interval immediately so the UI stays synced
+          if (!intervalRef.current) {
+            intervalRef.current = setInterval(checkServerProgress, 1000);
+          }
+        } else if (data.status === "Completed") {
+          setServerState("completed");
+          setServerProgress(100);
+          setTimeout(() => {
+          setServerState("idle");
+          setServerProgress(0);
+        }, 3000);
+        }
+      } catch (error) {
+        console.error("Failed to sync initial server state on load:", error);
+      }
+    };
+
+    checkInitialServerState();
+
+    // Cleanup: Clear interval when the component unmounts to prevent memory leaks
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [hash, id]);
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    
+    // Safety fallback cleanup block
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isModalOpen]);
   return (
     <div className="flex flex-col gap-4 w-full">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
@@ -414,7 +475,7 @@ export default function StreamActions({ hash, filename, title, id }: Props) {
       {/* MODAL CONFIGURATION DIALOG LAYER */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh]">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh] search-scrollbar">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
               <h3 className="text-base font-bold text-white">Select Server Target Destination</h3>
               <button 

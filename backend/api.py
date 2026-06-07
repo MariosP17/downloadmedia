@@ -15,10 +15,10 @@ progress_store = {}
 def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = ""):
     task_key = f"{identifier}_{idx}"
     progress_store[task_key] = 0.0
-    
+    print(f"Initiating download task for {task_key} with path: {path} and name: {name}\n")
     url = f"http://127.0.0.1:11470/{identifier}/{idx}?external=1&download=1"
     filename = os.path.join(path, name if bool(Path(name).suffix) else name + ".mp4" if name else os.path.join(path, task_key + ".mp4"))
-    print(f"Starting download for {task_key} from URL: {url} to path: {filename}")
+    print(f"Starting download for {task_key} from URL: {url} to path: {filename}\n")
     try:
         os.makedirs(path, exist_ok=True)
         response = requests.get(url, stream=True, timeout=30)
