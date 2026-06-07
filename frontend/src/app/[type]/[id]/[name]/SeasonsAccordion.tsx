@@ -36,6 +36,9 @@ export default function SeasonsAccordion({ seasons, type }: Props) {
             className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer"
             style={{ padding: 40 }}
           >
+            <div className="text-zinc-400 text-sm">
+              {season.episodes.length} {season.episodes.length === 1 ? "episode" : "episodes"}
+            </div>
             <h2 className="text-xl font-semibold mb-3 text-center">{season.name}</h2>
 
             <div

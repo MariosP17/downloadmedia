@@ -108,7 +108,7 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
         {/* Visible by default on touch screens, scales cleanly on desktop hover states */}
         <button
           onClick={handleDeleteFolder}
-          className="md:hidden group-hover:block text-xs text-red-400 hover:text-red-200 bg-zinc-950/60 active:bg-red-900/40 px-2.5 py-1 rounded ml-2 transition-all flex-shrink-0"
+          className="md:hidden group-hover:block text-xs text-red-400 hover:text-red-200 bg-zinc-950/60 hover:cursor-pointer active:bg-red-900/40 px-2.5 py-1 rounded ml-2 transition-all flex-shrink-0"
           title="Delete this directory (must be empty)"
         >
           Delete
