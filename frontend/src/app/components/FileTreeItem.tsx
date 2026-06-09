@@ -64,6 +64,10 @@ export default function FileTreeItem({ name, currentPath }: TreeItemProps) {
     }
   };
 
+  const regex = /\b(?:S(\d{1,2})E|(\d{1,2})X)(\d{1,2})\b/gi;
+
+  const match = regex.exec(cleanName);
+
   return (
     <div className="select-none">
       {/* Row Item Layout Wrapper */}
@@ -71,8 +75,12 @@ export default function FileTreeItem({ name, currentPath }: TreeItemProps) {
         onClick={handleToggle}
         className={`flex items-center gap-3 py-1.5 px-2 rounded transition-colors ${
           isFolder ? "hover:bg-zinc-800 cursor-pointer text-zinc-200 hover:text-white" : "text-zinc-400"
-        }`}
-      >
+        }`}>
+        {!isFolder && match && (
+          <span className="text-xs text-zinc-500 font-mono">
+            S{match[1] || match[2]}-E{match[3]}
+          </span>
+        )}
         <img
           src={getIcon()}
           alt=""

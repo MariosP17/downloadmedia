@@ -12,9 +12,9 @@ CORS(app)
 # Format: { "identifier_idx": percentage_float }
 progress_store = {}
 
-def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = ""):
+def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = "", ttid: str = ""):
     task_key = f"{identifier}_{idx}"
-    progress_store[task_key] = 0.0
+    progress_store[task_key] = { "ttid": ttid, "progress": 0.0 }
     print(f"Initiating download task for {task_key} with path: {path} and name: {name}\n")
     url = f"http://127.0.0.1:11470/{identifier}/{idx}?external=1&download=1"
     filename = os.path.join(path, name if bool(Path(name).suffix) else name + ".mp4" if name else os.path.join(path, task_key + ".mp4"))
@@ -30,7 +30,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
             if total_size is None:
                 for chunk in response.iter_content(chunk_size=8192):
                     # --- CANCELLATION CHECK ---
-                    if progress_store.get(task_key) == -1.0:
+                    if progress_store.get(task_key, {}).get("progress") == -1.0:
                         print(f"Download {task_key} canceled mid-flight.")
                         f.close() # Explicitly close file handle before deleting
                         if os.path.exists(filename): os.remove(filename)
@@ -38,14 +38,14 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
 
                     if chunk:
                         f.write(chunk)
-                progress_store[task_key] = 100.0
+                progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
             else:
                 total_size = int(total_size)
                 downloaded_bytes = 0
                 
                 for chunk in response.iter_content(chunk_size=131072):
                     # --- CANCELLATION CHECK ---
-                    if progress_store.get(task_key) == -1.0:
+                    if progress_store.get(task_key, {}).get("progress") == -1.0:
                         print(f"Download {task_key} canceled mid-flight.")
                         f.close() # Explicitly close file handle before deleting
                         if os.path.exists(filename): os.remove(filename)
@@ -55,16 +55,16 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                         f.write(chunk)
                         downloaded_bytes += len(chunk)
                         percentage = round((downloaded_bytes / total_size) * 100, 2)
-                        progress_store[task_key] = percentage
+                        progress_store[task_key] = { "ttid": ttid, "progress": percentage }
                         
                 print(f"Download completed successfully for {task_key}")
-                progress_store[task_key] = 100.0
+                progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
 
     except Exception as e:
         # Only set to -1 if it wasn't deliberately canceled by the user
-        if progress_store.get(task_key) != -1.0:
+        if progress_store.get(task_key, {}).get("progress") != -1.0:
             print(f"Error downloading {task_key}: {e}")
-            progress_store[task_key] = -2.0 # Use -2.0 for organic network failures
+            progress_store[task_key] = { "ttid": ttid, "progress": -2.0 } # Use -2.0 for organic network failures
         
         # Clean up partial file if a crash occurs
         if os.path.exists(filename):
@@ -81,6 +81,7 @@ def start_download():
     idx = data.get('idx')
     path = data.get('path', '/media')
     name = data.get('name', "")
+    ttid = data.get('ttid', "") 
 
     if not identifier or not idx:
         return jsonify({"error": "Both 'identifier' and 'idx' are required parameters."}), 400
@@ -88,11 +89,11 @@ def start_download():
     task_key = f"{identifier}_{idx}"
     
     # Check if download is already running or completed
-    if task_key in progress_store and progress_store[task_key] >= 0 and progress_store[task_key] < 100:
+    if task_key in progress_store and progress_store[task_key].get("progress") >= 0 and progress_store[task_key].get("progress") < 100:
         return jsonify({"message": "Download already in progress", "task_id": task_key}), 200
 
     # Start the download process in a separate background thread
-    thread = threading.Thread(target=download_stream_task, args=(identifier, idx, path, name))
+    thread = threading.Thread(target=download_stream_task, args=(identifier, idx, path, name, ttid))
     thread.daemon = True # Allows application to close cleanly
     thread.start()
     
@@ -119,7 +120,7 @@ def cancel_download():
     task_key = f"{identifier}_{idx}"
 
     if task_key in progress_store:
-        progress_store[task_key] = -1.0  # Mark as cancelled
+        progress_store[task_key] = { "ttid": progress_store[task_key].get("ttid"), "progress": -1.0 }  # Mark as cancelled
 
     return jsonify({"message": "Download cancellation requested.", "task_id": task_key}), 200
 
@@ -135,12 +136,20 @@ def get_progress(identifier, idx):
         
     current_progress = progress_store[task_key]
     
-    if current_progress == -1.0:
+    if current_progress.get("progress") == -1.0:
         return jsonify({"progress": 0.0, "status": "Failed"}), 500
-    elif current_progress == 100.0:
+    elif current_progress.get("progress") == 100.0:
+        progress_store.pop(task_key, None) # Clean up completed task
         return jsonify({"progress": 100.0, "status": "Completed"}), 200
         
-    return jsonify({"progress": current_progress, "status": "Downloading"}), 200
+    return jsonify({"progress": current_progress.get("progress"), "status": "Downloading"}), 200
+
+@app.route('/getProgressStore', methods=['GET'])
+def get_progress_store():
+    try:
+        return jsonify(progress_store), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/getItems', methods=['GET'])
 def get_items():
@@ -181,6 +190,34 @@ def delete_folder():
     try:
         os.rmdir(folder_path)  # Only works for empty directories
         return jsonify({"message": "Folder deleted successfully"}), 200
+    except OSError as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/renameFolder', methods=['POST'])
+def rename_folder():
+    data = request.get_json() or {}
+    folder = data.get('folder')
+    newName = data.get('newName')
+
+    if not folder or not newName:
+        return jsonify({"error": "Both 'folder' and 'newName' are required"}), 400
+    
+    folder_path = os.path.join('/media', folder)
+    if folder_path == "/media/stremio-server" or folder_path == "/media":
+        return jsonify({"error": "Cannot rename protected folder"}), 403
+    parent_dir = os.path.dirname(folder_path)
+    new_folder_path = os.path.join('/media', parent_dir, newName)
+
+    if not os.path.exists(folder_path):
+        return jsonify({"error": "Folder not found"}), 404
+
+    if os.path.exists(new_folder_path):
+        return jsonify({"error": "A folder with that name already exists"}), 400
+
+    try:
+        os.rename(folder_path, new_folder_path)
+        return jsonify({"message": "Folder renamed successfully"}), 200
     except OSError as e:
         return jsonify({"error": str(e)}), 500
 

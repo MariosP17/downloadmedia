@@ -7,6 +7,8 @@ type Props = {
   filename?: string;
   title?: string;
   id: string;
+  ttid: string;
+  data: { progress: number; status: string };
 };
 
 type ServerDownloadState = "idle" | "loading" | "downloading" | "completed" | "failed" | "cancelling";
@@ -21,6 +23,21 @@ type FolderTreeItemProps = {
   activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>; // Add this
 };
 
+let globalActiveCloseMenuFn: (() => void) | null = null;
+
+const registerGlobalMenu = (closeFn: () => void) => {
+  if (globalActiveCloseMenuFn && globalActiveCloseMenuFn !== closeFn) {
+    globalActiveCloseMenuFn(); // Close the previously opened menu instantly
+  }
+  globalActiveCloseMenuFn = closeFn;
+};
+
+const clearGlobalMenu = (closeFn: () => void) => {
+  if (globalActiveCloseMenuFn === closeFn) {
+    globalActiveCloseMenuFn = null;
+  }
+};
+
 function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef }: FolderTreeItemProps) {
   const cleanName = name.endsWith("/") ? name.slice(0, -1) : name;
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
@@ -28,7 +45,8 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
   const [isOpen, setIsOpen] = useState(false);
   const [subFolders, setSubFolders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const isSelected = selectedPath === itemPath;
 
   const fetchSubfolders = async () => {
@@ -78,6 +96,40 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
     }
   };
 
+  const handleRenameFolder = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newName = prompt("Enter new folder name:", cleanName);
+    if (newName && newName.trim()) {
+      try {
+      const res = await fetch(`http://${window.location.hostname}:7000/renameFolder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder: itemPath, newName: newName.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Deactivation failed");
+
+      toast.success("Folder renamed successfully!");
+      if (onRefreshParent) onRefreshParent();
+    } catch (err: any) {
+      toast.error(`Could not rename folder: ${err.message || "Name conflict?"}`);
+    }
+    }
+  };
+
+  useEffect(() => {
+  if (isMenuOpen) {
+    const closeMenu = () => setIsMenuOpen(false);
+    registerGlobalMenu(closeMenu);
+
+    // Close on any outside click anywhere on the page
+    window.addEventListener("click", closeMenu);
+    return () => {
+      window.removeEventListener("click", closeMenu);
+      clearGlobalMenu(closeMenu);
+    };
+  }
+}, [isMenuOpen]);
   return (
     <div className="select-none text-left">
       <div
@@ -104,15 +156,54 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
           {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
         </div>
 
-        {/* --- TOUCH COMPATIBLE DELETE BUTTON --- */}
-        {/* Visible by default on touch screens, scales cleanly on desktop hover states */}
-        <button
-          onClick={handleDeleteFolder}
-          className="md:hidden group-hover:block text-xs text-red-400 hover:text-red-200 bg-zinc-950/60 hover:cursor-pointer active:bg-red-900/40 px-2.5 py-1 rounded ml-2 transition-all flex-shrink-0"
-          title="Delete this directory (must be empty)"
-        >
-          Delete
-        </button>
+        {/* --- THREE DOTS OPTIONS DROPDOWN CONTEXT MENU --- */}
+        <div className="relative flex-shrink-0 ml-2">
+          {/* Trigger Button: Visible on Mobile, on Hover for Desktop */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation(); // Stops the folder row row from selecting/toggling
+              setIsMenuOpen(!isMenuOpen);
+            }}
+            className="flex w-7 h-7 items-center justify-center rounded-lg bg-zinc-950/40 hover:bg-zinc-900 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            title="Folder Actions"
+          >
+            {/* SVG vertical dots icon */}
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+            </svg>
+          </button>
+
+          {/* Floating Actions Overlay Box */}
+          {isMenuOpen && (
+            <div 
+              onClick={(e) => e.stopPropagation()} // Stop menu background clicks from expanding folder rows
+              className="absolute right-0 mt-1 w-28 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsMenuOpen(false);
+                  handleRenameFolder(e); // Safely fires your existing rename routine
+                }}
+                className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <img src="/edit.png" alt="Rename" className="w-4 h-4" />
+                Rename
+              </button>
+              
+              <button
+                onClick={(e) => {
+                  setIsMenuOpen(false);
+                  handleDeleteFolder(e); // Safely fires your existing delete routine
+                }}
+                className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <img src="/delete.png" alt="Delete" className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {isOpen && (
@@ -139,11 +230,10 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
 }
 
 // Main Downloader Component Module
-export default function StreamActions({ hash, filename, title, id }: Props) {
+export default function StreamActions({ hash, filename, title, id, ttid,data }: Props) {
   const [copiedServer, setCopiedServer] = useState(false);
   const [copiedDevice, setCopiedDevice] = useState(false);
   const [deviceLoading, setDeviceLoading] = useState(false);
-
   // Server download components/states
   const [serverState, _setServerState] = useState<ServerDownloadState>("idle");
   const [serverProgress, setServerProgress] = useState<number>(0);
@@ -317,6 +407,7 @@ export default function StreamActions({ hash, filename, title, id }: Props) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          ttid: ttid,
           identifier: hash,
           idx: String(id),
           path: destinationFolder,
@@ -340,11 +431,6 @@ export default function StreamActions({ hash, filename, title, id }: Props) {
   useEffect(() => {
     const checkInitialServerState = async () => {
       try {
-        // Hit your progress route to check if the server is already processing this item
-        const res = await fetch(`http://${window.location.hostname}:7000/progress/${hash}/${id}`);
-        if (!res.ok) return; // If progress isn't found or server is down, leave it as "idle"
-
-        const data = await res.json();
 
         // If the server tells us it's downloading or already has progress cached
         if (data.status === "Downloading") {
@@ -387,6 +473,7 @@ export default function StreamActions({ hash, filename, title, id }: Props) {
       document.body.style.overflow = "";
     };
   }, [isModalOpen]);
+  
   return (
     <div className="flex flex-col gap-4 w-full">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
@@ -456,6 +543,7 @@ export default function StreamActions({ hash, filename, title, id }: Props) {
           </div>
         </div>
       </div>
+      {/* <div className="border-t border-zinc-800 sm:border-l sm:border-t-0 sm:h-12 my-2 sm:my-0" /> */}
 
       {/* Progress Bar Display Render Segment */}
       {(serverState === "downloading" || serverState === "cancelling") && (
