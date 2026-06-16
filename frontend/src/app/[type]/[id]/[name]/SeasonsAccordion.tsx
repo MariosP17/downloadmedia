@@ -135,7 +135,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
         // For numbers under 10 (like 1.4, 1.54, 4), round to the nearest 0.5
         rounded = Math.round(num * 2) / 2;
       } else {
-        // For larger numbers (like 401, 445, 472), round to the nearest 50
+        // For larger numbers (like 401, 445, 472), round to the nearest 50 
         rounded = Math.round(num / 50) * 50;
       }
       

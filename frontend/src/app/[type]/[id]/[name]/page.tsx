@@ -95,11 +95,10 @@ const normalizeSeasons = (data: any) => {
 
   return normalized.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
 };
-export default async function ItemPage({ params }: Props,hostname: string) {
+export default async function ItemPage({ params }: Props) {
   const { type, id, name } = await params;
   const headersList = await headers();
   const host = headersList.get("host")?.split(":")[0] || "localhost";
-  hostname = host;
   // If this is a series id, try to fetch Cinemeta series metadata to show seasons/episodes
   let seriesData: any = null;
   if (type === "series" && !decodeURIComponent(id).includes(":")) {
@@ -167,7 +166,7 @@ export default async function ItemPage({ params }: Props,hostname: string) {
             const filename = s.behaviorHints?.filename || "";
             const data = s.progressData;
       try {
-        const res = await fetch(`http://${hostname}:7000/progress/${infoHash}/${s.fileIdx}`);
+        const res = await fetch(`http://${host}:7000/progress/${infoHash}/${s.fileIdx}`);
         const progressData = res.ok ? await res.json() : { progress: 0.0, status: "Not started or task not found" };
         return { ...s, progressData };
       } catch {
