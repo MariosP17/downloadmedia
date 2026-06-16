@@ -20,7 +20,6 @@ export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [activeSeasonForModal, setActiveSeasonForModal] = useState(null);
   const [bookmarks, setBookmarks] = useSyncedLocalStorage(`stream_bookmarks`, "[]");
-  const refs = useRef<Array<HTMLDivElement | null>>([]);
   const router = useRouter();
 
 
@@ -34,14 +33,6 @@ export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
     }
   }, [seasons, type]);
 
-  // 2. Adjust maxHeight transition spacing when accordion panels open
-  useEffect(() => {
-    if (openSeasonId !== null) {
-      const idx = seasons.findIndex((s) => String(s.id) === String(openSeasonId));
-      const el = refs.current[idx];
-      if (el) el.style.maxHeight = `${el.scrollHeight}px`;
-    }
-  }, [openSeasonId, seasons]);
 
   useEffect(() => {
     if (openAddAllModal) {

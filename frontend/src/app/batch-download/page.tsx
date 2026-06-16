@@ -261,6 +261,7 @@ export default function BatchDownloadPage() {
   const [rootFolders, setRootFolders] = useState<string[]>([]);
   const [newFolderName, setNewFolderName] = useState("");
   const [taskIds, setTaskIds] = useState<string[]>([]);
+  const [isOn, setIsOn] = useState(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -359,7 +360,7 @@ export default function BatchDownloadPage() {
         }
         setSeriesTabs(innerseriesTabs);
         setItems(hydratedList);
-        setCheckedItems(new Set(hydratedList.map(item => `${item.infoHash}-${item.fileIdx}`)));
+        setCheckedItems(new Set(hydratedList.map(item => `${item.infoHash}-${item.fileIdx}`))); //TO-DO: Somehow check previous
       } catch (err) {
         console.error("Failed hydrating batch assets from Cinemeta:", err);
         toast.error("Error building batch tracking details.");
@@ -561,6 +562,10 @@ export default function BatchDownloadPage() {
     setCheckedItems(updatedSet);
   };
 
+  const handleToggle = () => {
+    setIsOn(!isOn);
+  };
+
   return (
     <main className="pt-8 bg-zinc-950 max-w-screen max-h-screen text-white flex flex-col mx-auto relative p-3">
       <div className="mb-6">
@@ -581,12 +586,35 @@ export default function BatchDownloadPage() {
         <>
           {/* Scrollable Container Panel Area mapping list layout dimensions */}
           <div className="overflow-y-auto bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 space-y-3 search-scrollbar" style={{ height: window.innerHeight - 390+"px" }}>
+          <div className="flex-column justify-end gap-4 mb-3">
+            <div className="toggle-container">
+            <span><b>Group By:</b>&nbsp;&nbsp;Season</span>
+            
+            <label className="switch">
+              {/* Hidden checkbox that holds the actual state */}
+              <input 
+                type="checkbox" 
+                checked={isOn} 
+                onChange={handleToggle} 
+              />
+              {/* The visual slider track and ball */}
+              <span className="slider"></span>
+            </label>
+            
+            <span>Torrent</span>
+          </div>
+        </div>
           {seriesTabs.map((seriesItem: any, seriesIdx: number) => {
           // Filter your master items queue to isolate only the episodes belonging to this specific series
           const seriesEpisodes = items.filter(
             (item) => item.itemType === "series" && item.displayName === seriesItem.displayName
           );
-          const seriesSeasons = Array.from(new Set(seriesEpisodes.map(ep => ep.ttid.split(':')[1]))).sort((a, b) => parseInt(a) - parseInt(b));
+          const seriesSeasonsorSeriesTorrents = !isOn 
+            ? Array.from(new Set(seriesEpisodes.map(ep => ep.ttid.split(':')[1]))).sort((a, b) => parseInt(a) - parseInt(b))
+            : seriesEpisodes.map(ep => ({ hash: ep.infoHash, provider: ep.provider })).filter((ep, index, self) => 
+                index === self.findIndex(e => e.hash === ep.hash && e.provider === ep.provider)
+              );
+          const seriesTorrents = Array.from(new Set(seriesEpisodes.map(ep => ep.infoHash)));
           const isAllEpisodesChecked = seriesEpisodes.every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`));
           return (
             <div 
@@ -653,19 +681,21 @@ export default function BatchDownloadPage() {
 
               {/* Inner Nested Episodes Sub-List Tracking Area */}
               <div className="space-y-3 pl-2">
-                {seriesSeasons.map((season, seasonIdx) => (
-                  <div key={`${seriesItem.displayName}-season-${season}-${seasonIdx}`} className="space-y-2">
+                {seriesSeasonsorSeriesTorrents.map((seasonOrTorrent, seasonIdx) => (
+                  <div key={`${seriesItem.displayName}-season-${seasonOrTorrent}-${seasonIdx}`} className="space-y-2">
                     <div className="flex items-center gap-4 border-b border-zinc-800">
                     <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-semibold text-zinc-300 mt-2">{parseInt(season) > 0 ? `Season ${season}` : 'Specials'}</h4>
+                    <h4 className={`text-sm font-semibold text-zinc-300 mt-2 ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} onClick={!isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}`)} : () => {}} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
+                        ? seasonOrTorrent.provider + ` (${seasonOrTorrent.hash.slice(0, 8)}...)`
+                        : 'Unknown Provider')}</h4>
                      <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                    {seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season).length} {seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season).length === 1 ? "Episode" : "Episodes"} queued
+                    {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length} {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length === 1 ? "Episode" : "Episodes"} queued
                   </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0 pr-2">
                   <button
                     type="button"
-                    onClick={() => handleRemoveItems(seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season))}
+                    onClick={() => handleRemoveItems(seriesEpisodes.filter( ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")))}
                     className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                   >
                     Remove
@@ -673,20 +703,20 @@ export default function BatchDownloadPage() {
                     <input 
                   type="checkbox"
                   // 1. Compute state configurations dynamically
-                  checked={seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season).every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`))}
+                  checked={seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`))}
                   ref={(el) => {
                     if (el) {
-                      const checkedCount = seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season).filter(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`)).length;
+                      const checkedCount = seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).filter(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`)).length;
                       // It becomes indeterminate if some are checked, but not all of them
-                      el.indeterminate = checkedCount > 0 && checkedCount < seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season).length;
+                      el.indeterminate = checkedCount > 0 && checkedCount < seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length;
                     }
                   }}
                   onChange={(e) => {
                     const updatedSet = new Set(checkedItems);
                     if (e.target.checked) {
-                      seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season).forEach(ep => updatedSet.add(`${ep.infoHash}-${ep.fileIdx}`));
+                      seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).forEach(ep => updatedSet.add(`${ep.infoHash}-${ep.fileIdx}`));
                     } else {
-                      seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season).forEach(ep => updatedSet.delete(`${ep.infoHash}-${ep.fileIdx}`));
+                      seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).forEach(ep => updatedSet.delete(`${ep.infoHash}-${ep.fileIdx}`));
                     }
                     setCheckedItems(updatedSet);
                   }}
@@ -696,7 +726,7 @@ export default function BatchDownloadPage() {
                 </div>
                 </div>
                   <div className="space-y-3 pl-5 border-l-2 border-zinc-800" >
-                {seriesEpisodes.filter(ep => ep.ttid.split(':')[1] === season).map((episodeItem, epIdx) => (
+                {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).map((episodeItem, epIdx) => (
                   <div 
                     key={`${episodeItem.infoHash}-${episodeItem.fileIdx}-${epIdx}`}
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800/40 rounded-xl gap-4 transition-colors"
@@ -713,8 +743,8 @@ export default function BatchDownloadPage() {
                       </div>
                         
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs text-zinc-400 truncate" title={episodeItem.filename || episodeItem.title}>
-                          ⚙️ {episodeItem.provider || "Unknown Provider"}
+                        <p className={`text-xs text-zinc-400 truncate ${isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} title={episodeItem.filename || episodeItem.title} onClick={isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}`)} : () => {}}>
+                          { !isOn ? `⚙️ ${episodeItem.provider || "Unknown Provider"}` : parseInt(episodeItem.ttid.split(':')[1]) > 0 ? `Season ${episodeItem.ttid.split(':')[1]}` : `Specials`}
                         </p>
                         
                         {episodeItem.episodeTitle && (
