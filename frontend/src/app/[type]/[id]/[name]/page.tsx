@@ -20,6 +20,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `Download ${name}`,
   };
 }
+
 const normalizeSeasons = (data: any) => {
   let normalized: any[] = [];
 
@@ -94,14 +95,6 @@ const normalizeSeasons = (data: any) => {
 
   return normalized.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
 };
-const isBookmarked = (hash: string, fileIdx: number) => {
-              try {
-                const bookmarks = JSON.parse(localStorage.getItem("bookmarks") || "[]");
-                return bookmarks.some((b: any) => b.infoHash === hash && b.fileIdx === fileIdx);
-              } catch {
-                return false;
-              }
-            };
 export default async function ItemPage({ params }: Props,hostname: string) {
   const { type, id, name } = await params;
   const headersList = await headers();
@@ -122,13 +115,29 @@ export default async function ItemPage({ params }: Props,hostname: string) {
         console.error(`Failed to fetch series metadata from ${seasonurl}:`, e);
         // ignore and try next
       }
+    let streamsData: any = {};
     const seasons = normalizeSeasons(seriesData);
+    for (const season of seasons) {
+      let dummyVideoId = seriesData.videos.find((v: any) => v.season === season.number && v.number === 1)?.id || seriesData.videos.filter((v: any) => v.season === season.number)?.[0]?.id || seriesData.videos[0]?.id;
+      const seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
+      try {
+        const res = await fetch(seasontorrenturl);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const json = await res.json();
+          if (json && json.streams) {
+            streamsData[season.number] = json.streams;
+          }
+        } catch (e) {
+          console.error(`Failed to fetch series streams from ${seasontorrenturl}:`, e);
+          // ignore and try next
+        }
+    }
     if (seasons.length > 0) {
       return (
         <main className="p-8 bg-zinc-950 min-h-screen text-white">
           <h1 className="text-2xl font-bold mb-6">Season results for {decodeURIComponent(name)}</h1>
   
-          <SeasonsAccordion seasons={seasons} type={type} />
+          <SeasonsAccordion seasons={seasons} type={type} ttid={id} data={streamsData} />
         </main>
       );
     }
@@ -154,7 +163,9 @@ export default async function ItemPage({ params }: Props,hostname: string) {
     const streams = Array.isArray(data?.streams) ? data.streams : [];
     const streamsWithProgress = await Promise.all(
     streams.map(async (s: any) => {
-      const infoHash = s.infoHash || "";
+            const infoHash = s.infoHash || "";
+            const filename = s.behaviorHints?.filename || "";
+            const data = s.progressData;
       try {
         const res = await fetch(`http://${hostname}:7000/progress/${infoHash}/${s.fileIdx}`);
         const progressData = res.ok ? await res.json() : { progress: 0.0, status: "Not started or task not found" };
@@ -173,46 +184,51 @@ export default async function ItemPage({ params }: Props,hostname: string) {
         ) : (
           <div className="space-y-3">
           {streamsWithProgress.map((s: any, idx: number) => {
-            const sName = s.name || "Stream";
-            const title = s.title || "";
-            const infoHash = s.infoHash || "";
-            const filename = s.behaviorHints?.filename || "";
-            const data = s.progressData;
-            const icon = isBookmarked(infoHash, s.fileIdx) ? "/bookmark_check.png" : "/bookmark_add.png";
+            
             
 
             return (
               <div
-                key={`${infoHash}-${idx}`}
-                // Added "relative" and "pr-10" to give the absolute top-right logo breathing room
-                className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between bg-zinc-900 rounded-lg p-4 pr-10 hover:bg-zinc-800 transition-colors gap-3"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-col gap-2">
-                    <div className="text-zinc-400 text-sm whitespace-pre-wrap break-words">{sName}</div>
-                    <div className={`text-white font-semibold text-lg leading-tight ${title.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{title}</div>
-                    <div className="text-zinc-400 text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="flex items-center gap-1">👤 <strong className="text-white">{title.match(/👤\s*(\d+)/)?.[1] ?? "-"}</strong></span>
-                      <span className="flex items-center gap-1">💾 <strong className="text-white">{title.match(/💾\s*([^\s]+)/)?.[1] ?? (s.fileSize || "-")}</strong></span>
-                      <span className="flex items-center gap-1">⚙️ <span className="text-white">{title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"}</span></span>
-                      {title.includes("🇪🇸") && (<span className="ml-2">🇪🇸</span>)}
-                    </div>
-                    <div className="text-zinc-500 text-xs break-all">{filename || infoHash}</div>
-                  </div>
-                </div>
+  key={`${s.infoHash}-${idx}`}
+  className="flex flex-col sm:flex-row items-stretch sm:items-center bg-zinc-900 rounded-lg p-4 hover:bg-zinc-800 transition-colors gap-4 w-full overflow-hidden"
+>
+  {/* 1. Bookmark Button - First item in the flex engine flow */}
+  <div className="flex items-center justify-between sm:justify-start flex-shrink-0">
+    
+    {/* Optional Mobile-Only Label to balance the top row space */}
+    <span className="sm:hidden text-xs text-zinc-500 font-mono">{s.name}</span>
+    <BookMarkButton 
+      infoHash={s.infoHash} 
+      fileIdx={s.fileIdx} 
+      ttid={id}
+      type={type}
+      filename={s.behaviorHints?.filename}
+      provider={s.title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"}
+    />
+  </div>
 
-                <div className="w-full sm:w-auto flex items-center justify-end mt-3 sm:mt-0 gap-4 transition-colors rounded-md p-2">
-                  <StreamActions hash={infoHash} filename={filename} title={title} id={s.fileIdx} ttid={id} data={data} />
-                </div>
+  {/* 2. Metadata Info Block (Takes up remaining horizontal space) */}
+  <div className="flex-1 min-w-0 w-full">
+    <div className="flex flex-col gap-2">
+      <div className="hidden sm:flex text-zinc-400 text-sm whitespace-pre-wrap break-words">{s.name}</div>
+      <div className={`text-white font-semibold text-lg leading-tight ${s.title.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{s.title}</div>
+      
+      <div className="text-zinc-400 text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="flex items-center gap-1">👤 <strong className="text-white">{s.title.match(/👤\s*(\d+)/)?.[1] ?? "-"}</strong></span>
+        <span className="flex items-center gap-1">💾 <strong className="text-white">{s.title.match(/💾\s*([\d.,]+\s*(?:GB|MB|KB|B))/i)?.[1] ?? (s.fileSize || "-")}</strong></span>
+        <span className="flex items-center gap-1">⚙️ <span className="text-white">{s.title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"}</span></span>
+        {s.title.includes("🇪🇸") && (<span className="ml-2">🇪🇸</span>)}
+      </div>
+      
+      <div className="text-zinc-500 text-xs break-all">{s.behaviorHints?.filename || s.infoHash}</div>
+    </div>
+  </div>
 
-                <BookMarkButton 
-                  infoHash={infoHash} 
-                  fileIdx={s.fileIdx} 
-                  ttid={id}
-                  type={type}
-                  icon={icon}
-                />
-              </div>
+  {/* 3. Stream Actions (Stretches completely across the screen on phone viewports) */}
+  <div className="w-full sm:w-auto flex items-center justify-stretch sm:justify-end mt-1 sm:mt-0 transition-colors rounded-md">
+    <StreamActions hash={s.infoHash} filename={s.behaviorHints?.filename} title={s.title} id={s.fileIdx} ttid={id} data={s.progressData} />
+  </div>
+</div>
             );
           })}
         </div>

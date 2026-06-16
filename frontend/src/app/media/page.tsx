@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "react-hot-toast";
 import FileTreeItem from "../components/FileTreeItem";
 
 export default function MediaExplorerPage() {
@@ -24,6 +25,7 @@ export default function MediaExplorerPage() {
         setHasInitialized(true);
       } catch (error) {
         console.error("Error loading root media:", error);
+        toast.error("Failed to load root media items.");
       } finally {
         setLoading(false);
       }
@@ -63,6 +65,21 @@ export default function MediaExplorerPage() {
                     key={itemName}
                     name={itemName}
                     currentPath=""
+                    onRefreshParent={async () => {
+                      setLoading(true);
+                      try {
+                        const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=`);
+                        if (!res.ok) throw new Error("Failed to refresh root files");
+                        
+                        const data = await res.json();
+                        setRootItems(data.items || []);
+                      } catch (error) {
+                        console.error("Error refreshing root media:", error);
+                        toast.error("Failed to refresh root media items.");
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
                   />
                 ))
               )}

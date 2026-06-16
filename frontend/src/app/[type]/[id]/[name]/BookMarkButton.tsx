@@ -1,75 +1,80 @@
-"use client"; // Marks this specific boundary safely for browser interactivity
+"use client";
 
 import { toast } from "react-hot-toast";
-import {useRef,useEffect} from "react";
+import { useState, useEffect } from "react";
+import { useSyncedLocalStorage } from "../../../Utils/useSyncedLocalStorage";
 
 type BookmarkProps = {
   infoHash: string;
   fileIdx: number;
-  type: string; // Optional type for future extensibility (e.g. "movie" or "series")
+  type: string;
   ttid: string;
-  icon: string; // Optional custom icon for the bookmark button
-
+  filename?: string; // Optional filename for display purposes
+  provider?: string; // Optional provider for display purposes
 };
 
-export default function BookmarkButton({ infoHash, fileIdx, ttid,type, icon }: BookmarkProps) {
-  const bookMarkIconRef = useRef<HTMLImageElement>(null);
+export default function BookmarkButton({ infoHash, fileIdx, ttid, type, filename, provider }: BookmarkProps) {
+  // 1. Maintain bookmark status inside React State
+  const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
+  const [rawbookmarks, setBookmarks] = useSyncedLocalStorage("stream_bookmarks");
+
+  // Helper helper function to abstract localStorage lookups safely
+  const getBookmarks = (): any[] => {
+    // if (typeof window === "undefined") return []; // Guard clause for SSR
+    try {
+      return JSON.parse(localStorage.getItem("stream_bookmarks") || "[]");
+    } catch {
+      return [];
+    }
+  };
+
+  // 2. Sync bookmark status on component mount or when target specs change
+  useEffect(() => {
+    const found = getBookmarks().some((b: any) => b.infoHash === infoHash && b.fileIdx === fileIdx && b.ttid === ttid && b.type === type && b.filename === filename && b.provider === provider);
+    setIsBookmarked(found);
+  }, [rawbookmarks]);
 
   const handleBookmarkClick = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevents clicking the button from triggering row actions
+    const bookmarkData = { infoHash, fileIdx, ttid, type, filename, provider };
+    const existing = getBookmarks();
 
-    const bookmarkData = { infoHash, fileIdx, ttid, type };
-    // --- INSERT YOUR BOOKMARK STATE SAVING LOGIC HERE ---
-    // Example: localStorage or custom fetch API
     try {
-      const existing = JSON.parse(localStorage.getItem("stream_bookmarks") || "[]");
-      if (isBookmarked(infoHash, fileIdx)) {
-        const updated = existing.filter((b: any) => !(b.infoHash === infoHash && b.fileIdx === fileIdx));
-        localStorage.setItem("stream_bookmarks", JSON.stringify(updated));
-        if (bookMarkIconRef.current) {
-          bookMarkIconRef.current.src = "/bookmark_add.png";
-        }
+      if (isBookmarked) {
+        // Remove bookmark
+        const updated = existing.filter((b: any) => !(b.infoHash === infoHash && b.fileIdx === fileIdx && b.ttid === ttid && b.type === type && b.filename === filename && b.provider === provider));
+        console.log("Updated bookmarks after removal:", updated);
+        setBookmarks(JSON.stringify(updated));
+        setIsBookmarked(false); // Triggers visual re-render safely
         toast.success("Stream unbookmarked successfully.");
-      }
-      else {
+      } else {
+        // Add bookmark
         existing.push(bookmarkData);
-        localStorage.setItem("stream_bookmarks", JSON.stringify(existing));
-        if (bookMarkIconRef.current) {
-          bookMarkIconRef.current.src = "/bookmark_check.png";
-        }
+        console.log("Updated bookmarks after adding:", existing);
+        setBookmarks(JSON.stringify(existing));
+        setIsBookmarked(true); // Triggers visual re-render safely
         toast.success("Stream bookmarked successfully!");
       }
-    } catch {
-      toast.error("Failed to save bookmark.");
+    } catch (error) {
+      toast.error("Failed to update bookmark.");
     }
   };
-  useEffect(() => {
-    // Sync icon state on mount in case bookmarks were changed elsewhere
-    if (bookMarkIconRef.current) {
-      bookMarkIconRef.current.src = isBookmarked(infoHash, fileIdx) ? "/bookmark_check.png" : "/bookmark_add.png";
-    }
-  }, []);
-  const isBookmarked = (hash: string, fileIdx: number) => {
-    try {
-      const bookmarks = JSON.parse(localStorage.getItem("stream_bookmarks") || "[]");
-      return bookmarks.some((b: any) => b.infoHash === hash && b.fileIdx === fileIdx);
-    } catch {
-      return false;
-    }
-  }
+
+  // 3. Conditionally swap image paths based natively on local state
+  const currentIconSrc = isBookmarked ? "/bookmark_check.png" : "/bookmark_add.png";
 
   return (
-    <div 
-      className="absolute top-3 right-3 cursor-pointer hover:bg-zinc-800 active:bg-zinc-700/60 p-1.5 rounded-md transition-colors z-10 select-none group" 
+    <button
+      type="button"
+      className="cursor-pointer hover:bg-zinc-600 active:bg-zinc-700/60 p-1.5 rounded-md transition-colors select-none group focus:outline-none"
       onClick={handleBookmarkClick}
       title="Bookmark this stream layout position"
     >
       <img 
-        ref={bookMarkIconRef}
-        src={icon}
-        alt="Bookmark" 
+        src={currentIconSrc}
+        alt={isBookmarked ? "Bookmarked" : "Add Bookmark"} 
         className="w-5 h-5 object-contain" 
-        />
-    </div>
+      />
+    </button>
   );
 }

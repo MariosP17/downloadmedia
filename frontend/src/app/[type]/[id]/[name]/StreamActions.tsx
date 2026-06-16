@@ -164,7 +164,7 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
               e.stopPropagation(); // Stops the folder row row from selecting/toggling
               setIsMenuOpen(!isMenuOpen);
             }}
-            className="flex w-7 h-7 items-center justify-center rounded-lg bg-zinc-950/40 hover:bg-zinc-900 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className={"flex w-7 h-7 items-center justify-center rounded-lg " + (isSelected ? "bg-green-600" : "hover:bg-zinc-900") + " text-zinc-400 hover:text-white"+(isSelected ? " hover:bg-green-500" : "") +" transition-colors cursor-pointer"}
             title="Folder Actions"
           >
             {/* SVG vertical dots icon */}
