@@ -5,9 +5,21 @@ from threading import Lock
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pathlib import Path
+import shutil
+import ffmpeg
+from urllib.parse import unquote
+from dotenv import load_dotenv, set_key
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+
+OPEN_SUBTITLES_API_KEY = os.getenv("OPEN_SUBTITLES_API_KEY")
+OPEN_SUBTITLES_API_USERNAME = os.getenv("OPEN_SUBTITLES_API_USERNAME")
+OPEN_SUBTITLES_API_PASSWORD = os.getenv("OPEN_SUBTITLES_API_PASSWORD")
+OPEN_SUBTITLES_API_CURRENT_JWT = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
+OPEN_SUBTITLES_CURRENT_USER_AGENT = os.getenv("OPEN_SUBTITLES_CURRENT_USER_AGENT")
 
 # Global dictionary to keep track of download progress
 # Format: { "identifier_idx": percentage_float }
@@ -18,6 +30,170 @@ batch_progress_store = []
 progress_lock = Lock()
 batch_progress_lock = Lock()
 
+def refresh_login_token():
+    """Hits the login route, gets a new token, and saves it straight into the .env file."""
+    print("Token missing or invalid. Authenticating with OpenSubtitles...")
+    
+    url = "https://api.opensubtitles.com/api/v1/login"
+    headers = {
+        "Content-Type": "application/json",
+        "Api-Key": OPEN_SUBTITLES_API_KEY,
+        "User-Agent": OPEN_SUBTITLES_CURRENT_USER_AGENT
+    }
+    payload = {
+        "username": OPEN_SUBTITLES_API_USERNAME,
+        "password": OPEN_SUBTITLES_API_PASSWORD
+    }
+    
+    response = requests.post(url, json=payload, headers=headers)
+    
+    if response.status_code != 200:
+        raise Exception(f"Login failed ({response.status_code}): {response.text}")
+        
+    data = response.json()
+    new_token = data.get("token")
+    
+    # Write the new token directly to your disk inside the .env file
+    set_key(".env", "OPEN_SUBTITLES_API_CURRENT_JWT", new_token)
+    print("New JWT Token securely written to .env file!")
+    
+    return new_token
+
+def getSubtitleId(ttid, language="en"):
+    """Fetches the subtitle ID for a given ttid and language."""
+    isMovie = False if ":" in ttid else True
+    url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid}&languages={language}" if isMovie else f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid.split(':')[0]}&languages={language}&season_number={ttid.split(':')[1]}&episode_number={ttid.split(':')[2]}"
+    headers = {
+        "Content-Type": "application/json",
+        "Api-Key": OPEN_SUBTITLES_API_KEY,
+        "Authorization": f"Bearer {OPEN_SUBTITLES_API_CURRENT_JWT}",
+        "User-Agent": OPEN_SUBTITLES_CURRENT_USER_AGENT
+    }
+    
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        raise Exception(f"Subtitle fetch failed ({response.status_code}): {response.text}")
+        
+    data = response.json()
+    subtitles = data.get("data", [])
+    
+    if not subtitles:
+        print(f"No subtitles found for ttid: {ttid} in language: {language}")
+        return None
+    
+    # Return the first subtitle ID found
+    return subtitles[0].get("attributes", {}).get("files", [{}])[0].get("file_id", None)
+
+def download_and_save_subtitle(file_id, filename="subtitle.srt", is_retry=False):
+    """Downloads the subtitle file, validating the disk-persisted .env token."""
+    
+    # Step 1: Force a reload of the file to ensure we read the latest token value
+    load_dotenv(override=True)
+    token = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
+    
+    # If no token exists in the .env file yet, go get one
+    if not token:
+        try:
+            token = refresh_login_token()
+        except Exception as e:
+            print(f"Initial login attempt failed: {e}")
+            return
+
+    url = "https://api.opensubtitles.com/api/v1/download"
+    headers = {
+        "Content-Type": "application/json",
+        "Api-Key": OPEN_SUBTITLES_API_KEY,
+        "Authorization": f"Bearer {token}",
+        "User-Agent": OPEN_SUBTITLES_CURRENT_USER_AGENT
+    }
+    payload = {
+        "file_id": file_id
+    }
+    
+    print(f"Requesting download link for File ID: {file_id}...")
+    response = requests.post(url, json=payload, headers=headers)
+    
+    is_invalid_token = False
+    if response.status_code == 500:
+        try:
+            error_data = response.json()
+            # Check if the text "invalid" is in the message or string payload
+            if "invalid" in str(error_data).lower():
+                is_invalid_token = True
+        except ValueError:
+            # Fallback if response isn't clean JSON but contains the string
+            if "invalid" in response.text.lower():
+                is_invalid_token = True
+
+    if is_invalid_token and not is_retry:
+        print(" Server reported '500: invalid' token. Token expired! Refreshing...")
+        try:
+            refresh_login_token()
+            # Retry the calculation sequence, flagging is_retry to prevent loops
+            return download_and_save_subtitle(file_id, filename, is_retry=True)
+        except Exception as e:
+            print(f"Failed to refresh token during retry layout: {e}")
+            return
+    # ---------------------------------------------------------
+
+    # Handle any actual system/network errors
+    if response.status_code != 200:
+        print(f"Download endpoint error ({response.status_code}): {response.text}")
+        return
+
+    # Extract and pull down raw subtitle stream data
+    download_json = response.json()
+    download_url = download_json.get("link")
+    
+    print("Link received. Fetching raw subtitle text...")
+    file_content_response = requests.get(download_url)
+    
+    if file_content_response.status_code == 200:
+        with open(filename, "w", encoding="utf-8") as file:
+            file.write(file_content_response.text)
+        print(f"Success! Subtitle securely saved to disk as '{filename}'")
+    else:
+        print("Failed to stream the raw subtitle file from the generated link.")
+
+def checkForSubsAndDownload(filename, ttid):
+    # Check for subtitle files in the media metadata ussing ffmpeg or similar tools, and download them if available.
+    has_subs = check_for_subtitles(filename)
+
+    if has_subs is False:
+        dirname = os.path.dirname(filename)
+        base_name = os.path.splitext(os.path.basename(filename))[0]
+        subtitle_filename = os.path.join(dirname, base_name + ".srt")
+        if not os.path.exists(subtitle_filename):
+            print(f"Subtitle file not found for {filename}. Attempting to download subtitles for ttid: {ttid}")
+            try:
+                subtitle_id = getSubtitleId(ttid, language="en")
+                if subtitle_id:
+                    download_and_save_subtitle(subtitle_id, subtitle_filename)
+                else:
+                    print(f"No subtitles available for {filename} (ttid: {ttid}).")
+            except Exception as e:
+                print(f"Error occurred while fetching subtitle ID for {ttid}: {e}")
+        else:
+            print(f"Subtitle file already exists for {filename}. Skipping download.")
+    elif has_subs is True:
+        print(f"Subtitles already present in {filename}. No download needed.")
+    else:
+        print(f"Could not determine subtitle presence for {filename}. Skipping subtitle download.")
+
+def check_for_subtitles(filename):
+    try:
+        # Probe the video file to extract its stream architecture
+        probe = ffmpeg.probe(filename)
+        
+        # Filter the streams to look specifically for a subtitle track
+        subtitle_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'subtitle']
+    
+        return len(subtitle_streams) > 0
+    except ffmpeg.Error as e:
+        print(f"Error probing file: {e.stderr.decode()}")
+        return None
+    
 def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = "", ttid: str = ""):
     task_key = f"{identifier}_{idx}"
     
@@ -59,6 +235,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                 
                 with progress_lock:
                     progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
+                    checkForSubsAndDownload(filename,unquote(ttid)) 
             else:
                 total_size = int(total_size)
                 downloaded_bytes = 0
@@ -91,6 +268,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                 print(f"Download completed successfully for {task_key}")
                 with progress_lock:
                     progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
+                    checkForSubsAndDownload(filename,unquote(ttid))  # Check for subtitles after download
 
     except Exception as e:
         with progress_lock:
@@ -411,14 +589,20 @@ def delete_folder():
         return jsonify({"error": "Folder name is required"}), 400
 
     folder_path = os.path.join('/media', folder)
-    if folder_path == "/media/stremio-server" or folder_path == "/media":
+    if folder_path == "/media/stremio-server" or folder_path == "/media" or folder_path == "/media/Movies" or folder_path == "/media/TV-Shows":
         return jsonify({"error": "Cannot delete protected folder"}), 403
     if not os.path.exists(folder_path):
         return jsonify({"error": "Folder not found"}), 404
 
     try:
-        os.rmdir(folder_path)  # Only works for empty directories
-        return jsonify({"message": "Folder deleted successfully"}), 200
+        if os.path.isdir(folder_path) and not os.listdir(folder_path):
+            os.rmdir(folder_path)  # Only works for empty directories
+            return jsonify({"message": "Folder deleted successfully"}), 200
+        elif os.path.isdir(folder_path):
+            shutil.rmtree(folder_path)  # Recursively delete non-empty directories
+            return jsonify({"message": "Folder and its contents deleted successfully"}), 200
+        else:
+            return jsonify({"error": "Specified path is not a folder"}), 400
     except OSError as e:
         return jsonify({"error": str(e)}), 500
 
@@ -451,7 +635,7 @@ def rename_folder():
         return jsonify({"error": "Both 'folder' and 'newName' are required"}), 400
     
     folder_path = os.path.join('/media', folder)
-    if folder_path == "/media/stremio-server" or folder_path == "/media":
+    if folder_path == "/media/stremio-server" or folder_path == "/media" or folder_path == "/media/Movies" or folder_path == "/media/TV-Shows":
         return jsonify({"error": "Cannot rename protected folder"}), 403
     parent_dir = os.path.dirname(folder_path)
     new_folder_path = os.path.join('/media', parent_dir, newName)

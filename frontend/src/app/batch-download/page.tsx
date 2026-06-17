@@ -286,7 +286,7 @@ export default function BatchDownloadPage() {
         const rawStorage = bookmarks;
         if (!rawStorage) {
           setItems([]);
-          setCheckedItems(new Set(items.map(item => `${item.infoHash}-${item.fileIdx}`)));
+          setCheckedItems(new Set<string>());
           return;
         }
 
@@ -586,7 +586,7 @@ export default function BatchDownloadPage() {
         <>
           {/* Scrollable Container Panel Area mapping list layout dimensions */}
           <div className="overflow-y-auto bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 space-y-3 search-scrollbar" style={{ height: window.innerHeight - 390+"px" }}>
-          <div className="flex-column justify-end gap-4 mb-3">
+          <div className="grid justify-end gap-4 mb-3">
             <div className="toggle-container">
             <span><b>Group By:</b>&nbsp;&nbsp;Season</span>
             
@@ -685,7 +685,7 @@ export default function BatchDownloadPage() {
                   <div key={`${seriesItem.displayName}-season-${seasonOrTorrent}-${seasonIdx}`} className="space-y-2">
                     <div className="flex items-center gap-4 border-b border-zinc-800">
                     <div className="flex-1 min-w-0">
-                    <h4 className={`text-sm font-semibold text-zinc-300 mt-2 ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} onClick={!isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}`)} : () => {}} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
+                    <h4 className={`text-sm font-semibold text-zinc-300 mt-2 ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} onClick={!isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}`)} : () => {}} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
                         ? seasonOrTorrent.provider + ` (${seasonOrTorrent.hash.slice(0, 8)}...)`
                         : 'Unknown Provider')}</h4>
                      <p className="text-xs text-zinc-500 font-medium mt-0.5">
@@ -743,7 +743,7 @@ export default function BatchDownloadPage() {
                       </div>
                         
                       <div className="flex-1 min-w-0">
-                        <p className={`text-xs text-zinc-400 truncate ${isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} title={episodeItem.filename || episodeItem.title} onClick={isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}`)} : () => {}}>
+                        <p className={`text-xs text-zinc-400 truncate ${isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} title={episodeItem.filename || episodeItem.title} onClick={isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}`)} : () => {}}>
                           { !isOn ? `⚙️ ${episodeItem.provider || "Unknown Provider"}` : parseInt(episodeItem.ttid.split(':')[1]) > 0 ? `Season ${episodeItem.ttid.split(':')[1]}` : `Specials`}
                         </p>
                         

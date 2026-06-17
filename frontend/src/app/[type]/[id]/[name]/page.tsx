@@ -12,6 +12,9 @@ type Props = {
     id: string;
     name: string;
   };
+  searchParams: {
+    season?: string;
+  };
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -95,8 +98,9 @@ const normalizeSeasons = (data: any) => {
 
   return normalized.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
 };
-export default async function ItemPage({ params }: Props) {
+export default async function ItemPage({ params, searchParams }: Props) {
   const { type, id, name } = await params;
+  const { season } = await searchParams;
   const headersList = await headers();
   const host = headersList.get("host")?.split(":")[0] || "localhost";
   // If this is a series id, try to fetch Cinemeta series metadata to show seasons/episodes
@@ -114,29 +118,14 @@ export default async function ItemPage({ params }: Props) {
         console.error(`Failed to fetch series metadata from ${seasonurl}:`, e);
         // ignore and try next
       }
-    let streamsData: any = {};
     const seasons = normalizeSeasons(seriesData);
-    for (const season of seasons) {
-      let dummyVideoId = seriesData.videos.find((v: any) => v.season === season.number && v.number === 1)?.id || seriesData.videos.filter((v: any) => v.season === season.number)?.[0]?.id || seriesData.videos[0]?.id;
-      const seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
-      try {
-        const res = await fetch(seasontorrenturl);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const json = await res.json();
-          if (json && json.streams) {
-            streamsData[season.number] = json.streams;
-          }
-        } catch (e) {
-          console.error(`Failed to fetch series streams from ${seasontorrenturl}:`, e);
-          // ignore and try next
-        }
-    }
+
     if (seasons.length > 0) {
       return (
         <main className="p-8 bg-zinc-950 min-h-screen text-white">
           <h1 className="text-2xl font-bold mb-6">Season results for {decodeURIComponent(name)}</h1>
   
-          <SeasonsAccordion seasons={seasons} type={type} ttid={id} data={streamsData} />
+          <SeasonsAccordion seasons={seasons} type={type} ttid={id} paramsOpenSeason={season} />
         </main>
       );
     }

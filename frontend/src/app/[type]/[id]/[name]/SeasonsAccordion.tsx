@@ -10,16 +10,17 @@ type Props = {
   seasons: any[];
   type: string;
   ttid: string; // Optional ttid for future use, currently unused in this component
-  data?: any; // Optional data prop for future use, currently unused in this component
+  paramsOpenSeason?: string; // Optional prop to open a specific season initially
 };
 
-export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
+export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason }: Props) {
   const [openSeasonId, setOpenSeasonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [openAddAllModal, setOpenAddAllModal] = useState(false);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [activeSeasonForModal, setActiveSeasonForModal] = useState(null);
   const [bookmarks, setBookmarks] = useSyncedLocalStorage(`stream_bookmarks`, "[]");
+  const [data, setData] = useState<{ [seasonId: string]: any[] }>({});
   const router = useRouter();
 
 
@@ -33,6 +34,17 @@ export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
     }
   }, [seasons, type]);
 
+  useEffect(() => {
+    if (paramsOpenSeason) {
+      setOpenSeasonId(paramsOpenSeason);
+    }
+    const element = document.getElementById(`season-content-${paramsOpenSeason}`);
+    if (element) {
+      setTimeout(() => {
+        element.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 400);
+    }
+  }, [paramsOpenSeason]);
 
   useEffect(() => {
     if (openAddAllModal) {
@@ -112,6 +124,45 @@ export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
     });
   };
 
+  const setDataForSeason = async (season : any) => {
+    const seasonId = String(season.id);
+    if (data[seasonId]) {
+      // Data for this season is already fetched and cached
+      return;
+    }
+    let dummyVideoId = season.episodes.find((e: any) => e.season === season.number && e.number === 1)?.id || season.episodes.filter((e: any) => e.season === season.number)?.[0]?.id || season.episodes[0]?.id;
+    let seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
+    try {
+      const res = await fetch(seasontorrenturl);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const json = await res.json();
+        if (json) {
+          if (json.streams.length === 0) {
+            let dummyVideoId = season.episodes.find((e: any) => e.season === season.number && e.number === 2)?.id || season.episodes.filter((e: any) => e.season === season.number)?.[1]?.id || season.episodes[1]?.id;
+            seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
+            const res = await fetch(seasontorrenturl);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            const json = await res.json();
+              if (json && json.streams) {
+                setData((prevData) => ({
+                  ...prevData,
+                  [seasonId]: json.streams,
+                }));
+              }
+          }
+          else {
+            setData((prevData) => ({
+              ...prevData,
+              [seasonId]: json.streams,
+            }));
+          }
+        }
+      } catch (e) {
+        console.error(`Failed to fetch series streams from ${seasontorrenturl}:`, e);
+        // ignore and try next
+      }
+  };
+
   const ShowBasicData = (stream: any,object: boolean = false) => {
     if (!stream) return "Select an option";
     const provider = stream.title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-";
@@ -122,8 +173,8 @@ export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
 
       let rounded;
       
-      if (num < 10) {
-        // For numbers under 10 (like 1.4, 1.54, 4), round to the nearest 0.5
+      if (num < 100) {
+        // For numbers under 100
         rounded = Math.round(num * 2) / 2;
       } else {
         // For larger numbers (like 401, 445, 472), round to the nearest 50 
@@ -144,7 +195,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
     {seasons.map((season, idx) => {
       const isOpen = openSeasonId === String(season.id);
       return (
-        <section
+        <section id={`season-content-${season.id}`}
           key={season.id}
           onClick={() => toggle(String(season.id))}
           className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer"
@@ -156,6 +207,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,data }: Props) {
               className="cursor-pointer hover:bg-zinc-600 active:bg-zinc-700/60 p-1.5 rounded-md transition-colors select-none group focus:outline-none"
               onClick={(e) => {
                 e.stopPropagation();
+                setDataForSeason(season); // Fetch and set data for the selected season
                 // Pass the whole season object (or just season.id) to your state
                 setActiveSeasonForModal(season.id); 
                 setOpenAddAllModal(true);
