@@ -13,6 +13,11 @@ type Props = {
   paramsOpenSeason?: string; // Optional prop to open a specific season initially
 };
 
+const SvgAddAllIcon = {
+ "default": "M120-320v-80h280v80H120Zm0-160v-80h440v80H120Zm0-160v-80h440v80H120Zm520 480v-160H480v-80h160v-160h80v160h160v80H720v160h-80Z",
+ "checked": "M120-320v-80h320v80H120Zm0-160v-80h480v80H120Zm0-160v-80h480v80H120Zm534 440L512-342l56-56 86 84 170-170 56 58-226 226Z"
+};
+
 export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason }: Props) {
   const [openSeasonId, setOpenSeasonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -21,6 +26,21 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
   const [activeSeasonForModal, setActiveSeasonForModal] = useState(null);
   const [bookmarks, setBookmarks] = useSyncedLocalStorage(`stream_bookmarks`, "[]");
   const [data, setData] = useState<{ [seasonId: string]: any[] }>({});
+  const [svgPaths, setSvgPaths] = useState<{ [key: string]: string }>(() => {
+    const initialPaths: { [key: string]: string } = {};
+    
+    // Guard clause in case seasons data hasn't arrived yet during initial mount
+    if (seasons && Array.isArray(seasons)) {
+      seasons.forEach((season) => {
+        // SvgAddAllIcon.default can sometimes be a string (base64/url) 
+        // or a React Component depending on your bundler config.
+        // We string-coerce it just in case to match your type definition.
+        initialPaths[String(season.id)] = String(SvgAddAllIcon.default);
+      });
+    }
+    
+    return initialPaths;
+  });
   const router = useRouter();
 
 
@@ -98,6 +118,10 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
     }
     if (episodesadded == parseInt(episodesNum)) {
       toast.success(<div>{episodesadded} episodes added to batch!<br/><span className="text-blue-500 hover:underline cursor-pointer" onClick={() => {router.push("/batch-download");toast.dismiss(toastId)}}>View Bookmarks</span></div>, { id: toastId });
+      setSvgPaths((prev) => ({
+        ...prev,
+        [seasonid]: SvgAddAllIcon.checked
+      }));
     }
     else 
     {
@@ -214,11 +238,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
               }}
               title="Add all episodes of this season to batch"
             >
-              <img 
-                src="../../../../add-many.png"
-                alt="Add Bookmark"
-                className="w-5 h-5 object-contain" 
-              />
+              <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#FFFFFF"><path d={svgPaths[season.id]}/></svg>
             </button>
             <div className="text-zinc-400 text-sm">
               {season.episodes.length} {season.episodes.length === 1 ? "episode" : "episodes"}
@@ -301,6 +321,15 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
                   transition
                   className="absolute left-0 z-50 mt-1 w-full origin-top-left rounded-lg bg-zinc-900 border border-zinc-800 shadow-xl focus:outline-none py-1 max-h-48 overflow-y-auto search-scrollbar transition ease-out duration-100 data-[closed]:scale-95 data-[closed]:opacity-0"
                 >
+                  {data[activeSeasonForModal] == undefined && (
+                    <div className="p-4">
+                      <div className="animate-pulse">
+                        <div className="h-4 bg-zinc-800 rounded mb-2 w-3/4" />
+                        <div className="h-10 bg-zinc-800 rounded mb-2" />
+                        <div className="h-10 bg-zinc-800 rounded mb-2" />
+                      </div>
+                    </div>
+                  )}
                   {data[activeSeasonForModal]?.map((stream: any) => (ShowBasicData(stream, true))).map((item: any) => (
                     <MenuItem key={item.hash}>
                       <button

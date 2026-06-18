@@ -1,8 +1,9 @@
+import re
 import threading
 import os
 import requests
 from threading import Lock
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from pathlib import Path
 import shutil
@@ -387,6 +388,34 @@ def batch_download():
         "message": f"Successfully initiated background download threads for {len(task_ids)} items."
     }), 202
 
+@app.route('/downloadFileToClient', methods=['POST'])
+def download_file_to_client():
+    """
+    POST Endpoint: Streams the requested file to the client browser 
+    saving it cleanly using just the file's basename.
+    """
+    # --- FIXED: Changed from .get_json() to .form to accept standard form POST data ---
+    file_path = request.form.get('filePath', None)  
+
+    if not file_path:
+        return jsonify({"error": "The 'filePath' parameter is required.", "status": "Failed"}), 400
+
+    # Clean and resolve the absolute system path
+    absolute_path = os.path.join("/media", file_path)
+    if not os.path.exists(absolute_path) or os.path.isdir(absolute_path):
+        return jsonify({"error": "Target file path not found on server.", "status": "Failed"}), 404
+
+    clean_file_name = os.path.basename(absolute_path)
+
+    try:
+        return send_file(
+            absolute_path,
+            as_attachment=True,
+            download_name=clean_file_name 
+        )
+    except Exception as e:
+        return jsonify({"error": f"Failed to stream file payload: {str(e)}", "status": "Failed"}), 500
+    
 @app.route('/cancel', methods=['POST'])
 def cancel_download():
     data = request.get_json() or {}
@@ -557,28 +586,63 @@ def get_batch_progress_store():
         return jsonify(filtered_store), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+EPISODE_REGEX = re.compile(r'\b(?:S(\d{1,2})E|(\d{1,2})X)(\d{1,2})\b', re.IGNORECASE)
+def extract_season_episode(filename):
+    """
+    Extracts (season, episode) as integers for sorting.
+    If no match is found, returns a high fallback tuple so unparsed files sort to the bottom.
+    """
+    match = EPISODE_REGEX.search(filename)
+    if match:
+        # group(1) is S(__)E, group(2) is (__)X, group(3) is the episode number
+        season = match.group(1) or match.group(2)
+        episode = match.group(3)
+        return (int(season), int(episode))
+    
+    # Fallback for files matching no regex rules (sorted alphabetically at the end)
+    return (9999, 9999, filename)
 
 @app.route('/getItems', methods=['GET'])
 def get_items():
     """
-    GET Endpoint: Retrieve items from a specific folder.
+    GET Endpoint: Retrieve items from a specific folder, sorting matching files by Season/Episode.
     """
-    folder = request.args.get('folder',"")
-    showFiles = request.args.get('showFiles', 'true').lower() == 'true'
+    folder = request.args.get('folder', "")
+    show_files = request.args.get('showFiles', 'true').lower() == 'true'
     folder_path = os.path.join('/media', folder)
+    
     if not os.path.exists(folder_path):
         return jsonify({"error": "Folder not found"}), 404
 
-    items = []
+    folders = []
+    files_matching = []
+    files_other = []
+
     for filename in os.listdir(folder_path):
         filepath = os.path.join(folder_path, filename)
-        if os.path.isfile(filepath) and showFiles:
-            items.append(filename)
-        elif os.path.isdir(filepath):
-            if not filename == "stremio-server":  # Skip hidden folders
-                items.append(filename + "/")  # Append slash to indicate it's a folder
+        
+        if os.path.isdir(filepath):
+            if filename != "stremio-server":
+                folders.append(filename + "/")
+                
+        elif os.path.isfile(filepath) and show_files:
+            # Check if file matches the Season/Episode regex pattern
+            if EPISODE_REGEX.search(filename):
+                files_matching.append(filename)
+            else:
+                files_other.append(filename)
 
-    return jsonify({"items": items}), 200
+    # 1. Sort the matching files cleanly by Season number, then Episode number
+    files_matching.sort(key=extract_season_episode)
+    
+    # 2. Sort other files and folders alphabetically
+    folders.sort()
+    files_other.sort()
+
+    # Combine them: Folders first, then beautifully ordered episodes, then misc files
+    combined_items = folders + files_matching + files_other
+    
+    return jsonify({"items": combined_items}), 200
 
 @app.route('/deleteFolder', methods=['POST'])
 def delete_folder():
