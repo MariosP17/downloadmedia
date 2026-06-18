@@ -80,7 +80,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
       document.body.style.overflow = 'unset';
     };
   }, [openAddAllModal]);
-  
+
   const addAllEpisodesToBatch = async (key: string) => {
   const toastId = toast.loading(<span>Adding all episodes to batch...</span>);
   const [seasonid,hash,ttid,episodesNum] = key.split(",");
@@ -90,7 +90,8 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
     try {
       const response = await fetch(`https://torrentio.strem.fun/stream/series/${decodeURIComponent(ttid)}:${seasonid}:${i}.json`);
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        toast.error(`Failed to fetch episode ${i} of season ${seasonid}.`, { id: toastId });
+        continue; // Skip to the next episode if this one fails
       }
       const result = await response.json();
       const stream = result.streams.find((stream: any) => stream.infoHash === hash);
@@ -286,8 +287,8 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
 
     {/* 2. THE MODAL (Moved completely outside the loop) */}
     {openAddAllModal && activeSeasonForModal && (
-      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-md [backdrop-filter:blur(8px)]">
-        <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh] search-scrollbar">
+      <div onClick={(e) => {setOpenAddAllModal(false); setActiveSeasonForModal(null); }} className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-md [backdrop-filter:blur(8px)]">
+        <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh] search-scrollbar">
           
           {/* Header */}
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">

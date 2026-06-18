@@ -372,6 +372,23 @@ export default function BatchDownloadPage() {
     loadAndHydrateData();
   }, [bookmarks]);
 
+  useEffect(() => {
+    try{
+      const fetchProgress = async () => {
+        const res = await fetch(`http://${window.location.hostname}:7000/getBatchProgressStore`);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const data = await res.json();
+        if (data && Object.keys(data).length > 0) {
+          let allTaskIds: string[] = Object.keys(data);
+          intervalRef.current = setInterval(async () => await checkBatchProgress(allTaskIds), 1000);
+        }
+      };
+      fetchProgress();
+    } catch (err) {
+      console.error("Failed to fetch batch progress:", err);
+    }
+  }, []);
+
   const handleRemoveItems = (itemsToRemove: HydratedItem[]) => {
     const updated = JSON.parse(bookmarks || "[]").filter((i: any) => !itemsToRemove.some(item => item.infoHash === i.infoHash && item.fileIdx === i.fileIdx));
     setItems(updated);
@@ -884,7 +901,7 @@ export default function BatchDownloadPage() {
               <div className="flex items-end justify-center pt-2 sm:pt-0">
                 <button
                   onClick={handleBatchDownloadExecute}
-                  disabled={targetPath === "" || (checkedItems.size === 0 && serverStatus !== "Downloading")}
+                  disabled={(targetPath === "" && serverStatus !== "Downloading") || (checkedItems.size === 0 && serverStatus !== "Downloading")}
                   className={`w-full hover:cursor-pointer sm:w-auto px-6 py-3 ${serverStatus === "Completed" ? "bg-green-600 hover:bg-green-700" : serverStatus === "Downloading" ? "bg-red-600 hover:bg-red-700" : "bg-zinc-800"} disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-sm rounded-xl disabled:cursor-not-allowed transition-all shadow-lg flex items-center justify-center gap-2`}
                 >
                   {serverStatus === "Completed" ? `Start Batch Download (${checkedItems.size} items)` : serverStatus === "Downloading" ? "Cancel" : serverStatus === "Failed" ? "Retry Batch Download" : `Start Batch Download (${checkedItems.size} items)`}

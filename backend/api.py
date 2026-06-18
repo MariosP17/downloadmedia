@@ -543,7 +543,9 @@ def get_batch_progress():
             return jsonify({"progress": 0.0, "status": "Failed"}), 500
 
         # 4. Compute true average aggregate score percentage (0.0 to 100.0)
-        total_progress = round(accumulated_progress / active_count, 2)
+        divisor = active_count - cancelled_count - failed_count
+
+        total_progress = round(accumulated_progress / divisor, 2) if divisor > 0 else 0.0
 
         # 5. Check if absolutely everything completed successfully
         if completed_count == active_count or total_progress >= 100.0:
