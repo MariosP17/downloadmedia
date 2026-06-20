@@ -44,8 +44,20 @@ export default function SearchPage() {
         setLoading(false);
       }
     }
+    const loadOpenTabsFromSessionStorage = () => {
+      const storedShowMovies = sessionStorage.getItem("showMovies");
+      const storedShowSeries = sessionStorage.getItem("showSeries");
 
+      if (storedShowMovies !== null) {
+        setShowMovies(storedShowMovies === "true");
+      }
+
+      if (storedShowSeries !== null) {
+        setShowSeries(storedShowSeries === "true");
+      }
+    }
     load();
+    loadOpenTabsFromSessionStorage();
   }, [movies, series]);
 
   return (
@@ -53,7 +65,7 @@ export default function SearchPage() {
 
       <div className="space-y-8">
         {/* Movies tab */}
-        <section onClick={() => setShowMovies((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer" style={{padding: "40px"}}>
+        <section onClick={() => { sessionStorage.setItem("showMovies", String(!showMovies)); setShowMovies((s) => !s); }} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer" style={{padding: "40px"}}>
           <h2 className="text-xl font-semibold mb-3">Movies</h2>
 
           <div
@@ -105,7 +117,7 @@ export default function SearchPage() {
         </section>
 
         {/* Series tab */}
-        <section onClick={() => setShowSeries((s) => !s)} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer" style={{padding: "40px"}}>
+        <section onClick={() =>{ sessionStorage.setItem("showSeries", String(!showSeries));setShowSeries((s) => !s)}} className="relative bg-zinc-900 rounded-xl p-4 hover:bg-zinc-800 transition-colors cursor-pointer" style={{padding: "40px"}}>
           <h2 className="text-xl font-semibold mb-3">Series</h2>
 
           <div

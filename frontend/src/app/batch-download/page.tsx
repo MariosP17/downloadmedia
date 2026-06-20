@@ -278,11 +278,28 @@ export default function BatchDownloadPage() {
     }
   };
 
+  const fetchProgress = async () => {
+    try {
+    const res = await fetch(`http://${window.location.hostname}:7000/getBatchProgressStore`);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const data = await res.json();
+    if (data && Object.keys(data).length > 0) {
+      let allTaskIds: string[] = Object.keys(data);
+      setTaskIds(allTaskIds);
+      console.log("Fetched interval task IDs:", intervalRef.current);
+      if (!intervalRef.current) intervalRef.current = setInterval(async () => await checkBatchProgress(allTaskIds), 1000);
+    }
+  } catch (err) {
+    console.error("Failed to fetch batch progress store:", err);
+    toast.error("Error occurred while fetching batch progress store.");
+  }
+  };
   // 1. Fetch metadata context from Cinemeta and hook into local storage items
   useEffect(() => {
     const loadAndHydrateData = async () => {
       try {
         setPageLoading(true);
+        fetchProgress();
         const rawStorage = bookmarks;
         if (!rawStorage) {
           setItems([]);
@@ -371,23 +388,6 @@ export default function BatchDownloadPage() {
 
     loadAndHydrateData();
   }, [bookmarks]);
-
-  useEffect(() => {
-    try{
-      const fetchProgress = async () => {
-        const res = await fetch(`http://${window.location.hostname}:7000/getBatchProgressStore`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const data = await res.json();
-        if (data && Object.keys(data).length > 0) {
-          let allTaskIds: string[] = Object.keys(data);
-          intervalRef.current = setInterval(async () => await checkBatchProgress(allTaskIds), 1000);
-        }
-      };
-      fetchProgress();
-    } catch (err) {
-      console.error("Failed to fetch batch progress:", err);
-    }
-  }, []);
 
   const handleRemoveItems = (itemsToRemove: HydratedItem[]) => {
     const updated = JSON.parse(bookmarks || "[]").filter((i: any) => !itemsToRemove.some(item => item.infoHash === i.infoHash && item.fileIdx === i.fileIdx));
@@ -502,7 +502,6 @@ export default function BatchDownloadPage() {
         setBookmarks(JSON.stringify(updatedBookmarks));
 
         // 4. Send a single, clean notification toast
-        toast.success(`Cleared ${freshBookmarks.length - updatedBookmarks.length} items from batch queue.`);
         toast.success("Batch download request sent.");
         intervalRef.current = setInterval(async () =>await checkBatchProgress(innertaskIds), 1000);
       } catch (err) {
@@ -518,7 +517,6 @@ export default function BatchDownloadPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ task_ids: taskIds })
         });
-        toast.success("Batch download cancellation request sent.");
       }
       catch (err) {
         console.error("Failed to cancel batch download:", err);
@@ -535,36 +533,66 @@ export default function BatchDownloadPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task_ids: taskIds })
       });
+      
       console.log("Task IDs being checked for progress:", taskIds);
-      const data = await res.json();
-      if (data && data.progress !== undefined && data.status !== undefined) {
-        setServerProgress(data.progress);
-        if (data.status === "Completed" || data.status === "Failed" || data.status === "Downloading") {
-          setServerStatus(data.status as ServerStatus);
-          if (data.status === "Failed") {
-            toast.error("Batch download failed. Please check the server logs for details.");
-            setServerStatus("Completed"); 
-            setServerProgress(0);
-          }
-          else if (data.status === "Completed") {
-            toast.success("Batch download completed successfully.");
-            setServerStatus("Completed");
-            setServerProgress(0);
-          }
+
+      if (!res.ok) {
+        const activeInterval = intervalRef.current;
+        if (activeInterval) {
+          clearInterval(activeInterval);
+          intervalRef.current = null;
         }
-        else if (data.status === "Cancelled") {
+        if (res.status === 404) {
+          // --- FIXED: Localized clear strategy protects against null references ---
           setServerStatus("Completed");
+          setServerProgress(0);
         }
-        if (data.status === "Completed" || data.status === "Failed" || data.status === "Cancelled") {
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-          }
+        else if(res.status === 500) {
+          toast.error("Server error while checking batch progress. Please check server logs.");
+          setServerStatus("Completed");
+          setServerProgress(0);
+        }
+        return;
+      }
+
+      const data = await res.json();
+
+      if (data && data.progress !== undefined && data.status !== undefined) {
+        if (data.status === "Downloading") {
+          setServerProgress(data.progress);
+          setServerStatus("Downloading");
+          return;
+        }
+
+        // --- FIXED: TERMINAL STATES HANDLER (Failed, Completed, Cancelled) ---
+        console.log("Batch download terminal state reached:", data.status);
+        
+        // Grab a snapshot token immediately so we bypass any parent nullification changes
+        const activeInterval = intervalRef.current;
+        if (activeInterval) {
+          console.log("Batch download has reached a terminal state. Stopping progress checks cleanly.");
+          clearInterval(activeInterval);
+          intervalRef.current = null; // Clear it out safely *after* the browser stops the loop instance
+        }
+
+        if (data.status === "Failed") {
+          toast.error("Batch download failed. Please check the server logs for details.");
+          setServerStatus("Completed");
+          setServerProgress(0);
+        } 
+        else if (data.status === "Completed") {
+          toast.success("Batch download completed successfully.");
+          setServerStatus("Completed");
+          setServerProgress(0);
+        } 
+        else if (data.status === "Cancelled" || data.status === "Not Found") {
+          toast.success("Batch download cancelled.");
+          setServerStatus("Completed");
+          setServerProgress(0);
         }
       }
     } catch (err) {
       console.error("Failed to check batch progress:", err);
-      toast.error("Error occurred while checking batch progress.");
     }
   };
 
@@ -877,7 +905,7 @@ export default function BatchDownloadPage() {
       )}
           {/* --- BOTTOM TAB ACTION EXECUTIVE BAR --- */}
           {/* (serverStatus === "Downloading" || items.length > 0) &&  */}
-          {(
+        {!pageLoading && (
           <div className="mt-4 bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 shadow-xl">
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Target Server Base Directory</span>
@@ -923,7 +951,7 @@ export default function BatchDownloadPage() {
             </div>
 
           </div>
-          )}
+        )}
 
       {/* --- SELECTION DIALOGUE OVERLAY LAYER --- */}
       {isModalOpen && (

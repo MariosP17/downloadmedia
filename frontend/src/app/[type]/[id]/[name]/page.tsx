@@ -4,6 +4,7 @@ import FallbackImage from "../../../components/fallbackimg"
 import StreamActions from "./StreamActions";
 import SeasonsAccordion from "./SeasonsAccordion";
 import BookMarkButton from "./BookMarkButton";
+import ScrollToTopButton from "./ScrollToTopButton";
 
 
 type Props = {
@@ -172,55 +173,54 @@ export default async function ItemPage({ params, searchParams }: Props) {
         ) : (
           <div className="space-y-3">
           {streamsWithProgress.map((s: any, idx: number) => {
-            
-            
-
             return (
               <div
-  key={`${s.infoHash}-${idx}`}
-  className="flex flex-col sm:flex-row items-stretch sm:items-center bg-zinc-900 rounded-lg p-4 hover:bg-zinc-800 transition-colors gap-4 w-full overflow-hidden"
->
-  {/* 1. Bookmark Button - First item in the flex engine flow */}
-  <div className="flex items-center justify-between sm:justify-start flex-shrink-0">
-    
-    {/* Optional Mobile-Only Label to balance the top row space */}
-    <span className="sm:hidden text-xs text-zinc-500 font-mono">{s.name}</span>
-    <BookMarkButton 
-      infoHash={s.infoHash} 
-      fileIdx={s.fileIdx} 
-      ttid={id}
-      type={type}
-      filename={s.behaviorHints?.filename}
-      provider={s.title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"}
-    />
-  </div>
+              key={`${s.infoHash}-${idx}`}
+              className="flex flex-col sm:flex-row items-stretch sm:items-center bg-zinc-900 rounded-lg p-4 hover:bg-zinc-800 transition-colors gap-4 w-full overflow-hidden"
+            >
+              {/* 1. Bookmark Button - First item in the flex engine flow */}
+              <div className="flex items-center justify-between sm:justify-start flex-shrink-0">
+                
+                {/* Optional Mobile-Only Label to balance the top row space */}
+                <span className="sm:hidden text-xs text-zinc-500 font-mono">{s.name}</span>
+                <BookMarkButton 
+                  infoHash={s.infoHash} 
+                  fileIdx={s.fileIdx} 
+                  ttid={id}
+                  type={type}
+                  filename={s.behaviorHints?.filename}
+                  provider={s.title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"}
+                />
+              </div>
 
-  {/* 2. Metadata Info Block (Takes up remaining horizontal space) */}
-  <div className="flex-1 min-w-0 w-full">
-    <div className="flex flex-col gap-2">
-      <div className="hidden sm:flex text-zinc-400 text-sm whitespace-pre-wrap break-words">{s.name}</div>
-      <div className={`text-white font-semibold text-lg leading-tight ${s.title.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{s.title}</div>
-      
-      <div className="text-zinc-400 text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="flex items-center gap-1">👤 <strong className="text-white">{s.title.match(/👤\s*(\d+)/)?.[1] ?? "-"}</strong></span>
-        <span className="flex items-center gap-1">💾 <strong className="text-white">{s.title.match(/💾\s*([\d.,]+\s*(?:GB|MB|KB|B))/i)?.[1] ?? (s.fileSize || "-")}</strong></span>
-        <span className="flex items-center gap-1">⚙️ <span className="text-white">{s.title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"}</span></span>
-        {s.title.includes("🇪🇸") && (<span className="ml-2">🇪🇸</span>)}
-      </div>
-      
-      <div className="text-zinc-500 text-xs break-all">{s.behaviorHints?.filename || s.infoHash}</div>
-    </div>
-  </div>
+              {/* 2. Metadata Info Block (Takes up remaining horizontal space) */}
+              <div className="flex-1 min-w-0 w-full">
+                <div className="flex flex-col gap-2">
+                  <div className="hidden sm:flex text-zinc-400 text-sm whitespace-pre-wrap break-words">{s.name}</div>
+                  <div className={`text-white font-semibold text-lg leading-tight ${s.title.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{s.title}</div>
+                  
+                  <div className="text-zinc-400 text-sm flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span className="flex items-center gap-1">👤 <strong className="text-white">{s.title.match(/👤\s*(\d+)/)?.[1] ?? "-"}</strong></span>
+                    <span className="flex items-center gap-1">💾 <strong className="text-white">{s.title.match(/💾\s*([\d.,]+\s*(?:GB|MB|KB|B))/i)?.[1] ?? (s.fileSize || "-")}</strong></span>
+                    <span className="flex items-center gap-1">⚙️ <span className="text-white">{s.title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"}</span></span>
+                    {s.title.includes("🇪🇸") && (<span className="ml-2">🇪🇸</span>)}
+                  </div>
+                  
+                  <div className="text-zinc-500 text-xs break-all">{s.behaviorHints?.filename || s.infoHash}</div>
+                </div>
+              </div>
 
-  {/* 3. Stream Actions (Stretches completely across the screen on phone viewports) */}
-  <div className="w-full sm:w-auto flex items-center justify-stretch sm:justify-end mt-1 sm:mt-0 transition-colors rounded-md">
-    <StreamActions hash={s.infoHash} filename={s.behaviorHints?.filename} title={s.title} id={s.fileIdx} ttid={id} data={s.progressData} />
-  </div>
-</div>
+              {/* 3. Stream Actions (Stretches completely across the screen on phone viewports) */}
+              <div className="w-full sm:w-auto flex items-center justify-stretch sm:justify-end mt-1 sm:mt-0 transition-colors rounded-md">
+                <StreamActions hash={s.infoHash} filename={s.behaviorHints?.filename} title={s.title} id={s.fileIdx} ttid={id} data={s.progressData} />
+              </div>
+            </div>
             );
           })}
+          
         </div>
         )}
+        <ScrollToTopButton />
       </main>
     );
 

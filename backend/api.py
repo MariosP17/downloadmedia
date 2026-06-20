@@ -222,7 +222,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                         is_canceled = progress_store.get(task_key, {}).get("progress") == -1.0
                     
                     if is_canceled:
-                        print(f"Download {task_key} canceled mid-flight (No content length).")
+                        print(f"Download {task_key} cancelled mid-flight (No content length).")
                         f.close()
                         if os.path.exists(filename): os.remove(filename)
                         with progress_lock:
@@ -247,7 +247,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                         is_canceled = progress_store.get(task_key, {}).get("progress") == -1.0
                         
                     if is_canceled:
-                        print(f"Download {task_key} canceled mid-flight.")
+                        print(f"Download {task_key} cancelled mid-flight.")
                         f.close()
                         if os.path.exists(filename): os.remove(filename)
                         with progress_lock:
@@ -505,36 +505,42 @@ def get_batch_progress():
         failed_count = 0
         completed_count = 0
         accumulated_progress = 0.0
+        
+        # Track how many requested tasks actually still exist in volatile memory store
+        found_in_store_count = 0 
 
-        # Protect dictionary traversal using your global thread mutex lock
         with progress_lock:
             for task_id in task_ids:
                 if task_id in progress_store:
-                    print(f"Batch progress check for {task_id}: {progress_store[task_id]}")  # Debugging: Print current progress state
-                    active_count += 1
+                    found_in_store_count += 1
                     task_val = progress_store[task_id].get("progress", 0.0)
                     
                     if task_val == -1.0:
                         cancelled_count += 1
                     elif task_val == -2.0:
                         failed_count += 1
+                        # Force active count increments even for failed items so we can capture individual failure ticks
+                        active_count += 1 
                     elif task_val == 100.0:
                         completed_count += 1
                         accumulated_progress += 100.0
+                        active_count += 1
                     else:
                         accumulated_progress += task_val
+                        active_count += 1
 
-        # 1. If all active keys vanished from memory, the download threads finished cleaning themselves up
-        if active_count == 0:
-            return jsonify({"progress": 0.0, "status": "Completed"}), 404
+        # 1. --- FIXED: If all tasks have vanished cleanly from the memory store ---
+        # It means the active threads ran their cleanup routines. Since they aren't here anymore,
+        # it means they completed successfully. Return Completed with a clean 200 status.
+        if found_in_store_count == 0:
+            return jsonify({"progress": 100.0, "status": "Not Found"}), 200
 
-        # 2. Check if the ENTIRE batch was requested to stop
-        if cancelled_count == active_count:
-            # DO NOT POP HERE. Let the download tasks catch the -1.0 flag and clean themselves up.
+        # 2. Check if the ENTIRE batch was explicitly cancelled
+        if cancelled_count == found_in_store_count:
             return jsonify({"progress": 0.0, "status": "Cancelled"}), 200
 
-        # 3. Check if any organic server/network bugs crashed every single item
-        if failed_count == active_count:
+        # 3. Check if *every single remaining item* crashed hard organically
+        if failed_count == found_in_store_count:
             with progress_lock:
                 for task_id in task_ids: 
                     progress_store.pop(task_id, None)
@@ -542,21 +548,20 @@ def get_batch_progress():
                         if task_id in batch_progress_store: batch_progress_store.remove(task_id)
             return jsonify({"progress": 0.0, "status": "Failed"}), 500
 
-        # 4. Compute true average aggregate score percentage (0.0 to 100.0)
+        # 4. Compute true average math safely
         divisor = active_count - cancelled_count - failed_count
-
         total_progress = round(accumulated_progress / divisor, 2) if divisor > 0 else 0.0
 
-        # 5. Check if absolutely everything completed successfully
-        if completed_count == active_count or total_progress >= 100.0:
+        # 5. Check if everything currently tracked in memory has completed successfully
+        if completed_count == found_in_store_count or total_progress >= 100.0:
             with progress_lock:
                 for task_id in task_ids:
-                    progress_store.pop(task_id, None) # Safe to pop now; threads are dead
+                    progress_store.pop(task_id, None) 
                     with batch_progress_lock:
                         if task_id in batch_progress_store: batch_progress_store.remove(task_id)
             return jsonify({"progress": 100.0, "status": "Completed"}), 200
 
-        # 6. Default fallback return frame for progressive tracking
+        # 6. Default progression frame
         return jsonify({
             "progress": total_progress, 
             "status": "Downloading"
@@ -565,7 +570,7 @@ def get_batch_progress():
     except Exception as e:
         print(f"Batch processing error exception layer raised: {e}")
         return jsonify({"error": str(e), "status": "Failed"}), 500
-
+    
 @app.route('/getProgressStore', methods=['GET'])
 def get_progress_store():
     try:
@@ -588,6 +593,7 @@ def get_batch_progress_store():
         return jsonify(filtered_store), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 EPISODE_REGEX = re.compile(r'\b(?:S(\d{1,2})E|(\d{1,2})X)(\d{1,2})\b', re.IGNORECASE)
 def extract_season_episode(filename):
     """

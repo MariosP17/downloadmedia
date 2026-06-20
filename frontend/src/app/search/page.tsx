@@ -50,8 +50,21 @@ function SearchResultsList() {
         setLoading(false);
       }
     }
+    const loadOpenTabsFromSessionStorage = () => {
+      const storedShowMovies = sessionStorage.getItem("showSearchMovies");
+      const storedShowSeries = sessionStorage.getItem("showSearchSeries");
+
+      if (storedShowMovies !== null) {
+        setShowMovies(storedShowMovies === "true");
+      }
+
+      if (storedShowSeries !== null) {
+        setShowSeries(storedShowSeries === "true");
+      }
+    }
 
     load();
+    loadOpenTabsFromSessionStorage();
   }, [query]);
 
   useEffect(() => {
@@ -66,7 +79,7 @@ function SearchResultsList() {
       <div className="space-y-8">
         {/* Movies section */}
         <section 
-          onClick={() => setShowMovies((s) => !s)} 
+          onClick={() => { sessionStorage.setItem("showSearchMovies", String(!showMovies)); setShowMovies((s) => !s); }} 
           className="relative bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors cursor-pointer" 
           style={{ padding: "40px" }}
         >
@@ -125,7 +138,7 @@ function SearchResultsList() {
 
         {/* Series section */}
         <section 
-          onClick={() => setShowSeries((s) => !s)} 
+          onClick={() => { sessionStorage.setItem("showSearchSeries", String(!showSeries)); setShowSeries((s) => !s); }} 
           className="relative bg-zinc-900 rounded-xl hover:bg-zinc-800 transition-colors cursor-pointer" 
           style={{ padding: "40px" }}
         >
