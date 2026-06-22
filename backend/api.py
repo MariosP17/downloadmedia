@@ -24,6 +24,7 @@ OPEN_SUBTITLES_CURRENT_USER_AGENT = os.getenv("OPEN_SUBTITLES_CURRENT_USER_AGENT
 
 # Global dictionary to keep track of download progress
 # Format: { "identifier_idx": percentage_float }
+# progress_store = {"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_5": {"ttid": "tt6741278:2:4", "progress": 69.0}, "0566a661039cde9869b69f165569e4a140474ef4_3": {"ttid": "tt6741278:2:4", "progress": 100.0}}
 progress_store = {}
 batch_progress_store = []
 
