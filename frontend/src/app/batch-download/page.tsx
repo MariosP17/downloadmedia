@@ -389,6 +389,18 @@ export default function BatchDownloadPage() {
     loadAndHydrateData();
   }, [bookmarks]);
 
+  // This effect focuses 100% on ensuring NO zombie timers survive when leaving the page
+useEffect(() => {
+  // We leave the setup block empty because we only care about the exit cleanup phase
+  
+  return () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+}, []); // Empty brackets ensure this cleanup is securely bound to the page-exit event
+
   const handleRemoveItems = (itemsToRemove: HydratedItem[]) => {
     const updated = JSON.parse(bookmarks || "[]").filter((i: any) => !itemsToRemove.some(item => item.infoHash === i.infoHash && item.fileIdx === i.fileIdx));
     setItems(updated);
