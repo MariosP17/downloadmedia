@@ -42,8 +42,8 @@ export default function DownloadsPage() {
           );
   
           // If the store is completely empty or everything is done/cancelled, clear interval
-          if (downloadArray.length === 0 ) {
-            stopPolling();
+          if (downloadArray.length === 0 || !hasActiveDownloads) {
+            stopPolling(Object.keys(data),downloadArray.length != 0);
           } else if (!intervalRef.current) {
             // If there are active downloads and we aren't polling yet, start polling 
             startPolling();
@@ -63,13 +63,34 @@ export default function DownloadsPage() {
         }, 1000); // Polls every 1 second
       };
   
-      const stopPolling = () => {
+      const stopPolling = (keys: string[] = [],removeFromStore: boolean = false) => {
+        if (removeFromStore && keys.length > 0) {
+          removeDownloadsFromStore(keys);
+        }
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
       };
-  
+      
+    const removeDownloadsFromStore = async (keys: string[]) => {
+      try {
+        for (const key of keys) {
+          const [hash, idx] = key.split("_");
+          const res = await fetch(`http://${window.location.hostname}:7000/progress/${hash}/${idx}`);
+          if (!res.ok) {
+            console.error(`Failed to remove download ${key} from store`);
+          }
+        }
+      } catch (error) {
+        console.error("Error removing downloads from store:", error);
+      }
+      finally {
+        // After removing, fetch the updated progress store
+        fetchProgress();
+      }
+    };
+
       // Initial fetch on mount
       fetchProgress();
       // Clean up interval when component unmounts

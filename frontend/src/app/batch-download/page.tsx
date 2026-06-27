@@ -377,7 +377,32 @@ export default function BatchDownloadPage() {
         }
         setSeriesTabs(innerseriesTabs);
         setItems(hydratedList);
-        setCheckedItems(new Set(hydratedList.map(item => `${item.infoHash}-${item.fileIdx}`))); //TO-DO: Somehow check previous
+        // --- FIXED: Smart check-by-default for new items, preserve unchecks for old ones ---
+        setCheckedItems((prevChecked) => {
+          // 1. If it's the absolute first load of the page, check everything by default
+          // if (prevChecked.size === 0) {
+          //   return new Set(hydratedList.map(item => `${item.infoHash}-${item.fileIdx}`));
+          // }
+
+          // 2. Build a quick lookup array of items we were already displaying before this tick
+          const existingInfoHashesIndexes = new Set(items.map(item => `${item.infoHash}-${item.fileIdx}`));
+          const updatedSet = new Set<string>();
+
+          hydratedList.forEach((item) => {
+            const key = `${item.infoHash}-${item.fileIdx}`;
+            
+            // 3. If the torrent/movie infoHash is brand new to the list, check it by default!
+            if (!existingInfoHashesIndexes.has(key)) {
+              updatedSet.add(key);
+            } 
+            // 4. If it was already on the screen before, strictly respect the user's previous selection
+            else if (prevChecked.has(key)) {
+              updatedSet.add(key);
+            }
+          });
+
+          return updatedSet;
+        });
       } catch (err) {
         console.error("Failed hydrating batch assets from Cinemeta:", err);
         toast.error("Error building batch tracking details.");
@@ -401,22 +426,46 @@ useEffect(() => {
   };
 }, []); // Empty brackets ensure this cleanup is securely bound to the page-exit event
 
-  const handleRemoveItems = (itemsToRemove: HydratedItem[]) => {
-    const updated = JSON.parse(bookmarks || "[]").filter((i: any) => !itemsToRemove.some(item => item.infoHash === i.infoHash && item.fileIdx === i.fileIdx));
-    setItems(updated);
-    setCheckedItems(new Set(updated.map((item: any) => `${item.infoHash}-${item.fileIdx}`)));
-    setBookmarks(JSON.stringify(updated));
-    toast.success("Selected items cleared from batch queue.");
-  };
+const handleRemoveItems = (itemsToRemove: HydratedItem[]) => {
+  const updated = JSON.parse(bookmarks || "[]").filter(
+    (i: any) => !itemsToRemove.some(item => item.infoHash === i.infoHash && item.fileIdx === i.fileIdx)
+  );
+  
+  // 1. Update the master items list configuration
+  setItems(updated);
+  
+  // --- FIXED: Remove only the targets from your current checked choices ---
+  setCheckedItems((prevChecked) => {
+    const updatedSet = new Set(prevChecked);
+    itemsToRemove.forEach((item) => {
+      updatedSet.delete(`${item.infoHash}-${item.fileIdx}`);
+    });
+    return updatedSet;
+  });
+  
+  setBookmarks(JSON.stringify(updated));
+  toast.success("Selected items cleared from batch queue.");
+};
 
-  // 2. Remove an explicit node entry from storage allocations
-  const handleRemoveItem = (infoHash: string, fileIdx: number) => {
-    const updated = JSON.parse(bookmarks || "[]").filter((i: any) => !(i.infoHash === infoHash && i.fileIdx === fileIdx));
-    setItems(updated);
-    setCheckedItems(new Set(updated.map((item: any) => `${item.infoHash}-${item.fileIdx}`)));
-    setBookmarks(JSON.stringify(updated));
-    toast.success("Item cleared from batch queue.");
-  };
+// 2. Remove an explicit node entry from storage allocations
+const handleRemoveItem = (infoHash: string, fileIdx: number) => {
+  const updated = JSON.parse(bookmarks || "[]").filter(
+    (i: any) => !(i.infoHash === infoHash && i.fileIdx === fileIdx)
+  );
+  
+  // 1. Update the master items list configuration
+  setItems(updated);
+  
+  // --- FIXED: Safely delete just this single key from your current checked choices ---
+  setCheckedItems((prevChecked) => {
+    const updatedSet = new Set(prevChecked);
+    updatedSet.delete(`${infoHash}-${fileIdx}`);
+    return updatedSet;
+  });
+  
+  setBookmarks(JSON.stringify(updated));
+  toast.success("Item cleared from batch queue.");
+};
 
   
   // 3. Load top-level directories configurations

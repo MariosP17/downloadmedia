@@ -26,6 +26,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
   const [activeSeasonForModal, setActiveSeasonForModal] = useState(null);
   const [bookmarks, setBookmarks] = useSyncedLocalStorage(`stream_bookmarks`, "[]");
   const [data, setData] = useState<{ [seasonId: string]: any[] }>({});
+  const [loadingPercentage, setLoadingPercentage] = useState(0);
   const [svgPaths, setSvgPaths] = useState<{ [key: string]: string }>(() => {
     const initialPaths: { [key: string]: string } = {};
     
@@ -155,37 +156,64 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
       // Data for this season is already fetched and cached
       return;
     }
-    let dummyVideoId = season.episodes.find((e: any) => e.season === season.number && e.number === 1)?.id || season.episodes.filter((e: any) => e.season === season.number)?.[0]?.id || season.episodes[0]?.id;
-    let seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
-    try {
-      const res = await fetch(seasontorrenturl);
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const json = await res.json();
-        if (json) {
-          if (json.streams.length === 0) {
-            let dummyVideoId = season.episodes.find((e: any) => e.season === season.number && e.number === 2)?.id || season.episodes.filter((e: any) => e.season === season.number)?.[1]?.id || season.episodes[1]?.id;
-            seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
-            const res = await fetch(seasontorrenturl);
-            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-            const json = await res.json();
-              if (json && json.streams) {
-                setData((prevData) => ({
-                  ...prevData,
-                  [seasonId]: json.streams,
-                }));
+    const unifiedStreams : any[] = [];
+
+    // 1. Keep a map to count how many episodes each infoHash appears in
+    const hashCountMap = new Map<string, number>();
+
+    // 2. Keep a dictionary to store the stream objects so we can retrieve them later
+    const streamObjects = new Map<string, any>();
+
+    const totalEpisodes = season.episodes.length;
+    setLoadingPercentage(0); // Reset loading percentage at the start
+    for (let i = 1; i <= totalEpisodes; i++) {
+      setLoadingPercentage(Math.round((i / totalEpisodes) * 100)); // Update loading percentage
+      let seasontorrenturl = "";
+      try {
+        let dummyVideoId = season.episodes.find((e: any) => e.season === season.number && e.number === i)?.id;
+        if (!dummyVideoId) continue;
+
+        seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
+        const res = await fetch(seasontorrenturl);
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        
+        const json = await res.json();
+        
+        if (json && Array.isArray(json.streams)) {
+          // Avoid counting duplicate hits of the same hash within the exact same episode
+          const uniqueHashesInEpisode = new Set<string>();
+
+          for (const stream of json.streams) {
+            if (stream.infoHash) {
+              uniqueHashesInEpisode.add(stream.infoHash);
+              // Always save the stream object (this will naturally keep the fileIdx/data structure)
+              if (!streamObjects.has(stream.infoHash)) {
+                streamObjects.set(stream.infoHash, stream);
               }
+            }
           }
-          else {
-            setData((prevData) => ({
-              ...prevData,
-              [seasonId]: json.streams,
-            }));
+
+          // Increment the total episode match count for these hashes
+          for (const hash of uniqueHashesInEpisode) {
+            hashCountMap.set(hash, (hashCountMap.get(hash) || 0) + 1);
           }
         }
       } catch (e) {
         console.error(`Failed to fetch series streams from ${seasontorrenturl}:`, e);
-        // ignore and try next
       }
+    }
+
+    // 3. After the loop, find hashes whose count matches totalEpisodes exactly
+    for (const [hash, count] of hashCountMap.entries()) {
+      if (count === totalEpisodes) {
+        unifiedStreams.push(streamObjects.get(hash));
+      }
+    }
+
+    setData((prevData) => ({
+      ...prevData,
+      [seasonId]: unifiedStreams,
+    }));
   };
 
   const ShowBasicData = (stream: any,object: boolean = false) => {
@@ -328,10 +356,16 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
                         <div className="h-4 bg-zinc-800 rounded mb-2 w-3/4" />
                         <div className="h-10 bg-zinc-800 rounded mb-2" />
                         <div className="h-10 bg-zinc-800 rounded mb-2" />
+                        <p className="text-zinc-400 text-sm mt-2">Fetching streams for this season... {loadingPercentage}%</p>
                       </div>
                     </div>
                   )}
-                  {data[activeSeasonForModal]?.map((stream: any) => (ShowBasicData(stream, true))).map((item: any) => (
+                  {data[activeSeasonForModal]?.length === 0 && (
+                    <div className="p-4 text-zinc-400 text-sm">
+                      No streams available for this season that contain all episodes.
+                    </div>
+                  )}
+                  {data[activeSeasonForModal]?.length > 0 && data[activeSeasonForModal]?.map((stream: any) => (ShowBasicData(stream, true))).map((item: any) => (
                     <MenuItem key={item.hash}>
                       <button
                         type="button"
