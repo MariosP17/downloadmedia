@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState,useRef } from "react";
 import { toast } from "react-hot-toast";
 import FileTreeItem from "../components/FileTreeItem";
 
@@ -9,6 +9,8 @@ export default function MediaExplorerPage() {
   const [isMediaOpen, setIsMediaOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const activeRefreshRef = useRef<{ [path: string]: () => Promise<void> }>({});
+
 
   const toggleMediaFolder = async () => {
     const nextState = !isMediaOpen;
@@ -38,7 +40,6 @@ export default function MediaExplorerPage() {
         <h1 className="text-2xl font-bold text-zinc-100 mb-6 tracking-tight">
           File Browser
         </h1>
-
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-xl">
           {/* Main Collapsed Media Root Row */}
           <div
@@ -65,6 +66,7 @@ export default function MediaExplorerPage() {
                     key={itemName}
                     name={itemName}
                     currentPath=""
+                    activeRefreshRef={activeRefreshRef}
                     onRefreshParent={async () => {
                       setLoading(true);
                       try {

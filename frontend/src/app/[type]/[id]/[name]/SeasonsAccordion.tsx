@@ -295,7 +295,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
                       >
                         <FallbackImage src={ep.thumbnail || ep.poster || ep.cover || "/no-poster-16-9.jpg"} fallback="/no-poster-16-9.jpg" alt={ename} />
                       </div>
-                      <p className="mt-2 text-sm font-medium">{ename}</p>
+                      <p className="mt-2 text-sm font-medium"><span className="text-zinc-500">S{season.number.toString().padStart(2, '0')}E{ep.episode?.toString().padStart(2, '0') ?? ep.number?.toString().padStart(2, '0') ?? ""}</span> {ename}</p>
                       {(ep.description || ep.overview) && <p className="mt-1 text-xs text-zinc-400">{ep.description || ep.overview}</p>}
                     </div>
                   );

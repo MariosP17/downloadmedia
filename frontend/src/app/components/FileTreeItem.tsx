@@ -7,9 +7,10 @@ type TreeItemProps = {
   name: string;
   currentPath: string; // Tracks the accumulated path relative to /media
   onRefreshParent?: () => void; // Callback to tell the parent directory to refresh its list
-};
+  activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>;
+}
 
-export default function FileTreeItem({ name, currentPath, onRefreshParent }: TreeItemProps) {
+export default function FileTreeItem({ name, currentPath, onRefreshParent, activeRefreshRef }: TreeItemProps) {
   const isFolder = name.endsWith("/");
   const cleanName = isFolder ? name.slice(0, -1) : name;
   
@@ -42,9 +43,17 @@ export default function FileTreeItem({ name, currentPath, onRefreshParent }: Tre
     };
   }, [isMenuOpen]);
 
+  useEffect(() => {
+    return () => {
+      if (isFolder && activeRefreshRef.current) {
+        delete activeRefreshRef.current[itemPath];
+      }
+    };
+  }, [itemPath, isFolder, activeRefreshRef]);
+
   // Helper function to fetch folder contents (moved out to reuse during refreshes)
-  const fetchDirectoryContents = async () => {
-    setLoading(true);
+  const fetchDirectoryContents = async (setLoadingInternal: boolean = true) => {
+    if (setLoadingInternal) setLoading(true);
     try {
       const res = await fetch(
         `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(itemPath)}`
@@ -54,11 +63,99 @@ export default function FileTreeItem({ name, currentPath, onRefreshParent }: Tre
       const data = await res.json();
       setChildren(data.items || []);
       setHasFetched(true);
+
+      if (isFolder) {
+        // Register this folder's refresh function in the activeRefreshRef for cascading refreshes
+        activeRefreshRef.current[itemPath] = () => fetchDirectoryContents(false);
+      }
+
     } catch (err) {
       console.error("Failed fetching directory items:", err);
       toast.error("Failed to load folder updates.");
     } finally {
-      setLoading(false);
+      if (setLoadingInternal) setLoading(false);
+    }
+  };
+
+  const RefreshAllChildren = async () => {
+    try {
+      // 1. Fetch only subfolders for the current folder path
+      const res = await fetch(
+        `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`
+      );
+      if (!res.ok) throw new Error("Could not retrieve contents");
+      
+      const data = await res.json();
+      const childrenNames = data.items || [];
+      
+      const childrenPaths = childrenNames.map((subName: string) => {
+        const cleanSubName = subName.endsWith("/") ? subName.slice(0, -1) : subName;
+        return itemPath ? `${itemPath}/${cleanSubName}` : cleanSubName;
+      });
+
+      // 2. --- FIXED: Deep Recursive Cascade ---
+      // Instead of just looking for the function, we dispatch network commands 
+      // to force every subfolder branch to run its own RefreshAllChildren layout routine
+      await Promise.all(
+        childrenPaths.map(async (childPath: string) => {
+          // A. Trigger the component refresh if it's currently open/mounted in the DOM
+          const registeredRefreshFn = activeRefreshRef.current[childPath];
+          if (registeredRefreshFn) {
+            await registeredRefreshFn();
+          }
+
+          // B. Crucial: Force the backend API request cascade to dig deeper into this child's subfolders
+          try {
+            const childRes = await fetch(
+              `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(childPath)}&showFiles=false`
+            );
+            if (childRes.ok) {
+              const childData = await childRes.json();
+              const nestedChildren = childData.items || [];
+              
+              if (nestedChildren.length > 0) {
+                // If this child has folders of its own, make a temporary recursive call to dig deeper
+                await RefreshNestedSubTree(childPath);
+              }
+            }
+          } catch (e) {
+            console.warn(`Failed cascading deep tree refresh at path: ${childPath}`, e);
+          }
+        })
+      );
+    } catch (err) {
+      console.error("Failed fetching directory items:", err);
+    }
+  };
+
+  // --- ADD THIS HELPER FUNCTION INSIDE YOUR COMPONENT ---
+  // This cleanly handles recursion over paths that might not be mounted in the React tree yet
+  const RefreshNestedSubTree = async (targetPath: string): Promise<void> => {
+    try {
+      const res = await fetch(
+        `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(targetPath)}&showFiles=false`
+      );
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      const subNames = data.items || [];
+      
+      await Promise.all(
+        subNames.map(async (subName: string) => {
+          const cleanSub = subName.endsWith("/") ? subName.slice(0, -1) : subName;
+          const deepPath = `${targetPath}/${cleanSub}`;
+          
+          // Trigger the UI if open
+          if (activeRefreshRef.current[deepPath]) {
+            await activeRefreshRef.current[deepPath]();
+          }
+          
+          // Recurse downwards continuously
+          await RefreshNestedSubTree(deepPath);
+        })
+      );
+    } catch (err) {
+      console.error("Nested tree refresh loop failed:", err);
     }
   };
 
@@ -137,40 +234,56 @@ export default function FileTreeItem({ name, currentPath, onRefreshParent }: Tre
   };
 
   const handleDownload = (e: React.MouseEvent, isFolderInternal: boolean) => {
-  e.stopPropagation();
-  
-  if (isFolderInternal) {
-    toast.error("Folder download is not supported.");
-    return;
-  }
+    e.stopPropagation();
+    
+    if (isFolderInternal) {
+      toast.error("Folder download is not supported.");
+      return;
+    }
 
-  try {
-    // 1. Create a hidden, throwaway HTML form element
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = `http://${window.location.hostname}:7000/downloadFileToClient`;
-    form.style.display = "none";
+    try {
+      // 1. Create a hidden, throwaway HTML form element
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = `http://${window.location.hostname}:7000/downloadFileToClient`;
+      form.style.display = "none";
 
-    // 2. Add the filePath parameter to match application/x-www-form-urlencoded
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = "filePath";
-    input.value = itemPath; // The variable holding your path
-    form.appendChild(input);
+      // 2. Add the filePath parameter to match application/x-www-form-urlencoded
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "filePath";
+      input.value = itemPath; // The variable holding your path
+      form.appendChild(input);
 
-    // 3. Append to body, trigger the native stream download, and remove immediately
-    document.body.appendChild(form);
-    form.submit();
-    form.remove();
+      // 3. Append to body, trigger the native stream download, and remove immediately
+      document.body.appendChild(form);
+      form.submit();
+      form.remove();
 
-    // This alert fires instantly now!
-    toast.success("Download started!");
-  } catch (err) {
-    console.error("Download error:", err);
-    toast.error("Failed to initiate file download.");
-  }
-};
+      // This alert fires instantly now!
+      toast.success("Download started!");
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("Failed to initiate file download.");
+    }
+  };
 
+  const handleRefreshFolder = async (e: React.MouseEvent, isFolderInternal: boolean) => {
+    e.stopPropagation();
+    if (!isFolderInternal) return;
+    setLoading(true);
+    try{
+      await fetchDirectoryContents(false);
+      await RefreshAllChildren();
+    }
+    catch (err) {
+      console.error("Failed to refresh folder:", err);
+      toast.error("Failed to refresh folder contents.");
+    }
+    finally {
+      setLoading(false);
+    }
+  };
   // Helper function to pick the correct asset token based on extensions
   const getIcon = () => {
     if (isFolder) {
@@ -200,8 +313,7 @@ export default function FileTreeItem({ name, currentPath, onRefreshParent }: Tre
         onClick={handleToggle}
         className={`flex items-center gap-3 py-1.5 px-2 rounded transition-colors ${
           isFolder ? "hover:bg-zinc-800 cursor-pointer text-zinc-200 hover:text-white" : "text-zinc-400"
-        }`}
-      >
+        }`}>
         {!isFolder && match && (
           <span className="text-xs text-zinc-500 font-mono">
             S{match[1] || match[2]}-E{match[3]}
@@ -250,6 +362,18 @@ export default function FileTreeItem({ name, currentPath, onRefreshParent }: Tre
                 Download
               </button>
               )}
+              {isFolder && (
+                <button
+                  onClick={(e) => {
+                    setIsMenuOpen(false);
+                    handleRefreshFolder(e, isFolder);
+                  }}
+                className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+              >
+                <img src="/refresh.svg" alt="Refresh" className="w-4 h-4" />
+                Refresh
+              </button>
+              )}
               <button
                 onClick={(e) => {
                   setIsMenuOpen(false);
@@ -289,6 +413,7 @@ export default function FileTreeItem({ name, currentPath, onRefreshParent }: Tre
                 currentPath={itemPath}
                 // Recursively link the reload pipeline downwards 
                 onRefreshParent={fetchDirectoryContents}
+                activeRefreshRef={activeRefreshRef}
               />
             ))
           )}

@@ -209,68 +209,72 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
     try:
         os.makedirs(path, exist_ok=True)
         # Use a balanced timeout matrix to allow quick interruptions
-        response = requests.get(url, stream=True, timeout=(5, 30))
-        response.raise_for_status()
+        with requests.get(url, stream=True, timeout=(5, 30)) as response:
+            response.raise_for_status()
         
-        total_size = response.headers.get('content-length')
-        
-        with open(filename, 'wb') as f:
-            if total_size is None:
-                # Balanced chunk size gives Flask breathing room to process requests under the GIL
-                for chunk in response.iter_content(chunk_size=16384): 
-                    # Read the state safely under a lock window
-                    with progress_lock:
-                        is_canceled = progress_store.get(task_key, {}).get("progress") == -1.0
+            total_size = response.headers.get('content-length')
+            
+            with open(filename, 'wb') as f:
+                if total_size is None:
+                    # Balanced chunk size gives Flask breathing room to process requests under the GIL
+                    for chunk in response.iter_content(chunk_size=32768): 
+                        # Read the state safely under a lock window
+                        with progress_lock:
+                            is_canceled = progress_store.get(task_key, {}).get("progress") == -1.0
+                        
+                        if is_canceled:
+                            print(f"Download {task_key} cancelled mid-flight (No content length).")
+                            f.close()
+                            if os.path.exists(filename): os.remove(filename)
+                            with progress_lock:
+                                progress_store.pop(task_key, None)  # Clean up cancelled task
+                                with batch_progress_lock:
+                                    if task_key in batch_progress_store: batch_progress_store.remove(task_key)
+                            return 
+
+                        if chunk:
+                            f.write(chunk)
+                    f.flush()
+                    os.fsync(f.fileno())
+                    print(f"Download completed successfully for {task_key}")
+                    # with progress_lock:
+                    #     progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
+                    #     checkForSubsAndDownload(filename,unquote(ttid)) 
+                else:
+                    total_size = int(total_size)
+                    downloaded_bytes = 0
                     
-                    if is_canceled:
-                        print(f"Download {task_key} cancelled mid-flight (No content length).")
-                        f.close()
-                        if os.path.exists(filename): os.remove(filename)
-                        with progress_lock:
-                            progress_store.pop(task_key, None)  # Clean up cancelled task
-                            with batch_progress_lock:
-                                if task_key in batch_progress_store: batch_progress_store.remove(task_key)
-                        return 
+                    # Reduced from 128KB to 32KB to create frequent cancellation checks
+                    for chunk in response.iter_content(chunk_size=32768):
+                        with progress_lock: # Debugging: Print current progress store state
+                            is_canceled = progress_store.get(task_key, {}).get("progress") == -1.0
+                            
+                        if is_canceled:
+                            print(f"Download {task_key} cancelled mid-flight.")
+                            f.close()
+                            if os.path.exists(filename): os.remove(filename)
+                            with progress_lock:
+                                progress_store.pop(task_key, None)  # Clean up cancelled task
+                                with batch_progress_lock:
+                                    if task_key in batch_progress_store: batch_progress_store.remove(task_key)
+                            return 
 
-                    if chunk:
-                        f.write(chunk)
-                
-                with progress_lock:
-                    progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
-                    checkForSubsAndDownload(filename,unquote(ttid)) 
-            else:
-                total_size = int(total_size)
-                downloaded_bytes = 0
-                
-                # Reduced from 128KB to 32KB to create frequent cancellation checks
-                for chunk in response.iter_content(chunk_size=32768):
-                    with progress_lock: # Debugging: Print current progress store state
-                        is_canceled = progress_store.get(task_key, {}).get("progress") == -1.0
-                        
-                    if is_canceled:
-                        print(f"Download {task_key} cancelled mid-flight.")
-                        f.close()
-                        if os.path.exists(filename): os.remove(filename)
-                        with progress_lock:
-                            progress_store.pop(task_key, None)  # Clean up cancelled task
-                            with batch_progress_lock:
-                                if task_key in batch_progress_store: batch_progress_store.remove(task_key)
-                        return 
-
-                    if chunk:
-                        f.write(chunk)
-                        downloaded_bytes += len(chunk)
-                        percentage = round((downloaded_bytes / total_size) * 100, 2)
-                        
-                        with progress_lock:
-                            # Verify it wasn't canceled during the write execution cycle
-                            if progress_store.get(task_key, {}).get("progress") != -1.0:
-                                progress_store[task_key] = { "ttid": ttid, "progress": percentage }
-                                
-                print(f"Download completed successfully for {task_key}")
-                with progress_lock:
-                    progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
-                    checkForSubsAndDownload(filename,unquote(ttid))  # Check for subtitles after download
+                        if chunk:
+                            f.write(chunk)
+                            downloaded_bytes += len(chunk)
+                            percentage = round((downloaded_bytes / total_size) * 100, 2)
+                            
+                            with progress_lock:
+                                # Verify it wasn't canceled during the write execution cycle
+                                if progress_store.get(task_key, {}).get("progress") != -1.0:
+                                    progress_store[task_key] = { "ttid": ttid, "progress": percentage }
+                    f.flush()
+                    os.fsync(f.fileno())
+                                    
+                    print(f"Download completed successfully for {task_key}")
+        with progress_lock:
+            progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
+        checkForSubsAndDownload(filename,unquote(ttid))  # Check for subtitles after download
 
     except Exception as e:
         with progress_lock:
@@ -479,6 +483,10 @@ def get_progress(identifier, idx):
         current_progress = progress_store[task_key]
         print(f"Queried progress for {task_key}: {current_progress}")  # Debugging: Print current progress state
     if current_progress.get("progress") == -1.0 or current_progress.get("progress") == -2.0:
+        with progress_lock:
+            progress_store.pop(task_key, None) # Clean up cancelled or failed task
+            with batch_progress_lock:
+                if task_key in batch_progress_store: batch_progress_store.remove(task_key)
         return jsonify({"progress": 0.0, "status": "Failed"}), 500
     elif current_progress.get("progress") == 100.0:
         with progress_lock:
@@ -521,6 +529,10 @@ def get_batch_progress():
                     elif task_val == -2.0:
                         failed_count += 1
                         # Force active count increments even for failed items so we can capture individual failure ticks
+                        with progress_lock:
+                            progress_store.pop(task_id, None)
+                            with batch_progress_lock:
+                                if task_id in batch_progress_store: batch_progress_store.remove(task_id)
                         active_count += 1 
                     elif task_val == 100.0:
                         completed_count += 1

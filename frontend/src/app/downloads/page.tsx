@@ -197,7 +197,7 @@ export default function DownloadsPage() {
             {(Object.keys(itemsWithMetaMap).length > 0 && !loadingMeta) && Object.keys(itemsWithMetaMap).map((storeKey) => {
                 const source = itemsWithMetaMap[storeKey];
                 console.log("Rendering download item:", storeKey, source);
-                const ttid = source?.ttid;
+                const ttid = decodeURIComponent(source?.ttid);
                 const progress = source?.progress;
                 const name = source?.name;
                 const thumbnail = source?.thumbnail;
