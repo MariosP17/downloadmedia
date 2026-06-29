@@ -167,45 +167,116 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
     const totalEpisodes = season.episodes.length;
     let notFoundEpisodes = 0;
     setLoadingPercentage(0); // Reset loading percentage at the start
-    for (let i = 1; i <= totalEpisodes; i++) {
-      setLoadingPercentage(Math.round((i / totalEpisodes) * 100)); // Update loading percentage
-      let seasontorrenturl = "";
-      try {
-        let dummyVideoId = season.episodes.find((e: any) => e.season === season.number && e.number === i)?.id;
-        if (!dummyVideoId) continue;
+    const episodeIndices = Array.from({ length: totalEpisodes }, (_, idx) => idx + 1);
+    let completedCount = 0;
+    if (totalEpisodes >= 50) {
+      const BATCH_SIZE = 5; // (lower = safer)
 
-        seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
-        const res = await fetch(seasontorrenturl);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        
-        const json = await res.json();
-        
-        if (json && Array.isArray(json.streams)) {
-          if (json.streams.length === 0) {
-            notFoundEpisodes++; 
-            continue;
-          }
-          // Avoid counting duplicate hits of the same hash within the exact same episode
-          const uniqueHashesInEpisode = new Set<string>();
+      for (let i = 0; i < episodeIndices.length; i += BATCH_SIZE) {
+        // Isolate a small chunk of episodes (e.g., episodes 1 to 5)
+        const batch = episodeIndices.slice(i, i + BATCH_SIZE);
 
-          for (const stream of json.streams) {
-            if (stream.infoHash) {
-              uniqueHashesInEpisode.add(stream.infoHash);
-              // Always save the stream object (this will naturally keep the fileIdx/data structure)
-              if (!streamObjects.has(stream.infoHash)) {
-                streamObjects.set(stream.infoHash, stream);
+        // Execute this batch concurrently and wait for it to complete before moving to the next chunk
+        await Promise.all(
+          batch.map(async (episodeNum) => {
+            let seasontorrenturl = "";
+            try {
+              const dummyVideoId = season.episodes.find(
+                (e: any) => e.season === season.number && e.number === episodeNum
+              )?.id;
+              
+              if (!dummyVideoId) return;
+
+              seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
+              const res = await fetch(seasontorrenturl);
+              
+              if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+              
+              const json = await res.json();
+              
+              if (json && Array.isArray(json.streams)) {
+                if (json.streams.length === 0) {
+                  notFoundEpisodes++;
+                  return;
+                }
+
+                const uniqueHashesInEpisode = new Set<string>();
+
+                for (const stream of json.streams) {
+                  if (stream.infoHash) {
+                    uniqueHashesInEpisode.add(stream.infoHash);
+                    if (!streamObjects.has(stream.infoHash)) {
+                      streamObjects.set(stream.infoHash, stream);
+                    }
+                  }
+                }
+
+                for (const hash of uniqueHashesInEpisode) {
+                  hashCountMap.set(hash, (hashCountMap.get(hash) || 0) + 1);
+                }
+              }
+            } catch (e) {
+              console.error(`Failed to fetch series streams from ${seasontorrenturl}:`, e);
+            } finally {
+              // Keeps progress reporting working perfectly within the chunk layers
+              completedCount++;
+              setLoadingPercentage(Math.round((completedCount / totalEpisodes) * 100));
+            }
+          })
+        );
+
+        // Optional: Add a brief 200ms breathing window between batches to appease Torrentio's firewall
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+    else {
+      // 2. Dispatch all fetch execution threads concurrently
+      await Promise.all(
+        episodeIndices.map(async (i) => {
+          let seasontorrenturl = "";
+          try {
+            const dummyVideoId = season.episodes.find(
+              (e: any) => e.season === season.number && e.number === i
+            )?.id;
+            
+            if (!dummyVideoId) return; // Acts like 'continue' inside a map function
+
+            seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
+            const res = await fetch(seasontorrenturl);
+            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            
+            const json = await res.json();
+            
+            if (json && Array.isArray(json.streams)) {
+              if (json.streams.length === 0) {
+                notFoundEpisodes++; // Note: If multiple components edit this concurrently, it's fine in JS thread runtime
+                return;
+              }
+
+              const uniqueHashesInEpisode = new Set<string>();
+
+              for (const stream of json.streams) {
+                if (stream.infoHash) {
+                  uniqueHashesInEpisode.add(stream.infoHash);
+                  if (!streamObjects.has(stream.infoHash)) {
+                    streamObjects.set(stream.infoHash, stream);
+                  }
+                }
+              }
+
+              for (const hash of uniqueHashesInEpisode) {
+                hashCountMap.set(hash, (hashCountMap.get(hash) || 0) + 1);
               }
             }
+          } catch (e) {
+            console.error(`Failed to fetch series streams from ${seasontorrenturl}:`, e);
+          } finally {
+            // 3. Thread-safe progress tracking updater 
+            completedCount++;
+            setLoadingPercentage(Math.round((completedCount / totalEpisodes) * 100));
           }
-
-          // Increment the total episode match count for these hashes
-          for (const hash of uniqueHashesInEpisode) {
-            hashCountMap.set(hash, (hashCountMap.get(hash) || 0) + 1);
-          }
-        }
-      } catch (e) {
-        console.error(`Failed to fetch series streams from ${seasontorrenturl}:`, e);
-      }
+        })
+      );
     }
 
     // 3. After the loop, find hashes whose count matches totalEpisodes exactly
