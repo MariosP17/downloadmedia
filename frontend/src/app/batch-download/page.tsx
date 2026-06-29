@@ -298,7 +298,6 @@ export default function BatchDownloadPage() {
   useEffect(() => {
     const loadAndHydrateData = async () => {
       try {
-        setPageLoading(true);
         fetchProgress();
         const rawStorage = bookmarks;
         if (!rawStorage) {
@@ -407,7 +406,9 @@ export default function BatchDownloadPage() {
         console.error("Failed hydrating batch assets from Cinemeta:", err);
         toast.error("Error building batch tracking details.");
       } finally {
-        setPageLoading(false);
+        setTimeout(() => {
+          setPageLoading(false);
+        }, 200); // Delay to ensure UI updates smoothly
       }
     };
 
@@ -426,15 +427,21 @@ useEffect(() => {
   };
 }, []); // Empty brackets ensure this cleanup is securely bound to the page-exit event
 
-const handleRemoveItems = (itemsToRemove: HydratedItem[]) => {
-  const updated = JSON.parse(bookmarks || "[]").filter(
+const handleRemoveItems = (e: React.MouseEvent<HTMLButtonElement>, itemsToRemove: HydratedItem[]) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  // 1. Filter against localStorage for the persistent backend sync data
+  const updatedStorage = JSON.parse(bookmarks || "[]").filter(
     (i: any) => !itemsToRemove.some(item => item.infoHash === i.infoHash && item.fileIdx === i.fileIdx)
   );
+
+  // 2. Filter CURRENT hydrated items state array so you don't lose Cinemeta meta details
+  const updatedHydratedItems = items.filter(
+    (currentItem) => !itemsToRemove.some(target => target.infoHash === currentItem.infoHash && target.fileIdx === currentItem.fileIdx)
+  );
+  setItems(updatedHydratedItems);
   
-  // 1. Update the master items list configuration
-  setItems(updated);
-  
-  // --- FIXED: Remove only the targets from your current checked choices ---
   setCheckedItems((prevChecked) => {
     const updatedSet = new Set(prevChecked);
     itemsToRemove.forEach((item) => {
@@ -443,27 +450,33 @@ const handleRemoveItems = (itemsToRemove: HydratedItem[]) => {
     return updatedSet;
   });
   
-  setBookmarks(JSON.stringify(updated));
+  setBookmarks(JSON.stringify(updatedStorage));
   toast.success("Selected items cleared from batch queue.");
 };
 
 // 2. Remove an explicit node entry from storage allocations
-const handleRemoveItem = (infoHash: string, fileIdx: number) => {
-  const updated = JSON.parse(bookmarks || "[]").filter(
+const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: string, fileIdx: number) => {
+  e.preventDefault();
+  e.stopPropagation();
+
+  // 1. Filter against localStorage for the persistent backend sync data
+  const updatedStorage = JSON.parse(bookmarks || "[]").filter(
     (i: any) => !(i.infoHash === infoHash && i.fileIdx === fileIdx)
   );
   
-  // 1. Update the master items list configuration
-  setItems(updated);
+  // 2. Filter CURRENT hydrated items state array so you don't lose Cinemeta meta details
+  const updatedHydratedItems = items.filter(
+    (currentItem) => !(currentItem.infoHash === infoHash && currentItem.fileIdx === fileIdx)
+  );
+  setItems(updatedHydratedItems);
   
-  // --- FIXED: Safely delete just this single key from your current checked choices ---
   setCheckedItems((prevChecked) => {
     const updatedSet = new Set(prevChecked);
     updatedSet.delete(`${infoHash}-${fileIdx}`);
     return updatedSet;
   });
   
-  setBookmarks(JSON.stringify(updated));
+  setBookmarks(JSON.stringify(updatedStorage));
   toast.success("Item cleared from batch queue.");
 };
 
@@ -728,7 +741,7 @@ const handleRemoveItem = (infoHash: string, fileIdx: number) => {
               className="bg-zinc-900 border border-zinc-800/60 rounded-xl p-4 space-y-4 hover:border-zinc-700 transition-colors"
             >
               {/* Show Title Header Block */}
-              <div className="flex items-center gap-4 border-b border-zinc-800">
+              <div className="flex items-center sm:gap-4 gap-2 border-b border-zinc-800">
                 <div className="min-w-0">
                 <FallbackImage 
                   src={seriesItem.posterUrl} 
@@ -737,7 +750,7 @@ const handleRemoveItem = (infoHash: string, fileIdx: number) => {
                   className="object-cover w-12 h-18 rounded-lg border border-zinc-800 flex-shrink-0"
                 />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1">
                   <h3 
                     className="text-base font-bold text-white text-ellipsis hover:cursor-pointer hover:text-blue-400" 
                     title={seriesItem.displayName} 
@@ -751,10 +764,10 @@ const handleRemoveItem = (infoHash: string, fileIdx: number) => {
                     {seriesEpisodes.length} {seriesEpisodes.length === 1 ? "Episode" : "Episodes"} queued
                   </p>
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0">
+                <div className="flex items-center gap-2 sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0">
                   <button
                     type="button"
-                    onClick={() => handleRemoveItems(seriesEpisodes)}
+                    onClick={(e) => handleRemoveItems(e, seriesEpisodes)}
                     className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                   >
                     Remove
@@ -789,8 +802,8 @@ const handleRemoveItem = (infoHash: string, fileIdx: number) => {
               <div className="space-y-3 pl-2">
                 {seriesSeasonsorSeriesTorrents.map((seasonOrTorrent, seasonIdx) => (
                   <div key={`${seriesItem.displayName}-season-${seasonOrTorrent}-${seasonIdx}`} className="space-y-2">
-                    <div className="flex items-center gap-4 border-b border-zinc-800">
-                    <div className="flex-1 min-w-0">
+                    <div className="flex items-center sm:gap-4 gap-2 border-b border-zinc-800">
+                    <div className="flex-1">
                     <h4 className={`text-sm font-semibold text-zinc-300 mt-2 ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} onClick={!isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}`)} : () => {}} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
                         ? seasonOrTorrent.provider + ` (${seasonOrTorrent.hash.slice(0, 8)}...)`
                         : 'Unknown Provider')}</h4>
@@ -798,10 +811,10 @@ const handleRemoveItem = (infoHash: string, fileIdx: number) => {
                     {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length} {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length === 1 ? "Episode" : "Episodes"} queued
                   </p>
                 </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0 pr-2">
+                <div className="flex items-center gap-2 sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0 pr-2">
                   <button
                     type="button"
-                    onClick={() => handleRemoveItems(seriesEpisodes.filter( ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")))}
+                    onClick={(e) => handleRemoveItems(e, seriesEpisodes.filter( ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")))}
                     className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                   >
                     Remove
@@ -879,7 +892,7 @@ const handleRemoveItem = (infoHash: string, fileIdx: number) => {
                     <div className="flex items-center gap-3 w-full sm:w-auto justify-end border-t border-zinc-800/60 sm:border-0 pt-2 sm:pt-0">
                       <button
                         type="button"
-                        onClick={() => handleRemoveItem(episodeItem.infoHash, episodeItem.fileIdx)}
+                        onClick={(e) => handleRemoveItem(e, episodeItem.infoHash, episodeItem.fileIdx)}
                         className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                       >
                         Remove
@@ -944,7 +957,7 @@ const handleRemoveItem = (infoHash: string, fileIdx: number) => {
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t border-zinc-800 sm:border-0 pt-3 sm:pt-0">
                   <button
-                    onClick={() => handleRemoveItem(item.infoHash, item.fileIdx)}
+                    onClick={(e) => handleRemoveItem(e,item.infoHash, item.fileIdx)}
                     className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                   >
                     Remove

@@ -57,7 +57,7 @@ export default function MediaExplorerPage() {
 
           {/* Root Items Display Render Layer */}
           {isMediaOpen && (
-            <div className="pl-6 border-l-2 border-zinc-800 ml-5 mt-2 space-y-1">
+            <div className="sm:pl-6 border-l-2 border-zinc-800 sm:ml-5 ml-2 mt-2 space-y-1">
               {rootItems.length === 0 && !loading ? (
                 <div className="text-sm text-zinc-500 py-2 italic pl-2">No accessible files found in root</div>
               ) : (

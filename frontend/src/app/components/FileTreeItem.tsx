@@ -402,7 +402,7 @@ export default function FileTreeItem({ name, currentPath, onRefreshParent, activ
 
       {/* Nested Children Tree Sub-Loop Render Block */}
       {isFolder && isOpen && (
-        <div className="pl-6 border-l border-zinc-800 ml-4 mt-0.5 space-y-0.5">
+        <div className="sm:pl-6 border-l border-zinc-800 sm:ml-4 ml-1 mt-0.5 space-y-0.5">
           {children.length === 0 && !loading ? (
             <div className="text-xs text-zinc-600 py-1 pl-2 italic">Empty folder</div>
           ) : (
