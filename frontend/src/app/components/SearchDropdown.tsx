@@ -120,10 +120,11 @@ export default function SearchDropdown({
               </button>
             </div>
           </div>
-
-          <div className="text-zinc-400 text-sm">
-            {active === "movies" ? `${movies.length} results` : `${series.length} results`}
-          </div>
+          {!loading && (
+            <div className="text-zinc-400 text-sm">
+              {active === "movies" ? `${movies.length} results` : `${series.length} results`}
+            </div>
+          )}
         </div>
       </div>
 
