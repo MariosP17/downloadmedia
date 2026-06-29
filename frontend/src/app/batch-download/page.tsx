@@ -20,6 +20,7 @@ type HydratedItem = StorageItem & {
   displayName: string;
   itemType: string;
   episodeTitle: string;
+  number: number;
 };
 
 type SeriesItem={
@@ -371,7 +372,8 @@ export default function BatchDownloadPage() {
             posterUrl,
             displayName,
             itemType,
-            episodeTitle
+            episodeTitle,
+            number: parseInt(item.ttid.split(":")[2]) || -1
           });
         }
         setSeriesTabs(innerseriesTabs);
@@ -845,8 +847,8 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                 </div>
                 </div>
                   <div className="space-y-3 pl-5 border-l-2 border-zinc-800" >
-                {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).map((episodeItem, epIdx) => (
-                  <div 
+                {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).sort((a,b) => a.number - b.number).map((episodeItem, epIdx) => (
+                  <div
                     key={`${episodeItem.infoHash}-${episodeItem.fileIdx}-${epIdx}`}
                     className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800/40 rounded-xl gap-4 transition-colors"
                   >
@@ -914,7 +916,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
           );
         })}
             {items.filter(item => item.itemType === "movie").map((item, index) => (
-              <div 
+              <div
                 key={`${item.infoHash}-${item.fileIdx}-${index}`}
                 className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-zinc-900 border border-zinc-800/60 rounded-xl gap-4 hover:border-zinc-700 transition-colors"
               >

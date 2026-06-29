@@ -165,6 +165,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
     const streamObjects = new Map<string, any>();
 
     const totalEpisodes = season.episodes.length;
+    let notFoundEpisodes = 0;
     setLoadingPercentage(0); // Reset loading percentage at the start
     for (let i = 1; i <= totalEpisodes; i++) {
       setLoadingPercentage(Math.round((i / totalEpisodes) * 100)); // Update loading percentage
@@ -180,6 +181,10 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
         const json = await res.json();
         
         if (json && Array.isArray(json.streams)) {
+          if (json.streams.length === 0) {
+            notFoundEpisodes++; 
+            continue;
+          }
           // Avoid counting duplicate hits of the same hash within the exact same episode
           const uniqueHashesInEpisode = new Set<string>();
 
@@ -205,7 +210,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
 
     // 3. After the loop, find hashes whose count matches totalEpisodes exactly
     for (const [hash, count] of hashCountMap.entries()) {
-      if (count === totalEpisodes) {
+      if (count === totalEpisodes - notFoundEpisodes) {
         unifiedStreams.push(streamObjects.get(hash));
       }
     }
