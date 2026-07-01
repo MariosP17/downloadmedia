@@ -1,6 +1,7 @@
 import re
 import threading
 import os
+from time import time
 import requests
 from threading import Lock
 from flask import Flask, request, jsonify, send_file
@@ -21,6 +22,8 @@ OPEN_SUBTITLES_API_USERNAME = os.getenv("OPEN_SUBTITLES_API_USERNAME")
 OPEN_SUBTITLES_API_PASSWORD = os.getenv("OPEN_SUBTITLES_API_PASSWORD")
 OPEN_SUBTITLES_API_CURRENT_JWT = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
 OPEN_SUBTITLES_CURRENT_USER_AGENT = os.getenv("OPEN_SUBTITLES_CURRENT_USER_AGENT")
+JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
+PLEX_API_KEY = os.getenv("PLEX_API_KEY")
 
 # Global dictionary to keep track of download progress
 # Format: { "identifier_idx": percentage_float }
@@ -195,7 +198,84 @@ def check_for_subtitles(filename):
     except ffmpeg.Error as e:
         print(f"Error probing file: {e.stderr.decode()}")
         return None
+
+def checkIfDoneAndRefreshLibraries():
+    """
+    Checks if all downloads have completed and refreshes the media libraries if so.
+    """
+    isDownloading = False
     
+    with progress_lock:
+        # If there are no tasks tracked, we aren't downloading anything
+        if not progress_store:
+            isDownloading = False
+        else:
+            # STILL downloading if ANY task is active (between 0.0 and 100.0)
+            # and NOT in an idle/failed state (-1.0, -2.0)
+            isDownloading = any(
+                0.0 <= progress_store.get(task_id, {}).get("progress", 0.0) < 100.0
+                and progress_store.get(task_id, {}).get("progress", 0.0) not in (-1.0, -2.0)
+                for task_id in progress_store
+            )
+
+    if not isDownloading:  
+        print("All downloads completed (or cleared). Refreshing media libraries...")
+        try:
+            refresh_jellyfin_libraries()
+            refresh_plex_libraries()
+        except Exception as e:
+            print(f"Error occurred while refreshing libraries: {e}")
+    else:
+        print("Downloads still in progress...")
+
+def refresh_jellyfin_libraries():
+        url = "http://localhost:8096/Library/Refresh"
+        headers = {
+            "X-MediaBrowser-Token": JELLYFIN_API_KEY,
+            "Content-Type": "application/json"
+        }
+        while True:
+            try:
+                response = requests.post(url, headers=headers, json={})
+                
+                if response.status_code in (200, 204):
+                    print("Jellyfin libraries refreshed successfully.")
+                    return True  # Break the loop and exit the function successfully
+                    
+                elif response.status_code == 503:
+                    retry_after = int(response.headers.get('Retry-After', 5))
+                    message = response.json().get('message', 'Service Unavailable')
+                    print(f"{message}. Retrying after {retry_after} seconds...")
+                    time.sleep(retry_after)
+                    continue  # Loop goes back to the top and tries again cleanly
+                    
+                else:
+                    print(f"Failed to refresh. Status code: {response.status_code}, Response: {response.text}")
+                    return False # Exit on hard error (401, 404, etc.)
+                    
+            except Exception as e:
+                print(f"Exception occurred while refreshing Jellyfin libraries: {e}")
+                return False
+
+def refresh_plex_libraries():
+    url = "http://localhost:32400/library/sections/all/refresh"
+    headers = {
+        "X-Plex-Token": PLEX_API_KEY,
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code in (200, 204):
+            print("Plex libraries refreshed successfully.")
+            return True
+        else:
+            print(f"Failed to refresh Plex libraries. Status code: {response.status_code}, Response: {response.text}")
+            return False
+    except Exception as e:
+        print(f"Exception occurred while refreshing Plex libraries: {e}")
+        return False
+
 def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = "", ttid: str = ""):
     task_key = f"{identifier}_{idx}"
     
@@ -275,6 +355,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
         with progress_lock:
             progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
         checkForSubsAndDownload(filename,unquote(ttid))  # Check for subtitles after download
+        checkIfDoneAndRefreshLibraries()  # Refresh libraries after download completion
 
     except Exception as e:
         with progress_lock:
