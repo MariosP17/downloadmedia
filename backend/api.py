@@ -310,6 +310,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                                 progress_store.pop(task_key, None)  # Clean up cancelled task
                                 with batch_progress_lock:
                                     if task_key in batch_progress_store: batch_progress_store.remove(task_key)
+                            checkIfDoneAndRefreshLibraries()
                             return 
 
                         if chunk:
@@ -337,6 +338,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                                 progress_store.pop(task_key, None)  # Clean up cancelled task
                                 with batch_progress_lock:
                                     if task_key in batch_progress_store: batch_progress_store.remove(task_key)
+                            checkIfDoneAndRefreshLibraries()
                             return 
 
                         if chunk:
@@ -368,6 +370,7 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                 # Do NOT pop instantly; let the frontend read the failure status safely first
                 progress_store[task_key] = { "ttid": ttid, "progress": -2.0 } 
         
+        checkIfDoneAndRefreshLibraries()
         if os.path.exists(filename):
             try: os.remove(filename)
             except: pass
