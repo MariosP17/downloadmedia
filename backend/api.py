@@ -773,7 +773,11 @@ def delete_folder():
         else:
             return jsonify({"error": "Specified path is not a folder"}), 400
     except OSError as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500 
+    finally:
+        refresh_jellyfin_libraries()
+        refresh_plex_libraries()
+
 
 
 @app.route('/deleteFile', methods=['POST'])
@@ -793,6 +797,10 @@ def delete_file():
         return jsonify({"message": "File deleted successfully"}), 200
     except OSError as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        refresh_jellyfin_libraries()
+        refresh_plex_libraries()
+
 
 @app.route('/renameFolder', methods=['POST'])
 def rename_folder():
@@ -820,6 +828,10 @@ def rename_folder():
         return jsonify({"message": "Folder renamed successfully"}), 200
     except OSError as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        refresh_jellyfin_libraries()
+        refresh_plex_libraries()
+
 
 @app.route('/renameFile', methods=['POST'])
 def rename_file():
@@ -845,6 +857,10 @@ def rename_file():
         return jsonify({"message": "File renamed successfully"}), 200
     except OSError as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        refresh_jellyfin_libraries()
+        refresh_plex_libraries()
+
 
 @app.route('/createFolder', methods=['POST'])
 def create_folder():
