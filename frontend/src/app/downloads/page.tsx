@@ -38,7 +38,7 @@ export default function DownloadsPage() {
           // Check if there are active items left to download
           const downloadArray = Object.values(data);
           const hasActiveDownloads = downloadArray.some(
-            (item) => item.progress < 100 && item.status !== "cancelled" && item.status !== "paused"
+            (item) => item.progress < 100 && item.progress >= 0
           );
   
           // If the store is completely empty or everything is done/cancelled, clear interval
@@ -78,7 +78,7 @@ export default function DownloadsPage() {
         for (const key of keys) {
           const [hash, idx] = key.split("_");
           const res = await fetch(`http://${window.location.hostname}:7000/progress/${hash}/${idx}`);
-          if (!res.ok) {
+          if (!res.ok && res.status !== 500) {
             console.error(`Failed to remove download ${key} from store`);
           }
         }
@@ -205,6 +205,8 @@ export default function DownloadsPage() {
                 const type = decodeURIComponent(ttid).includes(":") ? "series" : "movie";
                 if (!ttid || progress === undefined || progress === null) return null;
               const isCompleted = progress >= 100;
+              const isCancelled = progress == -1.0;
+              const isFailed = progress == -2.0;
               const displayName = name ?? `ID: ${decodeURIComponent(ttid)}`;
               const seriesOrMovieName = type === "movie" ? displayName : seriesNames[decodeURIComponent(ttid).split(":")[0]] ?? displayName;
               const thumbnailUrl = thumbnail;
@@ -230,11 +232,15 @@ export default function DownloadsPage() {
                     <div className="flex-shrink-0 sm:order-last sm:ml-2">
                       {isCompleted ? (
                         <span className="px-2.5 py-1 text-xs font-semibold bg-green-500/10 text-green-400 rounded-full border border-green-500/20 whitespace-nowrap">
-                          Ready
+                          Finished
                         </span>
-                      ) : status === "cancelled" ? (
+                      ) : isCancelled ? (
                         <span className="px-2.5 py-1 text-xs font-semibold bg-red-500/10 text-red-400 rounded-full border border-red-500/20 whitespace-nowrap">
                           Cancelled
+                        </span>
+                      ) : isFailed ? (
+                        <span className="px-2.5 py-1 text-xs font-semibold bg-red-500/10 text-red-400 rounded-full border border-red-500/20 whitespace-nowrap">
+                          Failed
                         </span>
                       ) : (
                         <span className="px-2.5 py-1 text-xs font-semibold bg-blue-500/10 text-blue-400 animate-pulse rounded-full border border-blue-500/20 whitespace-nowrap">
@@ -273,7 +279,7 @@ export default function DownloadsPage() {
                       </div>
                       {/* Progress Percentage Text */}
                       <span className="text-xs text-zinc-400 font-mono w-12 text-right flex-shrink-0">
-                        {progress.toFixed(2)}%
+                        {progress >= 0 ? `${progress.toFixed(2)}%` : null}
                       </span>
                     </div>
                   </div>
