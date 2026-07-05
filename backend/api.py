@@ -880,6 +880,15 @@ def create_folder():
     except OSError as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/refreshLibraries', methods=['GET'])
+def refresh_libraries():
+    try:
+        refresh_jellyfin_libraries()
+        refresh_plex_libraries()
+        return jsonify({"message": "Libraries refreshed successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     # Start the Flask app explicitly on Port 7000
     app.run(host='0.0.0.0', port=7000, debug=True)

@@ -34,12 +34,38 @@ export default function MediaExplorerPage() {
     }
   };
 
+  const refreshLibraries = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    try{
+      e.preventDefault(); // Prevent the default action of the click event
+      e.stopPropagation(); // Prevent the click from propagating to the parent div
+      const res = await fetch(`http://${window.location.hostname}:7000/refreshLibraries`)
+      if (!res.ok) throw new Error("Failed to refresh libraries");
+      toast.success("Libraries refreshed successfully!");
+    } catch (error) {
+      console.error("Error refreshing libraries:", error);
+      toast.error("Failed to refresh libraries.");
+    }
+  };
+
   return (
     <main className="min-h-screen bg-zinc-950 text-white p-6 sm:p-12">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold text-zinc-100 mb-6 tracking-tight">
           File Browser
         </h1>
+        <div className="flex justify-end z-50 text-zinc-100 pb-4">
+          <button
+            onClick={(e) => refreshLibraries(e)}
+            className="text-zinc-100 text-xs hover:text-white focus:outline-none cursor-pointer flex items-center gap-2 font-semibold transition-colors bg-zinc-800 hover:bg-zinc-700 px-4 py-2 rounded-lg shadow-md"
+          >
+            <img
+              src="refresh-libraries.svg"
+              alt="Refresh Libraries"
+              className="w-5 h-5 object-contain flex-shrink-0"
+            />
+            Refresh Libraries
+          </button>
+        </div>
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-xl">
           {/* Main Collapsed Media Root Row */}
           <div
