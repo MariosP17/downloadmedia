@@ -20,7 +20,9 @@ type FolderTreeItemProps = {
   selectedPath: string;
   onSelectPath: (path: string) => void;
   onRefreshParent?: () => void;
-  activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>; // Add this
+  activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>,
+  expandedFolders?: string;
+  exists?: boolean;
 };
 
 let globalActiveCloseMenuFn: (() => void) | null = null;
@@ -38,17 +40,23 @@ const clearGlobalMenu = (closeFn: () => void) => {
   }
 };
 
-function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef }: FolderTreeItemProps) {
+function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef, expandedFolders,exists }: FolderTreeItemProps) {
   const cleanName = name.endsWith("/") ? name.slice(0, -1) : name;
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
-  
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(exists &&expandedFolders != null && expandedFolders.split("/").includes(cleanName));
   const [subFolders, setSubFolders] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const isSelected = selectedPath === itemPath;
-
+  useEffect(() => {
+    const fetchSubFoldersOnConditions = async () => {
+    if (exists && expandedFolders != null && expandedFolders.split("/").includes(cleanName)) {
+      fetchSubfolders(); // Fetch subfolders when the component mounts or when expandedFolders changes
+    }
+  }
+    fetchSubFoldersOnConditions();
+  }, [expandedFolders]);
   const fetchSubfolders = async () => {
     setLoading(true);
     try {
@@ -220,6 +228,8 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
                 onSelectPath={onSelectPath}
                 onRefreshParent={fetchSubfolders}
                 activeRefreshRef={activeRefreshRef}
+                expandedFolders={expandedFolders}
+                exists={exists}
               />
             ))
           )}
@@ -240,13 +250,26 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
   
   // Custom Selection Window / Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalCreateFolderOpen, setIsModalCreateFolderOpen] = useState(false);
   const [rootFolders, setRootFolders] = useState<string[]>([]);
   const [targetPath, setTargetPath] = useState(""); 
   const [targetName, setTargetName] = useState(filename || title || "");
   const [newFolderName, setNewFolderName] = useState("");
+  const [exists, setExists] = useState(false);
 
   const serverStateRef = useRef<ServerDownloadState>("idle");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const getCinemetaData = async () => {
+    const cinemetaUrl = `https://v3-cinemeta.strem.io/meta/${decodeURIComponent(ttid).split(":").length > 1 ? "series" : "movie"}/${decodeURIComponent(ttid).split(":")[0]}.json`;
+    try{
+      const res = await fetch(cinemetaUrl);
+      const data = await res.json();
+      return data;
+    }
+    catch(e){
+      return null;
+    }
+  }
 
   const setServerState = (newState: ServerDownloadState) => {
     serverStateRef.current = newState;
@@ -334,11 +357,24 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
       if (intervalRef.current) clearInterval(intervalRef.current);
     }
   };
-
   const openSelectionModal = async () => {
-    setIsModalOpen(true);
-    setTargetPath(""); // Starts with base root directory path selected
-    await loadRootFolders();
+    const initialPath = await getInitialPath();
+    setTargetPath(initialPath); // Starts with base root directory path selected
+    const existsUrl = await fetch(`http://${window.location.hostname}:7000/destinationExists`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ destination: initialPath })
+    })
+    const existsData = await existsUrl.json();
+    const newexists = existsData.exists;
+    setExists(existsData.exists);
+    if (!newexists) {
+      setIsModalCreateFolderOpen(true);
+    }
+    else{
+      setIsModalOpen(true);
+      await loadRootFolders();
+    }
   };
 
   const handleCreateFolder = async () => {
@@ -371,6 +407,27 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
       toast.error(err.message || "Failed creating folder.");
     }
   };
+
+  const createFolderAndContinue = async () => {
+    if (!targetPath.trim()) return;
+
+    try {
+      console.log(`Creating folder at path: ${targetPath}`); // Debug log for folder creation
+      const res = await fetch(`http://${window.location.hostname}:7000/createFolder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folder: targetPath })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Directory assembly aborted");
+      setExists(true);
+      setIsModalCreateFolderOpen(false);
+      setIsModalOpen(true);
+      await loadRootFolders();
+    } catch (err: any) {
+      toast.error(err.message || "Failed creating folder.");
+    }
+  }
 
   const triggerCancellationTask = async () => {
     setServerState("cancelling");
@@ -474,6 +531,18 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
     };
   }, [isModalOpen]);
   
+  const getInitialPath = async () => {
+    let path = "";
+    const data = await getCinemetaData();
+    if (data && data.meta && data.meta.name && data.meta.year && data.meta.type) {
+      path = `${data.meta.type === "series" ? "TV-Shows" : "Movies"}/${data.meta.name} (${data.meta.year.toString().split("–")[0]})`;
+      if (data.meta.type === "series" && decodeURIComponent(ttid).split(":").length > 1) {
+        path += `/Season ${decodeURIComponent(ttid).split(":")[1].padStart(2, "0")}`;
+      }
+    }
+    return path;
+  };
+
   return (
     <div className="flex flex-col gap-4 w-full">
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full">
@@ -596,6 +665,8 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
                     onSelectPath={setTargetPath}
                     onRefreshParent={loadRootFolders}
                     activeRefreshRef={activeRefreshRef}
+                    expandedFolders={targetPath.split("/").length > 0 ? targetPath.split("/").slice(0, -1).join("/") : undefined}
+                    exists = {exists}
                   />
                 ))}
               </div>
@@ -657,6 +728,43 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
                   Start Download
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isModalCreateFolderOpen && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-end border-b border-zinc-800 pb-3 mb-4">
+              <button 
+                onClick={() => setIsModalCreateFolderOpen(false)} 
+                className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-zinc-400 tracking-wider mb-1">Suggested folder for this item doesn't exist. Do you want to create it?</label>
+              <input className="block text-sm font-bold bg-black text-green-400 tracking-wider p-1 mb-1 w-full" value={targetPath} onChange={(e) => setTargetPath(e.target.value)} />
+
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => {setIsModalCreateFolderOpen(false); setIsModalOpen(true); setTargetPath(""); loadRootFolders();}}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                No
+              </button>
+              <button
+                onClick={createFolderAndContinue}
+                disabled={!targetPath.trim()}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
+              >
+                Create Folder
+              </button>
             </div>
           </div>
         </div>

@@ -889,6 +889,17 @@ def refresh_libraries():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/destinationExists', methods=['POST'])
+def destination_exists():
+    data = request.get_json() or {}
+    destination = data.get('destination')
+
+    if not destination:
+        return jsonify({"error": "Destination path is required"}), 400
+
+    destination_path = os.path.join('/media', destination)
+    return jsonify({"exists": os.path.exists(destination_path)}), 200
+
 if __name__ == '__main__':
     # Start the Flask app explicitly on Port 7000
     app.run(host='0.0.0.0', port=7000, debug=True)
