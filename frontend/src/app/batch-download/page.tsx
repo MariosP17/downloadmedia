@@ -1,6 +1,6 @@
 'use client';
 import FallbackImage from "../components/fallbackimg";
-import { useEffect, useState,useRef } from "react";
+import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useSyncedLocalStorage } from "../Utils/useSyncedLocalStorage";
 import { useRouter } from "next/navigation";
@@ -31,11 +31,16 @@ type SeriesItem={
 // Dummy / Interface placeholder for custom recursive file paths wrapper configuration tracker
 type FolderTreeItemProps = {
   name: string;
+  size: string;
+  numberOfItems: number;
+  numberOfFolders: number;
   currentPath: string;
   selectedPath: string;
   onSelectPath: (path: string) => void;
   onRefreshParent?: () => void;
   activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>; // Add this
+  expandedFolders?: string;
+  exists?: boolean;
 };
 
 let globalActiveCloseMenuFn: (() => void) | null = null;
@@ -53,19 +58,35 @@ const clearGlobalMenu = (closeFn: () => void) => {
   }
 };
 
+const closeAnyOpenMenu = () => {
+  globalActiveCloseMenuFn?.();
+};
+
 type ServerStatus = "Downloading" | "Failed" | "Completed";
 
-function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef }: FolderTreeItemProps) {
+function FolderTreeItem({ name, size, numberOfItems, numberOfFolders, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef, expandedFolders, exists }: FolderTreeItemProps) {
   const cleanName = name.endsWith("/") ? name.slice(0, -1) : name;
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
+  const menuAnchorRef = useRef<HTMLDivElement>(null);
   
-  const [isOpen, setIsOpen] = useState(false);
-  const [subFolders, setSubFolders] = useState<string[]>([]);
+  const [isOpen, setIsOpen] = useState(exists && expandedFolders != null && expandedFolders.split("/").includes(cleanName));
+  const [subFolders, setSubFolders] = useState<{name: string, size: string, numberOfItems: number, numberOfFolders: number}[]>([]);
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-
+  const [isMenuReady, setIsMenuReady] = useState(false);
+  const [menuPlacement, setMenuPlacement] = useState<"down" | "up">("down");
+  const [isDeleteFolderModalOpen, setIsDeleteFolderModalOpen] = useState(false);
+  const [isRenameFolderModalOpen, setIsRenameFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState(cleanName);
   const isSelected = selectedPath === itemPath;
-
+  useEffect(() => {
+    const fetchSubFoldersOnConditions = async () => {
+    if (exists && expandedFolders != null && expandedFolders.split("/").includes(cleanName)) {
+      fetchSubfolders(); // Fetch subfolders when the component mounts or when expandedFolders changes
+    }
+  }
+    fetchSubFoldersOnConditions();
+  }, [expandedFolders]);
   const fetchSubfolders = async () => {
     setLoading(true);
     try {
@@ -85,6 +106,7 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
 
   const handleToggleExpand = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering path selection when clicking the icon arrow
+    closeAnyOpenMenu();
     const nextState = !isOpen;
     setIsOpen(nextState);
     if (nextState) {
@@ -92,11 +114,10 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
     }
   };
 
+
   const handleDeleteFolder = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log(`Attempting to delete folder at path: ${itemPath}`); // Debug log for deletion path
-    if (!confirm(`Are you sure you want to delete "${cleanName}"?`)) return;
-
+  
     try {
       const res = await fetch(`http://${window.location.hostname}:7000/deleteFolder`, {
         method: "POST",
@@ -115,13 +136,12 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
 
   const handleRenameFolder = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newName = prompt("Enter new folder name:", cleanName);
-    if (newName && newName.trim()) {
+    if (newFolderName && newFolderName.trim()) {
       try {
       const res = await fetch(`http://${window.location.hostname}:7000/renameFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ folder: itemPath, newName: newName.trim() })
+        body: JSON.stringify({ folder: itemPath, newName: newFolderName.trim() })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Deactivation failed");
@@ -146,35 +166,100 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
       clearGlobalMenu(closeMenu);
     };
   }
-}, [isMenuOpen]);
+}, [isMenuOpen,isOpen]);
+
+  useLayoutEffect(() => {
+    const anchorElement = menuAnchorRef.current;
+    if (!isMenuOpen || !anchorElement) return;
+
+    const updatePlacement = () => {
+      const anchorRect = anchorElement.getBoundingClientRect();
+      if (!anchorRect) return;
+
+      const menuElement = anchorElement.querySelector<HTMLElement>("[data-folder-menu]");
+      const estimatedMenuHeight = menuElement?.getBoundingClientRect().height ?? 88;
+
+      let scrollParent: HTMLElement | null = anchorElement.parentElement;
+      while (scrollParent) {
+        const overflowY = window.getComputedStyle(scrollParent).overflowY;
+        if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") {
+          break;
+        }
+        scrollParent = scrollParent.parentElement;
+      }
+
+      const boundaryRect = scrollParent?.getBoundingClientRect();
+      const bottomBoundary = boundaryRect?.bottom ?? window.innerHeight;
+      const topBoundary = boundaryRect?.top ?? 0;
+
+      const spaceBelow = bottomBoundary - anchorRect.bottom;
+      const spaceAbove = anchorRect.top - topBoundary;
+
+      setMenuPlacement(spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow ? "up" : "down");
+    };
+
+    updatePlacement();
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
+    };
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      setIsMenuReady(false);
+      return;
+    }
+
+    setIsMenuReady(false);
+    const animationFrame = window.requestAnimationFrame(() => {
+      setIsMenuReady(true);
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [isMenuOpen, menuPlacement]);
+
   return (
     <div className="select-none text-left">
       <div
-        onClick={() => onSelectPath(itemPath)}
+        onClick={() => {
+          closeAnyOpenMenu();
+          onSelectPath(itemPath);
+        }}
         className={`flex items-center justify-between group py-2 px-2 rounded cursor-pointer transition-colors ${
           isSelected ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-300"
         }`}
       >
-        <div className="flex items-center gap-2 truncate min-w-0 flex-1">
           <button 
             onClick={handleToggleExpand} 
-            className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors p-0.5"
+            className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors p-0.5 pr-5"
           >
             {isOpen ? "▼" : "▶"}
           </button>
-          <img
-            src={isOpen ? "/open-folder.png" : "/folder.png"}
-            alt=""
-            className="w-4 h-4 object-contain flex-shrink-0"
-          />
-          <span className="text-sm font-medium break-words whitespace-normal">
-            {cleanName}
-          </span>
-          {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
+        <div className="flex items-center gap-2 overflow-x-auto truncate truncate min-w-0 flex-1">
+          {/* <span className=""> */}
+            <img
+              src={isOpen ? "/open-folder.png" : "/folder.png"}
+              alt=""
+              className="w-4 h-4 object-contain flex-shrink-0"
+            />
+            <span className="text-sm font-medium break-words whitespace-normal">
+              {cleanName}
+            </span>
+            {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
+            {!loading && (
+              <span className={`text-xs ${isSelected ? "text-white" : "text-zinc-500"} font-mono`}>
+                ({numberOfFolders} {numberOfFolders === 1 ? "folder" : "folders"})
+              </span>
+            )}
+          {/* </span> */}
         </div>
 
         {/* --- THREE DOTS OPTIONS DROPDOWN CONTEXT MENU --- */}
-        <div className="relative flex-shrink-0 ml-2">
+        <div className="relative flex-shrink-0 ml-2" ref={menuAnchorRef}>
           {/* Trigger Button: Visible on Mobile, on Hover for Desktop */}
           <button
             onClick={(e) => {
@@ -194,13 +279,14 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
           {isMenuOpen && (
             <div 
               onClick={(e) => e.stopPropagation()} // Stop menu background clicks from expanding folder rows
-              className="absolute right-0 mt-1 w-28 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
+              data-folder-menu
+              className={`absolute right-0 w-28 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl py-1 z-30 transform-gpu transition-all duration-150 ease-out ${isMenuReady ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-1"} ${menuPlacement === "up" ? "bottom-full mb-1 origin-bottom-right" : "mt-1 origin-top-right"}`}
             >
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsMenuOpen(false);
-                  handleRenameFolder(e); // Safely fires your existing rename routine
+                  setIsRenameFolderModalOpen(true);
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
               >
@@ -210,8 +296,9 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
               
               <button
                 onClick={(e) => {
+                  e.stopPropagation();
                   setIsMenuOpen(false);
-                  handleDeleteFolder(e); // Safely fires your existing delete routine
+                  setIsDeleteFolderModalOpen(true);
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-colors cursor-pointer flex items-center gap-1.5"
               >
@@ -228,18 +315,97 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
           {subFolders.length === 0 && !loading ? (
             <div className="text-xs text-zinc-600 py-1 pl-2 italic">No subdirectories</div>
           ) : (
-            subFolders.map((subName) => (
+            subFolders.map(({ name, size, numberOfItems, numberOfFolders }) => (
               <FolderTreeItem
-                key={subName}
-                name={subName}
+                key={name}
+                name={name}
+                size={size}
+                numberOfItems={numberOfItems}
+                numberOfFolders={numberOfFolders}
                 currentPath={itemPath}
                 selectedPath={selectedPath}
                 onSelectPath={onSelectPath}
                 onRefreshParent={fetchSubfolders}
                 activeRefreshRef={activeRefreshRef}
+                expandedFolders={expandedFolders}
+                exists={exists}
               />
             ))
           )}
+        </div>
+      )}
+      {isDeleteFolderModalOpen && (
+        <div onClick={() => {setIsDeleteFolderModalOpen(false);}} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <label className="block text-sm font-bold text-zinc-400 tracking-wider">Confirm Deletion</label>
+              <button 
+                onClick={() => {setIsDeleteFolderModalOpen(false);}} 
+                className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <span className="block text-sm font-bold text-zinc-400 tracking-wider mb-1">Are you sure you want to delete this folder and all its contents?</span>
+              <span className={`block text-center text-sm font-bold bg-black text-red-400 tracking-wider p-1 mb-1 w-full ${itemPath.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{itemPath}</span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={(e) => {handleDeleteFolder(e); setIsDeleteFolderModalOpen(false);}}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => {setIsDeleteFolderModalOpen(false);}}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isRenameFolderModalOpen && (
+        <div onClick={() => {setIsRenameFolderModalOpen(false); setNewFolderName(cleanName);}} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <label className="block text-sm font-boldtext-zinc-400 tracking-wider">Rename Folder</label>
+              <button 
+                onClick={() => {setIsRenameFolderModalOpen(false); setNewFolderName(cleanName);}} 
+                className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <input 
+                type="text" 
+                value={newFolderName} 
+                onChange={(e) => setNewFolderName(e.target.value)} 
+                className="block text-sm font-bold bg-black text-zinc-400 tracking-wider p-1 mb-1 w-full"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={(e) => {handleRenameFolder(e); setIsRenameFolderModalOpen(false);}}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
+              >
+                Rename
+              </button>
+              <button
+                onClick={() => {setIsRenameFolderModalOpen(false); setNewFolderName(cleanName);}}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -258,11 +424,14 @@ export default function BatchDownloadPage() {
 
   // Bottom action bar & target server tree variables configuration states
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [targetPath, setTargetPath] = useState<string>(""); 
-  const [rootFolders, setRootFolders] = useState<string[]>([]);
+  const [temporarySelectedPath, setTemporarySelectedPath] = useState<string>(""); // For temporary selection before confirming
+  const [rootFolders, setRootFolders] = useState<{name: string, size: string, numberOfItems: number, numberOfFolders: number}[]>([]);
   const [newFolderName, setNewFolderName] = useState("");
   const [taskIds, setTaskIds] = useState<string[]>([]);
   const [isOn, setIsOn] = useState(false);
+  const [globalExists, setGlobalExists] = useState<boolean>(false);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -287,7 +456,6 @@ export default function BatchDownloadPage() {
     if (data && Object.keys(data).length > 0) {
       let allTaskIds: string[] = Object.keys(data);
       setTaskIds(allTaskIds);
-      console.log("Fetched interval task IDs:", intervalRef.current);
       if (!intervalRef.current) intervalRef.current = setInterval(async () => await checkBatchProgress(allTaskIds), 1000);
     }
   } catch (err) {
@@ -348,7 +516,7 @@ export default function BatchDownloadPage() {
               );
               if (matchingVideo) {
                 displayName = `${cached.name}`;
-                episodeTitle = `S${matchingVideo.season}E${matchingVideo.number} : ${matchingVideo.name}`;
+                episodeTitle = `S${matchingVideo.season.toString().padStart(2, '0')}E${matchingVideo.number.toString().padStart(2, '0')}: ${matchingVideo.name}`;
                 posterUrl = matchingVideo.poster || matchingVideo.thumbnail || posterUrl;
               } else {
                 displayName = cached.name;
@@ -386,12 +554,12 @@ export default function BatchDownloadPage() {
           // }
 
           // 2. Build a quick lookup array of items we were already displaying before this tick
-          const existingInfoHashesIndexes = new Set(items.map(item => `${item.infoHash}-${item.fileIdx}`));
+          const existingInfoHashesIndexes = new Set(items.map(item => `${item.infoHash}-${item.fileIdx}-${item.ttid}`));
           const updatedSet = new Set<string>();
 
           hydratedList.forEach((item) => {
-            const key = `${item.infoHash}-${item.fileIdx}`;
-            
+            const key = `${item.infoHash}-${item.fileIdx}-${item.ttid}`;
+
             // 3. If the torrent/movie infoHash is brand new to the list, check it by default!
             if (!existingInfoHashesIndexes.has(key)) {
               updatedSet.add(key);
@@ -435,19 +603,19 @@ const handleRemoveItems = (e: React.MouseEvent<HTMLButtonElement>, itemsToRemove
 
   // 1. Filter against localStorage for the persistent backend sync data
   const updatedStorage = JSON.parse(bookmarks || "[]").filter(
-    (i: any) => !itemsToRemove.some(item => item.infoHash === i.infoHash && item.fileIdx === i.fileIdx)
+    (i: any) => !itemsToRemove.some(item => item.infoHash === i.infoHash && item.fileIdx === i.fileIdx && decodeURIComponent(item.ttid) === decodeURIComponent(i.ttid))
   );
 
   // 2. Filter CURRENT hydrated items state array so you don't lose Cinemeta meta details
   const updatedHydratedItems = items.filter(
-    (currentItem) => !itemsToRemove.some(target => target.infoHash === currentItem.infoHash && target.fileIdx === currentItem.fileIdx)
+    (currentItem) => !itemsToRemove.some(target => target.infoHash === currentItem.infoHash && target.fileIdx === currentItem.fileIdx && decodeURIComponent(target.ttid) === decodeURIComponent(currentItem.ttid))
   );
   setItems(updatedHydratedItems);
   
   setCheckedItems((prevChecked) => {
     const updatedSet = new Set(prevChecked);
     itemsToRemove.forEach((item) => {
-      updatedSet.delete(`${item.infoHash}-${item.fileIdx}`);
+      updatedSet.delete(`${item.infoHash}-${item.fileIdx}-${decodeURIComponent(item.ttid)}`);
     });
     return updatedSet;
   });
@@ -457,24 +625,23 @@ const handleRemoveItems = (e: React.MouseEvent<HTMLButtonElement>, itemsToRemove
 };
 
 // 2. Remove an explicit node entry from storage allocations
-const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: string, fileIdx: number) => {
+const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: string, fileIdx: number, ttid: string) => {
   e.preventDefault();
   e.stopPropagation();
-
   // 1. Filter against localStorage for the persistent backend sync data
   const updatedStorage = JSON.parse(bookmarks || "[]").filter(
-    (i: any) => !(i.infoHash === infoHash && i.fileIdx === fileIdx)
+    (i: any) => !(i.infoHash === infoHash && i.fileIdx === fileIdx && decodeURIComponent(i.ttid) === decodeURIComponent(ttid))
   );
   
   // 2. Filter CURRENT hydrated items state array so you don't lose Cinemeta meta details
   const updatedHydratedItems = items.filter(
-    (currentItem) => !(currentItem.infoHash === infoHash && currentItem.fileIdx === fileIdx)
+    (currentItem) => !(currentItem.infoHash === infoHash && currentItem.fileIdx === fileIdx && decodeURIComponent(currentItem.ttid) === decodeURIComponent(ttid))
   );
   setItems(updatedHydratedItems);
   
   setCheckedItems((prevChecked) => {
     const updatedSet = new Set(prevChecked);
-    updatedSet.delete(`${infoHash}-${fileIdx}`);
+    updatedSet.delete(`${infoHash}-${fileIdx}-${decodeURIComponent(ttid)}`);
     return updatedSet;
   });
   
@@ -483,8 +650,97 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
 };
 
   
+  const checkIfItemsAreFromSameSeriesOrSameMovie = (selectedKeys: Array<string>) : boolean => {
+    const parsedItems = selectedKeys.map(key => {
+    // Grab the 3rd element (index 2) after splitting by '-'
+    const targetPart = key.split('-')[2] || ""; 
+    return targetPart.split(':');
+    });
+
+    // 2. Safely capture the baseline lengths and values from the first item
+    const firstItem = parsedItems[0];
+    const firstLength = firstItem ? firstItem.length : 0;
+
+    const isValid = parsedItems.every(parts => {
+        // Rule 1: The length of the split(":") must be equal for ALL items
+        if (parts.length !== firstLength) return false;
+        
+        // Rule 2: If length > 1, check if BOTH index 0 and index 1 match the first item
+        if (parts.length > 1) {
+            return parts[0] === firstItem[0] && parts[1] === firstItem[1];
+        }
+        
+        // Rule 3: If length === 1, check if index 0 matches the first item
+        if (parts.length === 1) {
+            return parts[0] === firstItem[0];
+        }
+        
+        // Rule 4: Else (length is 0 or invalid)
+        return false;
+    });
+
+    return isValid;
+  };
+
+  const getCinemetaData = async (ttid: string, itemType: string) => {
+    const baseImdbId = ttid.split(":")[0];
+    const res = await fetch(`https://v3-cinemeta.strem.io/meta/${itemType}/${baseImdbId}.json`);
+    const data = await res.json();
+    return data;
+  };
+
+  const checkExists = async (meta: any, season: number = -1) => {
+    let pathToCheck = "";
+    if (meta && meta.type && meta.name && meta.year) {
+      pathToCheck = `${meta.type === "series" ? "TV-Shows" : "Movies"}/${meta.name} (${meta.year.toString().split("–")[0]})`;
+      if (meta.type === "series" && season >= 0){
+        pathToCheck += season != 0 ? `/Season ${season.toString().padStart(2, "0")}` : "/Specials";
+      }
+    }
+    if (pathToCheck === "") {
+      return { exists: false, path: "" }; // If we couldn't construct a valid path, return false
+    }
+    try {
+      const existsRes = await fetch(`http://${window.location.hostname}:7000/destinationExists`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination: pathToCheck })
+      });
+      const existsData = await existsRes.json();
+      return { exists: existsData.exists, path: pathToCheck };
+    } 
+    catch (err) {
+        console.error("Failed to check destination existence:", err);
+        return { exists: false, path: pathToCheck }; // Return the path we tried to check for debugging
+    }
+  };
+
   // 3. Load top-level directories configurations
   const openLocationSelectorModal = async () => {
+    if (targetPath !== "") {
+      setTemporarySelectedPath(targetPath);
+    }
+    if (Array.from(checkedItems).length > 0 && checkIfItemsAreFromSameSeriesOrSameMovie(Array.from(checkedItems))) {
+      const firstCheckedKey = decodeURIComponent(Array.from(checkedItems)[0].split("-")[2]);
+      const data = await getCinemetaData(firstCheckedKey, firstCheckedKey.split(":").length > 1 ? "series" : "movie");
+      const localExists = await checkExists(data.meta, firstCheckedKey.split(":").length > 1 ? parseInt(firstCheckedKey.split(":")[1]) : -1);
+      if (localExists.exists) {
+        setTemporarySelectedPath(localExists.path);
+        await openModal();
+      }
+      else{
+        setTemporarySelectedPath(localExists.path);
+        setIsCreateFolderModalOpen(true);
+      }
+      setGlobalExists(localExists.exists);
+    }
+    else{
+      await openModal();
+    }
+    
+  };
+  
+  const openModal = async () => {
     setIsModalOpen(true);
     try {
       const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=&showFiles=false`);
@@ -495,7 +751,26 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     } catch {
       toast.error("Failed to map destination options from target server.");
     }
-  };
+  }
+
+  const createFolderAndContinue = async () => {
+      if (!temporarySelectedPath.trim()) return;
+  
+      try {
+        const res = await fetch(`http://${window.location.hostname}:7000/createFolder`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ folder: temporarySelectedPath })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Directory assembly aborted");
+        setGlobalExists(true);
+        setIsCreateFolderModalOpen(false);
+        await openModal();
+      } catch (err: any) {
+        toast.error(err.message || "Failed creating folder.");
+      }
+    }
 
   // 4. Handle inline custom directory builds inside modal
   const handleCreateFolder = async () => {
@@ -543,7 +818,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            items: items.filter(item => checkedItems.has(`${item.infoHash}-${item.fileIdx}`)).map(item => ({
+            items: items.filter(item => checkedItems.has(`${item.infoHash}-${item.fileIdx}-${item.ttid}`)).map(item => ({
               identifier: item.infoHash,
               idx: item.fileIdx,
               name: item.filename ||"Raw Stream Index Output",
@@ -568,11 +843,12 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
 
         // 2. Filter out ALL items that match the checked keys in one single step
         const updatedBookmarks = freshBookmarks.filter((item: any) => {
-          const itemKey = `${item.infoHash}-${item.fileIdx}`;
+          const itemKey = `${item.infoHash}-${item.fileIdx}-${decodeURIComponent(item.ttid)}`;
           return !checkedItems.has(itemKey); // Keep it ONLY if it is NOT checked
         });
 
         // 3. Update all your states exactly ONCE
+        console.log("Updated bookmarks after batch download:", updatedBookmarks, "before was:", freshBookmarks);
         setItems(updatedBookmarks);
         setCheckedItems(new Set()); // Clear checked list since they are gone
         setBookmarks(JSON.stringify(updatedBookmarks));
@@ -587,7 +863,6 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     }
     else if (serverStatus === "Downloading") {
       try{
-        console.log("Cancelling batch download for task IDs:", taskIds);
         const res = await fetch(`http://${window.location.hostname}:7000/cancelBatch`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -610,7 +885,6 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
         body: JSON.stringify({ task_ids: taskIds })
       });
       
-      console.log("Task IDs being checked for progress:", taskIds);
 
       if (!res.ok) {
         const activeInterval = intervalRef.current;
@@ -639,14 +913,10 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
           setServerStatus("Downloading");
           return;
         }
-
-        // --- FIXED: TERMINAL STATES HANDLER (Failed, Completed, Cancelled) ---
-        console.log("Batch download terminal state reached:", data.status);
         
         // Grab a snapshot token immediately so we bypass any parent nullification changes
         const activeInterval = intervalRef.current;
         if (activeInterval) {
-          console.log("Batch download has reached a terminal state. Stopping progress checks cleanly.");
           clearInterval(activeInterval);
           intervalRef.current = null; // Clear it out safely *after* the browser stops the loop instance
         }
@@ -672,8 +942,8 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     }
   };
 
-  const handleCheckboxChange = (infoHash: string, fileIdx: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const key = `${infoHash}-${fileIdx}`;
+  const handleCheckboxChange = (infoHash: string, fileIdx: number, ttid: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const key = `${infoHash}-${fileIdx}-${ttid}`;
     const updatedSet = new Set(checkedItems);
     if (e.target.checked) {
       updatedSet.add(key);
@@ -707,6 +977,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
         <>
           {/* Scrollable Container Panel Area mapping list layout dimensions */}
           <div className="overflow-y-auto bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 space-y-3 search-scrollbar" style={{ height: window.innerHeight - 390+"px" }}>
+          {seriesTabs.length > 0 && (
           <div className="grid justify-end gap-4 mb-3">
             <div className="toggle-container">
             <span><b>Group By:</b>&nbsp;&nbsp;Season</span>
@@ -725,6 +996,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
             <span>Torrent</span>
           </div>
         </div>
+          )}
           {seriesTabs.map((seriesItem: any, seriesIdx: number) => {
           // Filter your master items queue to isolate only the episodes belonging to this specific series
           const seriesEpisodes = items.filter(
@@ -777,10 +1049,10 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   <input 
                   type="checkbox"
                   // 1. Compute state configurations dynamically
-                  checked={seriesEpisodes.every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`))}
+                  checked={seriesEpisodes.every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`))}
                   ref={(el) => {
                     if (el) {
-                      const checkedCount = seriesEpisodes.filter(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`)).length;
+                      const checkedCount = seriesEpisodes.filter(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`)).length;
                       // It becomes indeterminate if some are checked, but not all of them
                       el.indeterminate = checkedCount > 0 && checkedCount < seriesEpisodes.length;
                     }
@@ -788,9 +1060,9 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   onChange={(e) => {
                     const updatedSet = new Set(checkedItems);
                     if (e.target.checked) {
-                      seriesEpisodes.forEach(ep => updatedSet.add(`${ep.infoHash}-${ep.fileIdx}`));
+                      seriesEpisodes.forEach(ep => updatedSet.add(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`));
                     } else {
-                      seriesEpisodes.forEach(ep => updatedSet.delete(`${ep.infoHash}-${ep.fileIdx}`));
+                      seriesEpisodes.forEach(ep => updatedSet.delete(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`));
                     }
                     setCheckedItems(updatedSet);
                   }}
@@ -824,10 +1096,10 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     <input 
                   type="checkbox"
                   // 1. Compute state configurations dynamically
-                  checked={seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`))}
+                  checked={seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`))}
                   ref={(el) => {
                     if (el) {
-                      const checkedCount = seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).filter(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`)).length;
+                      const checkedCount = seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).filter(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`)).length;
                       // It becomes indeterminate if some are checked, but not all of them
                       el.indeterminate = checkedCount > 0 && checkedCount < seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length;
                     }
@@ -835,9 +1107,9 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   onChange={(e) => {
                     const updatedSet = new Set(checkedItems);
                     if (e.target.checked) {
-                      seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).forEach(ep => updatedSet.add(`${ep.infoHash}-${ep.fileIdx}`));
+                      seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).forEach(ep => updatedSet.add(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`));
                     } else {
-                      seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).forEach(ep => updatedSet.delete(`${ep.infoHash}-${ep.fileIdx}`));
+                      seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).forEach(ep => updatedSet.delete(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`));
                     }
                     setCheckedItems(updatedSet);
                   }}
@@ -894,15 +1166,15 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     <div className="flex items-center gap-3 w-full sm:w-auto justify-end border-t border-zinc-800/60 sm:border-0 pt-2 sm:pt-0">
                       <button
                         type="button"
-                        onClick={(e) => handleRemoveItem(e, episodeItem.infoHash, episodeItem.fileIdx)}
+                        onClick={(e) => handleRemoveItem(e, episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)}
                         className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                       >
                         Remove
                       </button>
                       <input
                         type="checkbox"
-                        checked={checkedItems.has(`${episodeItem.infoHash}-${episodeItem.fileIdx}`)}
-                        onChange={(e) => handleCheckboxChange(episodeItem.infoHash, episodeItem.fileIdx)(e)}
+                        checked={checkedItems.has(`${episodeItem.infoHash}-${episodeItem.fileIdx}-${episodeItem.ttid}`)}
+                        onChange={(e) => handleCheckboxChange(episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)(e)}
                         className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
                       />
                     </div>
@@ -959,7 +1231,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
 
                 <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t border-zinc-800 sm:border-0 pt-3 sm:pt-0">
                   <button
-                    onClick={(e) => handleRemoveItem(e,item.infoHash, item.fileIdx)}
+                    onClick={(e) => handleRemoveItem(e,item.infoHash, item.fileIdx, item.ttid)}
                     className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                   >
                     Remove
@@ -967,7 +1239,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   <input
                     type="checkbox"
                     defaultChecked={true}
-                    onChange={handleCheckboxChange(item.infoHash, item.fileIdx)}
+                    onChange={handleCheckboxChange(item.infoHash, item.fileIdx, item.ttid)}
                     className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
                   />
                 </div>
@@ -986,6 +1258,8 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
             <div className="flex flex-col flex-1 min-w-0">
               <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Target Server Base Directory</span>
               <div className="flex items-center gap-2">
+                <div className="flex gap-2 w-full items-center">
+                {/* The Input Field */}
                 <input
                   type="text"
                   readOnly
@@ -994,6 +1268,18 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     targetPath === null ? "text-zinc-600 border-zinc-800 italic" : "text-green-400 border-green-900/60 font-semibold"
                   }`}
                 />
+
+                {/* The Clear Button - Visible only if a path is selected */}
+                {targetPath !== "" && (
+                  <button
+                    type="button"
+                    onClick={() => setTargetPath("")} // Keeps state consistent with your null checks
+                    className="px-3 py-2 bg-red-600 hover:bg-red-700 text-xs font-bold text-white rounded-lg whitespace-nowrap transition-colors cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
                 <button
                   onClick={openLocationSelectorModal}
                   className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 rounded-lg whitespace-nowrap transition-colors cursor-pointer"
@@ -1031,12 +1317,12 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
 
       {/* --- SELECTION DIALOGUE OVERLAY LAYER --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh] search-scrollbar">
+        <div onClick={() => {setIsModalOpen(false); setTemporarySelectedPath("")}} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh] search-scrollbar">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
               <h3 className="text-base font-bold text-white">Select Server Target Destination</h3>
               <button 
-                onClick={() => setIsModalOpen(false)} 
+                onClick={() =>{setIsModalOpen(false); setTemporarySelectedPath("")}} 
                 className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
               >
                 ✕
@@ -1045,25 +1331,30 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
 
             <div className="flex-1 overflow-y-auto bg-zinc-950 p-3 rounded-lg border border-zinc-800 space-y-1 max-h-[40vh]">
               <div 
-                onClick={() => setTargetPath("")}
+                onClick={() => setTemporarySelectedPath("")}
                 className={`flex items-center gap-2 py-1.5 px-2 rounded cursor-pointer transition-all font-semibold ${
-                  targetPath === "" ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-200"
+                  temporarySelectedPath === "" ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-200"
                 }`}
               >
                 <img src="/folder.png" alt="" className="w-4 h-4 object-contain" />
-                <span className="text-sm">media /</span>
+                <span className="text-sm">media/</span>
               </div>
               
               <div className="pl-3 border-l border-zinc-800 ml-2 space-y-0.5">
-                {rootFolders.map((dirName) => (
+                {rootFolders.map(({ name, size, numberOfItems, numberOfFolders }) => (
                   <FolderTreeItem
-                    key={dirName}
-                    name={dirName}
+                    key={name}
+                    name={name}
+                    size={size}
+                    numberOfItems={numberOfItems}
+                    numberOfFolders={numberOfFolders}
                     currentPath=""
-                    selectedPath={targetPath}
-                    onSelectPath={setTargetPath}
+                    selectedPath={temporarySelectedPath}
+                    onSelectPath={setTemporarySelectedPath}
                     onRefreshParent={loadRootFolders}
                     activeRefreshRef={activeRefreshRef}
+                    expandedFolders={temporarySelectedPath.split("/").length > 0 ? temporarySelectedPath.split("/").slice(0, -1).join("/") : undefined}
+                    exists={globalExists}
                   />
                 ))}
               </div>
@@ -1085,23 +1376,67 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                 + Create
               </button>
             </div>
-
+            <label className="text-xs text-zinc-400 mb-2">
+              Selected Path: <span className="text-green-400 font-semibold">{temporarySelectedPath === "" ? "/media" : `/media/${temporarySelectedPath}`}</span>
+            </label>
             <div className="flex justify-end gap-2 border-t border-zinc-800 pt-3">
               <button
+                onClick={() => {setIsModalOpen(false); setTargetPath(temporarySelectedPath); setTemporarySelectedPath("");}}
+                disabled={temporarySelectedPath === ""}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors cursor-pointer"
+              >
+                Confirm
+              </button>
+              <button
                 onClick={() => {
-                  setTargetPath(""); 
                   setIsModalOpen(false);
+                  setTemporarySelectedPath("");
                 }}
                 className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
               >
-                Clear Selection
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isCreateFolderModalOpen && (
+        <div onClick={() => {setIsCreateFolderModalOpen(false); setTemporarySelectedPath("");}} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-end border-b border-zinc-800 pb-3 mb-4">
+              <button 
+                onClick={() => {setIsCreateFolderModalOpen(false); setTemporarySelectedPath("")}} 
+                className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-bold text-zinc-400 tracking-wider mb-1">Suggested folder for this/these item(s) doesn't exist. Do you want to create it before proceeding?</label>
+              <input className="block text-sm font-bold bg-black text-green-400 tracking-wider p-1 mb-1 w-full" value={temporarySelectedPath} onChange={(e) => setTemporarySelectedPath(e.target.value)} />
+
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={createFolderAndContinue}
+                disabled={!temporarySelectedPath.trim()}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
+              >
+                Yes
               </button>
               <button
-                onClick={() => setIsModalOpen(false)}
-                disabled={targetPath === ""}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors cursor-pointer"
+                onClick={async () => {setIsCreateFolderModalOpen(false); setTemporarySelectedPath("");await openModal();}}
+                className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
               >
-                Confirm Destination
+                No
+              </button>
+              <button
+                onClick={() => {setIsCreateFolderModalOpen(false); setTemporarySelectedPath("")}}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                Cancel
               </button>
             </div>
           </div>

@@ -16,6 +16,9 @@ type ServerDownloadState = "idle" | "loading" | "downloading" | "completed" | "f
 // Inner Helper Component: Recursive Folder Selection Row
 type FolderTreeItemProps = {
   name: string;
+  size: string;
+  numberOfItems: number;
+  numberOfFolders: number;
   currentPath: string;
   selectedPath: string;
   onSelectPath: (path: string) => void;
@@ -40,13 +43,23 @@ const clearGlobalMenu = (closeFn: () => void) => {
   }
 };
 
-function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef, expandedFolders,exists }: FolderTreeItemProps) {
+const closeAnyOpenMenu = () => {
+  globalActiveCloseMenuFn?.();
+};
+
+function FolderTreeItem({ name, size, numberOfItems, numberOfFolders, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef, expandedFolders, exists }: FolderTreeItemProps) {
   const cleanName = name.endsWith("/") ? name.slice(0, -1) : name;
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
+  const menuAnchorRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(exists &&expandedFolders != null && expandedFolders.split("/").includes(cleanName));
-  const [subFolders, setSubFolders] = useState<string[]>([]);
+  const [newName, setNewName] = useState(cleanName);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isRenameModalOpen, setIsRenameModalOpen] = useState(false);
+  const [subFolders, setSubFolders] = useState<{ name: string; size: string; numberOfItems: number; numberOfFolders: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuReady, setIsMenuReady] = useState(false);
+  const [menuPlacement, setMenuPlacement] = useState<"down" | "up">("down");
 
   const isSelected = selectedPath === itemPath;
   useEffect(() => {
@@ -76,6 +89,7 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
 
   const handleToggleExpand = async (e: React.MouseEvent) => {
     e.stopPropagation(); // Avoid triggering path selection when clicking the icon arrow
+    closeAnyOpenMenu();
     const nextState = !isOpen;
     setIsOpen(nextState);
     if (nextState) {
@@ -85,8 +99,6 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
 
   const handleDeleteFolder = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    console.log(`Attempting to delete folder at path: ${itemPath}`); // Debug log for deletion path
-    if (!confirm(`Are you sure you want to delete "${cleanName}"?`)) return;
 
     try {
       const res = await fetch(`http://${window.location.hostname}:7000/deleteFolder`, {
@@ -106,7 +118,6 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
 
   const handleRenameFolder = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newName = prompt("Enter new folder name:", cleanName);
     if (newName && newName.trim()) {
       try {
       const res = await fetch(`http://${window.location.hostname}:7000/renameFolder`, {
@@ -138,21 +149,76 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
     };
   }
 }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isMenuOpen) {
+      setIsMenuReady(false);
+      return;
+    }
+
+    setIsMenuReady(false);
+    const animationFrame = window.requestAnimationFrame(() => {
+      setIsMenuReady(true);
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [isMenuOpen, menuPlacement]);
+
+  useEffect(() => {
+    const anchorElement = menuAnchorRef.current;
+    if (!isMenuOpen || !anchorElement) return;
+
+    const updatePlacement = () => {
+      const anchorRect = anchorElement.getBoundingClientRect();
+      const menuElement = anchorElement.querySelector<HTMLElement>("[data-folder-menu]");
+      const estimatedMenuHeight = menuElement?.getBoundingClientRect().height ?? 88;
+
+      let scrollParent: HTMLElement | null = anchorElement.parentElement;
+      while (scrollParent) {
+        const overflowY = window.getComputedStyle(scrollParent).overflowY;
+        if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") {
+          break;
+        }
+        scrollParent = scrollParent.parentElement;
+      }
+
+      const boundaryRect = scrollParent?.getBoundingClientRect();
+      const bottomBoundary = boundaryRect?.bottom ?? window.innerHeight;
+      const topBoundary = boundaryRect?.top ?? 0;
+
+      const spaceBelow = bottomBoundary - anchorRect.bottom;
+      const spaceAbove = anchorRect.top - topBoundary;
+
+      setMenuPlacement(spaceBelow < estimatedMenuHeight && spaceAbove > spaceBelow ? "up" : "down");
+    };
+
+    updatePlacement();
+    window.addEventListener("resize", updatePlacement);
+    window.addEventListener("scroll", updatePlacement, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePlacement);
+      window.removeEventListener("scroll", updatePlacement, true);
+    };
+  }, [isMenuOpen]);
   return (
     <div className="select-none text-left">
       <div
-        onClick={() => onSelectPath(itemPath)}
+        onClick={() => {
+          closeAnyOpenMenu();
+          onSelectPath(itemPath);
+        }}
         className={`flex items-center justify-between group py-2 px-2 rounded cursor-pointer transition-colors ${
           isSelected ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-300"
         }`}
       >
-        <div className="flex items-center gap-2 truncate min-w-0 flex-1">
-          <button 
-            onClick={handleToggleExpand} 
-            className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors p-0.5"
-          >
-            {isOpen ? "▼" : "▶"}
-          </button>
+        <button 
+          onClick={handleToggleExpand} 
+          className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors p-0.5 pr-5"
+        >
+          {isOpen ? "▼" : "▶"}
+        </button>
+        <div className="flex items-center gap-2 overflow-x-auto truncate min-w-0 flex-1">
           <img
             src={isOpen ? "/open-folder.png" : "/folder.png"}
             alt=""
@@ -162,10 +228,15 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
             {cleanName}
           </span>
           {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
+          {!loading && (
+            <span className={`text-xs ${isSelected ? "text-white" : "text-zinc-500"} font-mono`}>
+              ({numberOfFolders} {numberOfFolders === 1 ? "folder" : "folders"})
+            </span>
+          )}
         </div>
 
         {/* --- THREE DOTS OPTIONS DROPDOWN CONTEXT MENU --- */}
-        <div className="relative flex-shrink-0 ml-2">
+        <div className="relative flex-shrink-0 ml-2" ref={menuAnchorRef}>
           {/* Trigger Button: Visible on Mobile, on Hover for Desktop */}
           <button
             onClick={(e) => {
@@ -185,13 +256,14 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
           {isMenuOpen && (
             <div 
               onClick={(e) => e.stopPropagation()} // Stop menu background clicks from expanding folder rows
-              className="absolute right-0 mt-1 w-28 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl py-1 z-30 animate-in fade-in zoom-in-95 duration-100"
+              data-folder-menu
+              className={`absolute right-0 w-28 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl py-1 z-30 transform-gpu transition-all duration-150 ease-out ${isMenuReady ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-1"} ${menuPlacement === "up" ? "bottom-full mb-1 origin-bottom-right" : "mt-1 origin-top-right"}`}
             >
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsMenuOpen(false);
-                  handleRenameFolder(e); // Safely fires your existing rename routine
+                  setIsRenameModalOpen(true); // Open the rename modal
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
               >
@@ -201,8 +273,9 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
               
               <button
                 onClick={(e) => {
+                  e.stopPropagation();
                   setIsMenuOpen(false);
-                  handleDeleteFolder(e); // Safely fires your existing delete routine
+                  setIsDeleteModalOpen(true); // Open the delete confirmation modal
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-colors cursor-pointer flex items-center gap-1.5"
               >
@@ -219,10 +292,13 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
           {subFolders.length === 0 && !loading ? (
             <div className="text-xs text-zinc-600 py-1 pl-2 italic">No subdirectories</div>
           ) : (
-            subFolders.map((subName) => (
+            subFolders.map(({ name, size, numberOfItems, numberOfFolders }) => (
               <FolderTreeItem
-                key={subName}
-                name={subName}
+                key={name}
+                name={name}
+                size={size}
+                numberOfItems={numberOfItems}
+                numberOfFolders={numberOfFolders}
                 currentPath={itemPath}
                 selectedPath={selectedPath}
                 onSelectPath={onSelectPath}
@@ -233,6 +309,80 @@ function FolderTreeItem({ name, currentPath, selectedPath, onSelectPath, onRefre
               />
             ))
           )}
+        </div>
+      )}
+      {isDeleteModalOpen && (
+        <div onClick={() => {setIsDeleteModalOpen(false);}} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <label className="block text-sm font-bold text-zinc-400 tracking-wider">Confirm Deletion</label>
+              <button 
+                onClick={() => {setIsDeleteModalOpen(false);}} 
+                className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <span className="block text-sm font-boldtext-zinc-400 tracking-wider mb-1">Are you sure you want to delete this folder and all its contents?</span>
+              <span className={`block text-center text-sm font-bold bg-black text-red-400 tracking-wider p-1 mb-1 w-full ${itemPath.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{itemPath}</span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={(e) => {handleDeleteFolder(e); setIsDeleteModalOpen(false);}}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => {setIsDeleteModalOpen(false);}}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {isRenameModalOpen && (
+        <div onClick={() => {setIsRenameModalOpen(false); setNewName(cleanName);}} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <label className="block text-sm font-boldtext-zinc-400 tracking-wider">Rename Folder</label>
+              <button 
+                onClick={() => {setIsRenameModalOpen(false); setNewName(cleanName);}} 
+                className="text-zinc-400  hover:text-white font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <input 
+                type="text" 
+                value={newName} 
+                onChange={(e) => setNewName(e.target.value)} 
+                className="block text-sm font-bold bg-black text-zinc-400 tracking-wider p-1 mb-1 w-full"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={(e) => {handleRenameFolder(e); setIsRenameModalOpen(false);}}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
+              >
+                Rename
+              </button>
+              <button
+                onClick={() => {setIsRenameModalOpen(false); setNewName(cleanName);}}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -251,7 +401,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
   // Custom Selection Window / Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModalCreateFolderOpen, setIsModalCreateFolderOpen] = useState(false);
-  const [rootFolders, setRootFolders] = useState<string[]>([]);
+  const [rootFolders, setRootFolders] = useState<{ name: string; size: string; numberOfItems: number; numberOfFolders: number }[]>([]);
   const [targetPath, setTargetPath] = useState(""); 
   const [targetName, setTargetName] = useState(filename || title || "");
   const [newFolderName, setNewFolderName] = useState("");
@@ -537,7 +687,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
     if (data && data.meta && data.meta.name && data.meta.year && data.meta.type) {
       path = `${data.meta.type === "series" ? "TV-Shows" : "Movies"}/${data.meta.name} (${data.meta.year.toString().split("–")[0]})`;
       if (data.meta.type === "series" && decodeURIComponent(ttid).split(":").length > 1) {
-        path += `/Season ${decodeURIComponent(ttid).split(":")[1].padStart(2, "0")}`;
+        path += decodeURIComponent(ttid).split(":")[1] != "0" ? `/Season ${decodeURIComponent(ttid).split(":")[1].padStart(2, "0")}` : "/Specials";
       }
     }
     return path;
@@ -631,8 +781,8 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
 
       {/* MODAL CONFIGURATION DIALOG LAYER */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh] search-scrollbar">
+        <div onClick={() => setIsModalOpen(false)} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh] search-scrollbar">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
               <h3 className="text-base font-bold text-white">Select Server Target Destination</h3>
               <button 
@@ -656,10 +806,13 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
               </div>
               
               <div className="pl-3 border-l border-zinc-800 ml-2 space-y-0.5">
-                {rootFolders.map((dirName) => (
+                {rootFolders.map(({ name, size, numberOfItems, numberOfFolders }) => (
                   <FolderTreeItem
-                    key={dirName}
-                    name={dirName}
+                    key={name}
+                    name={name}
+                    size={size}
+                    numberOfItems={numberOfItems}
+                    numberOfFolders={numberOfFolders}
                     currentPath=""
                     selectedPath={targetPath}
                     onSelectPath={setTargetPath}
@@ -734,8 +887,8 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
       )}
 
       {isModalCreateFolderOpen && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+        <div onClick={() => setIsModalCreateFolderOpen(false)} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
             <div className="flex items-center justify-end border-b border-zinc-800 pb-3 mb-4">
               <button 
                 onClick={() => setIsModalCreateFolderOpen(false)} 
@@ -746,24 +899,30 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
             </div>
             
             <div className="mb-4">
-              <label className="block text-sm font-bold text-zinc-400 tracking-wider mb-1">Suggested folder for this item doesn't exist. Do you want to create it?</label>
+              <label className="block text-sm font-bold text-zinc-400 tracking-wider mb-1">Suggested folder for this item doesn't exist. Do you want to create it before proceeding?</label>
               <input className="block text-sm font-bold bg-black text-green-400 tracking-wider p-1 mb-1 w-full" value={targetPath} onChange={(e) => setTargetPath(e.target.value)} />
 
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <button
-                onClick={() => {setIsModalCreateFolderOpen(false); setIsModalOpen(true); setTargetPath(""); loadRootFolders();}}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
-              >
-                No
-              </button>
-              <button
                 onClick={createFolderAndContinue}
                 disabled={!targetPath.trim()}
                 className="px-4 py-2 bg-green-600 hover:bg-green-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
               >
-                Create Folder
+                Yes
+              </button>
+              <button
+                onClick={() => {setIsModalCreateFolderOpen(false); setIsModalOpen(true); setTargetPath(""); loadRootFolders();}}
+                className="px-4 py-2 bg-red-700 hover:bg-red-600 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                No
+              </button>
+              <button
+                onClick={() => setIsModalCreateFolderOpen(false)}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                Cancel
               </button>
             </div>
           </div>

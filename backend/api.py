@@ -27,7 +27,7 @@ PLEX_API_KEY = os.getenv("PLEX_API_KEY")
 
 # Global dictionary to keep track of download progress
 # Format: { "identifier_idx": percentage_float }
-# progress_store = {"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_5": {"ttid": "tt6741278:2:4", "progress": 100},"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_6": {"ttid": "tt6741278:2:5", "progress": 100}}
+# progress_store = {"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_5": {"ttid": "tt6741278:2:4", "progress": -1.0},"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_6": {"ttid": "tt6741278:2:5", "progress": 100},"fc72b75b1275cc5a93f638c552da62d90f9b2853_2": {"ttid": "tt11198330:3:3", "progress": -2.0},"a3882ea6609c0332594ddce04bc462a8c1955574_2": {"ttid": "tt17490712", "progress": 100}}
 progress_store = {}
 batch_progress_store = []
 
@@ -276,11 +276,12 @@ def refresh_plex_libraries():
         print(f"Exception occurred while refreshing Plex libraries: {e}")
         return False
 
-def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = "", ttid: str = ""):
+def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = "", ttid: str = "",add: bool = True):
     task_key = f"{identifier}_{idx}"
     
-    with progress_lock:
-        progress_store[task_key] = { "ttid": ttid, "progress": 0.0 }
+    if add:
+        with progress_lock:
+            progress_store[task_key] = { "ttid": ttid, "progress": 0.0 }
         
     print(f"Initiating download task for {task_key} with path: {path} and name: {name}\n")
     url = f"http://127.0.0.1:11470/{identifier}/{idx}?external=1&download=1"
@@ -375,6 +376,20 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
             try: os.remove(filename)
             except: pass
 
+# def batchDownloadsInitialiseAndStart(items: list):
+#     """
+#     Initializes and starts batch downloads for a list of task identifiers.
+#     """
+#     for task_id in items:
+#         with progress_lock:
+#             if task_id.get("identifier", "")+"_"+task_id.get("idx", "") in progress_store and progress_store[task_id.get("identifier", "")+"_"+task_id.get("idx", "")].get("progress", 0.0) >= 0 and progress_store[task_id.get("identifier", "")+"_"+task_id.get("idx", "")].get("progress", 0.0) < 100:
+#                 print(f"Download already in progress for {task_id}. Skipping.")
+#                 continue
+#             else:
+#                 progress_store[task_id.get("identifier", "")+"_"+task_id.get("idx", "")] = { "ttid": task_id.get("ttid", ""), "progress": 0.0 }
+#     for task in items:
+#         download_stream_task(task.get("identifier", ""), task.get("idx", ""), task.get("path", ""), task.get("name", ""), task.get("ttid", ""), add=False)
+
 @app.route('/download', methods=['POST'])
 def start_download():
     """
@@ -431,7 +446,8 @@ def batch_download():
         return jsonify({"error": "Specified path does not exist"}), 404
 
     task_ids = []
-    
+    local_task_ids = []
+
     for item in items:
         identifier = item.get('identifier')
         
@@ -459,6 +475,7 @@ def batch_download():
             task_ids.append(task_key)
             continue
         
+        local_task_ids.append({"identifier": identifier, "idx": str(idx),"path": path, "name": name, "ttid": ttid})
         # This aligns perfectly with task key formatting and downstream network buffer logic
         thread = threading.Thread(
             target=download_stream_task, 
@@ -470,6 +487,8 @@ def batch_download():
         with batch_progress_lock:
             batch_progress_store.append(task_key)
         task_ids.append(task_key)
+
+    # batchDownloadsInitialiseAndStart(local_task_ids)
 
     return jsonify({
         "status": "Batch download initiated",
@@ -707,6 +726,16 @@ def extract_season_episode(filename):
     # Fallback for files matching no regex rules (sorted alphabetically at the end)
     return (9999, 9999, filename)
 
+def format_size(size_bytes):
+    if size_bytes >= 1073741824:  # 1024^3
+        return f"{size_bytes / 1073741824:.2f} GB"
+    elif size_bytes >= 1048576:    # 1024^2
+        return f"{size_bytes / 1048576:.2f} MB"
+    elif size_bytes >= 1024:
+        return f"{size_bytes / 1024:.2f} KB"
+    else:
+        return f"{size_bytes} B"
+    
 @app.route('/getItems', methods=['GET'])
 def get_items():
     """
@@ -715,7 +744,7 @@ def get_items():
     folder = request.args.get('folder', "")
     show_files = request.args.get('showFiles', 'true').lower() == 'true'
     folder_path = os.path.join('/media', folder)
-    
+
     if not os.path.exists(folder_path):
         return jsonify({"error": "Folder not found"}), 404
 
@@ -728,26 +757,65 @@ def get_items():
         
         if os.path.isdir(filepath):
             if filename != "stremio-server":
-                folders.append(filename + "/")
+                total_size = 0
+                for root, dirs, files in os.walk(filepath):
+                    for f in files:
+                        fp = os.path.join(root, f)
+                        if os.path.exists(fp):
+                            total_size += os.path.getsize(fp)
+
+                folders.append({
+                    "name": filename + "/",
+                    "size": format_size(total_size), 
+                    "numberOfItems": len(os.listdir(filepath)),
+                    "numberOfFolders": len([d for d in os.listdir(filepath) if os.path.isdir(os.path.join(filepath, d))])
+                })
                 
         elif os.path.isfile(filepath) and show_files:
             # Check if file matches the Season/Episode regex pattern
-            if EPISODE_REGEX.search(filename):
-                files_matching.append(filename)
+            if EPISODE_REGEX.search(filename) and filename.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.wmv')):
+                files_matching.append({"name": filename, "size": format_size(os.path.getsize(filepath))})
             else:
-                files_other.append(filename)
+                files_other.append({"name": filename, "size": format_size(os.path.getsize(filepath))})
 
     # 1. Sort the matching files cleanly by Season number, then Episode number
-    files_matching.sort(key=extract_season_episode)
+    files_matching.sort(key=lambda x: extract_season_episode(x['name'] if isinstance(x, dict) else x))
     
     # 2. Sort other files and folders alphabetically
-    folders.sort()
-    files_other.sort()
+    folders.sort(key=lambda x: x['name'].lower())
+    files_other.sort(key=lambda x: x['name'].lower())
 
     # Combine them: Folders first, then beautifully ordered episodes, then misc files
     combined_items = folders + files_matching + files_other
     
     return jsonify({"items": combined_items}), 200
+
+def get_folder_size(folder_path):
+    """Calculates total size of a specific directory in bytes."""
+    total_size = 0
+    if not os.path.exists(folder_path):
+        return 0
+    for root, dirs, files in os.walk(folder_path):
+        for f in files:
+            fp = os.path.join(root, f)
+            if os.path.exists(fp):
+                total_size += os.path.getsize(fp)
+    return total_size
+
+@app.route('/getUsageStats', methods=['GET'])
+def get_usage_stats():
+    # Drive-wide stats come from shutil (based on the root partition)
+    total, _, _ = shutil.disk_usage("/")
+    
+    # Specific folder sizes must be calculated manually
+    used_media = get_folder_size("/media")
+    used_stremio = get_folder_size("/media/stremio-server")
+    
+    return jsonify({
+        "total": format_size(total),
+        "used": format_size(used_media-used_stremio),
+        "usedStremio": format_size(used_stremio)
+    }), 200
 
 @app.route('/deleteFolder', methods=['POST'])
 def delete_folder():
