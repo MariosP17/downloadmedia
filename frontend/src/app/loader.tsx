@@ -1,4 +1,4 @@
-export default function Loading() {
+export default function Loader() {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
         <span className="loader"></span>

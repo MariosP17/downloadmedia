@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useLayoutEffect } from "react";
 import { toast } from "react-hot-toast";
 import { useSyncedLocalStorage } from "../Utils/useSyncedLocalStorage";
 import { useRouter } from "next/navigation";
+import Loader from "../loader";
 
 type StorageItem = {
   infoHash: string;
@@ -421,6 +422,7 @@ export default function BatchDownloadPage() {
   const [items, setItems] = useState<HydratedItem[]>([]);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [pageLoading, setPageLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [bookmarks, setBookmarks] = useSyncedLocalStorage("stream_bookmarks");
   const [seriesTabs, setSeriesTabs] = useState<SeriesItem[]>([]);
   const [serverStatus, setServerStatus] = useState<ServerStatus>("Completed");
@@ -1285,7 +1287,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                 )}
               </div>
                 <button
-                  onClick={openLocationSelectorModal}
+                  onClick={async () => { setLoading(true); await openLocationSelectorModal(); setLoading(false); }}
                   className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 rounded-lg whitespace-nowrap transition-colors cursor-pointer"
                 >
                   Choose Location
@@ -1318,6 +1320,8 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
 
           </div>
         )}
+
+      {loading && <Loader />}
 
       {/* --- SELECTION DIALOGUE OVERLAY LAYER --- */}
       {isModalOpen && (

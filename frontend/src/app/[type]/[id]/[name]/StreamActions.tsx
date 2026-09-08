@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
-import Loading from "../../../../../loader";
+import Loader from "../../../loader";
 
 type Props = {
   hash: string;
@@ -936,7 +936,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
           </div>
         </div>
       )}
-      {loading && <div className="absolute"> <Loading /> </div>}
+      {loading && <div className="absolute"> <Loader /> </div>}
     </div>
   );
 }
