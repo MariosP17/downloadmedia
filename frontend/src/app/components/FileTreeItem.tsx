@@ -14,6 +14,13 @@ type TreeItemProps = {
   activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>;
 }
 
+type ArchiveJob = {
+  job_id: string;
+  status: "queued" | "scanning" | "zipping" | "cancelling" | "cancelled" | "ready" | "failed";
+  progress: number;
+  error?: string | null;
+};
+
 export default function FileTreeItem({ name, size, numberOfItems, numberOfFolders, currentPath, refreshStats, onRefreshParent, activeRefreshRef }: TreeItemProps) {
   const isFolder = name.endsWith("/");
   const cleanName = isFolder ? name.slice(0, -1) : name;
@@ -30,6 +37,8 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const [hasFetched, setHasFetched] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMenuReady, setIsMenuReady] = useState(false);
+  const [archiveJob, setArchiveJob] = useState<ArchiveJob | null>(null);
+  const archivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Reference hook assigned to the dropdown container to check for outside clicks
   const menuRef = useRef<HTMLDivElement>(null);
@@ -70,6 +79,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       if (isFolder && activeRefreshRef.current) {
         delete activeRefreshRef.current[itemPath];
       }
+      if (archivePollRef.current) clearInterval(archivePollRef.current);
     };
   }, [itemPath, isFolder, activeRefreshRef]);
 
@@ -254,34 +264,63 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     }
   };
 
-  const handleDownload = (e: React.MouseEvent, isFolderInternal: boolean) => {
+  const pollArchiveJob = (jobId: string) => {
+    const poll = async () => {
+      try {
+        const response = await fetch(`http://${window.location.hostname}:7000/folderDownloadProgress/${jobId}`);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not retrieve archive progress");
+
+        setArchiveJob(data);
+        if (data.status === "ready") {
+          if (archivePollRef.current) clearInterval(archivePollRef.current);
+          archivePollRef.current = null;
+          setArchiveJob(null);
+          toast.success("Archive ready. Download starting...");
+          window.location.href = `http://${window.location.hostname}:7000/downloadFolderToClient/${jobId}`;
+        } else if (["cancelled", "failed"].includes(data.status)) {
+          if (archivePollRef.current) clearInterval(archivePollRef.current);
+          archivePollRef.current = null;
+          if (data.status === "failed") toast.error(data.error || "Archive creation failed.");
+        }
+      } catch (error) {
+        if (archivePollRef.current) clearInterval(archivePollRef.current);
+        archivePollRef.current = null;
+        setArchiveJob((current) => current ? { ...current, status: "failed", error: error instanceof Error ? error.message : "Progress request failed" } : current);
+      }
+    };
+
+    void poll();
+    archivePollRef.current = setInterval(() => void poll(), 500);
+  };
+
+  const handleCancelArchive = async () => {
+    if (!archiveJob) return;
+    setArchiveJob((current) => current ? { ...current, status: "cancelling" } : current);
+    try {
+      await fetch(`http://${window.location.hostname}:7000/cancelFolderDownload/${archiveJob.job_id}`, { method: "POST" });
+    } catch {
+      toast.error("Could not cancel archive creation.");
+    }
+  };
+
+  const handleDownload = async (e: React.MouseEvent, isFolderInternal: boolean) => {
     e.stopPropagation();
     
     if (isFolderInternal) {
       try {
-        // 1. Create a hidden, throwaway HTML form element
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = `http://${window.location.hostname}:7000/downloadFolderToClient`;
-        form.style.display = "none";
-
-        // 2. Add the filePath parameter to match application/x-www-form-urlencoded
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = "filePath";
-        input.value = itemPath; // The variable holding your path
-        form.appendChild(input);
-
-        // 3. Append to body, trigger the native stream download, and remove immediately
-        document.body.appendChild(form);
-        form.submit();
-        form.remove();
-
-        // This alert fires instantly now!
-        toast.success("Download started!");
+        const response = await fetch(`http://${window.location.hostname}:7000/downloadFolderToClient`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ filePath: itemPath })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not start archive creation");
+        setArchiveJob(data);
+        pollArchiveJob(data.job_id);
       } catch (err) {
         console.error("Download error:", err);
-        toast.error("Failed to initiate file download.");
+        toast.error(err instanceof Error ? err.message : "Failed to initiate archive creation.");
       }
     }
     else {
@@ -474,6 +513,50 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
               <span className="ml-4 text-lg text-white">Loading...</span>
             </div>
           )}
+        </div>
+      )}
+      {archiveJob && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <label className="block text-sm font-bold text-zinc-400 tracking-wider">Preparing Folder Download</label>
+              {!["queued", "scanning", "zipping", "cancelling"].includes(archiveJob.status) && (
+                <button onClick={() => setArchiveJob(null)} className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm" aria-label="Close archive status">✕</button>
+              )}
+            </div>
+            <p className="text-sm text-zinc-300 break-words mb-4">{itemPath}</p>
+            {archiveJob.status === "failed" ? (
+              <p className="text-sm text-red-400 mb-4">{archiveJob.error || "Archive creation failed."}</p>
+            ) : archiveJob.status === "cancelled" ? (
+              <p className="text-sm text-zinc-400 mb-4">Archive creation cancelled.</p>
+            ) : archiveJob.status === "cancelling" ? (
+              <p className="text-sm text-amber-400 mb-4">Cancelling archive creation...</p>
+            ) : (
+              <>
+                <p className="text-sm text-zinc-400 mb-2">
+                  {archiveJob.status === "zipping" ? `Packaging files: ${archiveJob.progress.toFixed(0)}%` : "Scanning folder contents..."}
+                </p>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+                  <div
+                    className={`h-full rounded-full bg-blue-500 transition-all duration-300 ${archiveJob.status === "zipping" ? "" : "animate-pulse"}`}
+                    style={{ width: `${archiveJob.status === "zipping" ? Math.max(archiveJob.progress, 2) : 100}%` }}
+                  />
+                </div>
+              </>
+            )}
+            <div className="flex justify-end gap-2 pt-4">
+              {["queued", "scanning", "zipping"].includes(archiveJob.status) && (
+                <button onClick={() => void handleCancelArchive()} className="px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-medium text-white transition-colors cursor-pointer">
+                  Cancel
+                </button>
+              )}
+              {["cancelled", "failed"].includes(archiveJob.status) && (
+                <button onClick={() => setArchiveJob(null)} className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium text-white transition-colors cursor-pointer">
+                  Close
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
       {/* --- DELETE CONFIRMATION MODAL --- */}

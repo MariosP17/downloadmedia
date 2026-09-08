@@ -4,13 +4,14 @@ import os
 from time import time
 import requests
 from threading import Lock
-from flask import Flask, request, jsonify, send_file, after_this_request
+from flask import Flask, Response, request, jsonify, send_file
 from flask_cors import CORS
 from pathlib import Path
 import shutil
 import ffmpeg
 import zipfile
 import tempfile
+import uuid
 from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
 
@@ -32,10 +33,27 @@ PLEX_API_KEY = os.getenv("PLEX_API_KEY")
 # progress_store = {"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_5": {"ttid": "tt6741278:2:4", "progress": -1.0},"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_6": {"ttid": "tt6741278:2:5", "progress": 100},"fc72b75b1275cc5a93f638c552da62d90f9b2853_2": {"ttid": "tt11198330:3:3", "progress": -2.0},"a3882ea6609c0332594ddce04bc462a8c1955574_2": {"ttid": "tt17490712", "progress": 100}}
 progress_store = {}
 batch_progress_store = []
+archive_jobs = {}
 
 # Create a thread lock to ensure safe cross-talk between Flask routes and download threads
 progress_lock = Lock()
 batch_progress_lock = Lock()
+archive_jobs_lock = Lock()
+ARCHIVE_JOB_TTL_SECONDS = 3600
+ARCHIVE_CHUNK_SIZE = 1024 * 1024
+
+def remove_archive_temp_file(temp_zip_path, job_id, reason):
+    if not temp_zip_path or not os.path.exists(temp_zip_path):
+        print(f"job {job_id}: temporary archive already absent during {reason}")
+        return True
+
+    try:
+        os.remove(temp_zip_path)
+        print(f"job {job_id}: temporary archive removed during {reason}")
+        return True
+    except OSError as error:
+        print(f"job {job_id}: failed to remove temporary archive during {reason}: {error}")
+        return False
 
 def refresh_login_token():
     """Hits the login route, gets a new token, and saves it straight into the .env file."""
@@ -582,56 +600,237 @@ def download_file_to_client():
     except Exception as e:
         return jsonify({"error": f"Failed to stream file payload: {str(e)}", "status": "Failed"}), 500
 
+def cleanup_archive_jobs():
+    now = time()
+    with archive_jobs_lock:
+        expired = [
+            job_id for job_id, job in archive_jobs.items()
+            if job.get("status") in {"ready", "cancelled", "failed"}
+            and now - job.get("updated_at", now) > ARCHIVE_JOB_TTL_SECONDS
+        ]
+        for job_id in expired:
+            temp_zip_path = archive_jobs[job_id].get("temp_zip_path")
+            remove_archive_temp_file(temp_zip_path, job_id, "expiry cleanup")
+            del archive_jobs[job_id]
+            print(f"expired job {job_id}")
+
+
+def resolve_archive_folder(folder_path):
+    print(f"resolving folder path: {folder_path!r}")
+    media_root = Path("/media").resolve()
+    absolute_path = (media_root / str(folder_path).lstrip("/\\")).resolve()
+    if absolute_path != media_root and media_root not in absolute_path.parents:
+        print(f"rejected folder outside media root: {folder_path!r}")
+        return None
+    if not absolute_path.is_dir():
+        print(f"rejected missing or non-directory path: {absolute_path}")
+        return None
+    print(f"resolved folder: {absolute_path}")
+    return absolute_path
+
+
+def archive_job_snapshot(job_id):
+    with archive_jobs_lock:
+        job = archive_jobs.get(job_id)
+        if not job:
+            print(f"status requested for unknown job {job_id}")
+            return None
+        snapshot = {
+            "job_id": job_id,
+            "status": job["status"],
+            "progress": job["progress"],
+            "total_bytes": job["total_bytes"],
+            "processed_bytes": job["processed_bytes"],
+            "folder_name": job["folder_name"],
+            "error": job.get("error"),
+        }
+    print(f"status {job_id}: {snapshot['status']} ({snapshot['progress']}%)")
+    return snapshot
+
+
+def archive_job_cancelled(job_id):
+    with archive_jobs_lock:
+        return archive_jobs.get(job_id, {}).get("status") in {"cancelling", "cancelled"}
+
+
+def create_archive_job(job_id, absolute_path, temp_zip_path):
+    print(f"worker started for job {job_id}: {absolute_path}")
+    try:
+        files = []
+        total_bytes = 0
+        with archive_jobs_lock:
+            archive_jobs[job_id]["status"] = "scanning"
+            archive_jobs[job_id]["updated_at"] = time()
+        print(f"job {job_id}: scanning files")
+
+        for root, dirs, filenames in os.walk(absolute_path, followlinks=False):
+            dirs[:] = [directory for directory in dirs if not Path(root, directory).is_symlink()]
+            for filename in filenames:
+                source_path = Path(root, filename)
+                if source_path.is_symlink() or not source_path.is_file():
+                    continue
+                file_size = source_path.stat().st_size
+                files.append((source_path, os.path.relpath(source_path, absolute_path)))
+                total_bytes += file_size
+
+        with archive_jobs_lock:
+            archive_jobs[job_id]["total_bytes"] = total_bytes
+            archive_jobs[job_id]["status"] = "zipping"
+            archive_jobs[job_id]["updated_at"] = time()
+        print(f"job {job_id}: found {len(files)} files ({total_bytes} bytes); packaging without compression")
+
+        with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_STORED) as zip_file:
+            for source_path, archive_name in files:
+                if archive_job_cancelled(job_id):
+                    raise InterruptedError("Archive creation cancelled")
+                print(f"job {job_id}: adding {archive_name}")
+                with source_path.open("rb") as source, zip_file.open(archive_name, "w") as destination:
+                    while True:
+                        chunk = source.read(ARCHIVE_CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        destination.write(chunk)
+                        with archive_jobs_lock:
+                            job = archive_jobs[job_id]
+                            job["processed_bytes"] += len(chunk)
+                            job["progress"] = round(
+                                job["processed_bytes"] / total_bytes * 100, 2
+                            ) if total_bytes else 100.0
+                            job["updated_at"] = time()
+                        if archive_job_cancelled(job_id):
+                            raise InterruptedError("Archive creation cancelled")
+                print(f"job {job_id}: added {archive_name}")
+
+        with archive_jobs_lock:
+            archive_jobs[job_id]["status"] = "ready"
+            archive_jobs[job_id]["progress"] = 100.0
+            archive_jobs[job_id]["updated_at"] = time()
+        print(f"job {job_id}: ready at {temp_zip_path}")
+    except InterruptedError:
+        remove_archive_temp_file(temp_zip_path, job_id, "cancellation")
+        with archive_jobs_lock:
+            archive_jobs[job_id]["status"] = "cancelled"
+            archive_jobs[job_id]["updated_at"] = time()
+            print(f"job {job_id}: cancelled and temporary archive removed")
+    except Exception as error:
+        remove_archive_temp_file(temp_zip_path, job_id, "failure cleanup")
+        with archive_jobs_lock:
+            archive_jobs[job_id]["status"] = "failed"
+            archive_jobs[job_id]["error"] = str(error)
+            archive_jobs[job_id]["updated_at"] = time()
+        print(f"job {job_id}: failed: {error}")
+
+
 @app.route('/downloadFolderToClient', methods=['POST'])
 def download_folder_to_client():
-    """
-    POST Endpoint: Streams the requested folder as a ZIP to the client browser.
-    """
-    folder_path = request.form.get('filePath', None)  
-
-    if not folder_path:
-        return jsonify({"error": "The 'filePath' parameter is required.", "status": "Failed"}), 400
-
-    absolute_path = os.path.join("/media", folder_path)
-    if not os.path.exists(absolute_path) or not os.path.isdir(absolute_path):
+    print("archive creation requested")
+    cleanup_archive_jobs()
+    data = request.get_json(silent=True) or request.form
+    folder_path = data.get('filePath')
+    absolute_path = resolve_archive_folder(folder_path) if folder_path else None
+    if absolute_path is None:
+        print("archive request rejected: folder not found")
         return jsonify({"error": "Target folder path not found on server.", "status": "Failed"}), 404
 
-    clean_folder_name = os.path.basename(absolute_path)
+    temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+    temp_zip_path = temp_zip.name
+    temp_zip.close()
+    job_id = uuid.uuid4().hex
+    with archive_jobs_lock:
+        archive_jobs[job_id] = {
+            "status": "queued", "progress": 0.0, "total_bytes": 0,
+            "processed_bytes": 0, "folder_name": absolute_path.name,
+            "temp_zip_path": temp_zip_path, "updated_at": time(), "error": None,
+        }
+    thread = threading.Thread(target=create_archive_job, args=(job_id, absolute_path, temp_zip_path), daemon=True)
+    thread.start()
+    print(f"job {job_id}: queued for {absolute_path} with temporary archive {temp_zip_path}")
+    return jsonify({"status": "queued", "job_id": job_id}), 202
 
-    try:
-            # Create a temporary file on disk rather than RAM
-            temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-            temp_zip_path = temp_zip.name
-            temp_zip.close()  # Close file handle so zipfile can open it safely
 
-            # Write files into the on-disk zip archive
-            with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for root, dirs, files in os.walk(absolute_path):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, absolute_path)
-                        zip_file.write(file_path, arcname)
+@app.route('/folderDownloadProgress/<job_id>', methods=['GET'])
+def folder_download_progress(job_id):
+    print(f"progress endpoint called for job {job_id}")
+    cleanup_archive_jobs()
+    snapshot = archive_job_snapshot(job_id)
+    if snapshot is None:
+        return jsonify({"error": "Archive job not found"}), 404
+    return jsonify(snapshot), 200
 
-            # Ensure the file is deleted from disk after the download finishes
-            @after_this_request
-            def cleanup(response):
-                try:
-                    if os.path.exists(temp_zip_path):
-                        os.remove(temp_zip_path)
-                except Exception as cleanup_err:
-                    print(f"Error removing temporary zip: {cleanup_err}")
-                return response
 
-            # send_file streams from disk in small chunks — RAM stays around ~60-80MB
-            return send_file(
-                temp_zip_path,
-                mimetype='application/zip',
-                as_attachment=True,
-                download_name=f"{clean_folder_name}.zip"
-            )
+@app.route('/cancelFolderDownload/<job_id>', methods=['POST'])
+def cancel_folder_download(job_id):
+    print(f"cancel requested for job {job_id}")
+    with archive_jobs_lock:
+        job = archive_jobs.get(job_id)
+        if job is None:
+            print(f"cancel rejected for unknown job {job_id}")
+            return jsonify({"error": "Archive job not found"}), 404
+        if job["status"] in {"queued", "scanning", "zipping"}:
+            job["status"] = "cancelling"
+            job["updated_at"] = time()
+            print(f"job {job_id}: marked cancelling")
+        else:
+            print(f"job {job_id}: cancel ignored in status {job['status']}")
+    return jsonify({"status": "cancelling", "job_id": job_id}), 202
 
-    except Exception as e:
-        return jsonify({"error": f"Failed to stream folder payload: {str(e)}", "status": "Failed"}), 500
+
+@app.route('/downloadFolderToClient/<job_id>', methods=['GET'])
+def download_folder_archive(job_id):
+    print(f"download requested for job {job_id}")
+    with archive_jobs_lock:
+        job = archive_jobs.get(job_id)
+        if job is None:
+            print(f"download rejected for unknown job {job_id}")
+            return jsonify({"error": "Archive job not found"}), 404
+        if job["status"] != "ready":
+            print(f"download rejected for job {job_id}: status {job['status']}")
+            return jsonify({"error": f"Archive is {job['status']}"}), 409
+        temp_zip_path = job["temp_zip_path"]
+        download_name = f"{job['folder_name']}.zip"
+        archive_size = os.path.getsize(temp_zip_path)
+
+    def stream_archive():
+        try:
+            with open(temp_zip_path, "rb") as archive_file:
+                while True:
+                    chunk = archive_file.read(ARCHIVE_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    yield chunk
+        finally:
+            remove_archive_temp_file(temp_zip_path, job_id, "download cleanup")
+            with archive_jobs_lock:
+                archive_jobs.pop(job_id, None)
+            print(f"job {job_id}: download stream closed and temporary archive removed")
+
+    response = Response(stream_archive(), mimetype="application/zip", direct_passthrough=True)
+    response.headers["Content-Disposition"] = f'attachment; filename="{download_name}"'
+    response.headers["Content-Length"] = str(archive_size)
+    return response
+
+@app.route("/archiveJobs", methods=["GET"])
+def list_archive_jobs():
+    cleanup_archive_jobs()
+    with archive_jobs_lock:
+        jobs_snapshot = [
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "progress": job["progress"],
+                "total_bytes": job["total_bytes"],
+                "processed_bytes": job["processed_bytes"],
+                "folder_name": job["folder_name"],
+                "error": job.get("error"),
+            }
+            for job_id, job in archive_jobs.items()
+        ]
+    return jsonify(jobs_snapshot), 200
+
+@app.route('/cleanupArchiveJobs', methods=['POST'])
+def cleanup_archive_jobs_endpoint():
+    cleanup_archive_jobs()
+    return jsonify({"status": "Cleanup completed"}), 200
 
 @app.route('/cancel', methods=['POST'])
 def cancel_download():
