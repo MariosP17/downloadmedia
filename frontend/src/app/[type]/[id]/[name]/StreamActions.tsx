@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
+import Loading from "../../../../../loader";
 
 type Props = {
   hash: string;
@@ -212,27 +213,31 @@ function FolderTreeItem({ name, size, numberOfItems, numberOfFolders, currentPat
           isSelected ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-300"
         }`}
       >
+        {numberOfFolders > 0 && (
         <button 
           onClick={handleToggleExpand} 
           className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors p-0.5 pr-5"
         >
           {isOpen ? "▼" : "▶"}
         </button>
+        )}
         <div className="flex items-center gap-2 overflow-x-auto truncate min-w-0 flex-1">
           <img
             src={isOpen ? "/open-folder.png" : "/folder.png"}
             alt=""
             className="w-4 h-4 object-contain flex-shrink-0"
           />
-          <span className="text-sm font-medium break-words whitespace-normal">
-            {cleanName}
-          </span>
-          {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
-          {!loading && (
-            <span className={`text-xs ${isSelected ? "text-white" : "text-zinc-500"} font-mono`}>
-              ({numberOfFolders} {numberOfFolders === 1 ? "folder" : "folders"})
+          <div>
+            <span className="text-sm font-medium break-words whitespace-normal">
+              {cleanName}
             </span>
-          )}
+            {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
+            {!loading && numberOfFolders == 0 && (
+              <span className={`text-xs pl-1 no-break ${isSelected ? "text-white" : "text-zinc-500"} font-mono`}>
+                ({numberOfItems} {numberOfItems === 1 ? "file" : "files"})
+              </span>
+            )}
+          </div>
         </div>
 
         {/* --- THREE DOTS OPTIONS DROPDOWN CONTEXT MENU --- */}
@@ -394,6 +399,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
   const [copiedServer, setCopiedServer] = useState(false);
   const [copiedDevice, setCopiedDevice] = useState(false);
   const [deviceLoading, setDeviceLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   // Server download components/states
   const [serverState, _setServerState] = useState<ServerDownloadState>("idle");
   const [serverProgress, setServerProgress] = useState<number>(0);
@@ -427,7 +433,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
   };
   const activeRefreshRef = useRef<{ [path: string]: () => Promise<void> }>({});
   const getlink = (target: "server" | "device") => {
-    const domain = target === "device" ? window.location.hostname + ":11470/" : "127.0.0.1:11470/";
+    const domain = target != "device" ? window.location.hostname + ":11470/" : "127.0.0.1:11470/";
     return "http://" + domain + hash + "/" + id + "?external=1&download=1";
   };
 
@@ -508,6 +514,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
     }
   };
   const openSelectionModal = async () => {
+    setLoading(true);
     const initialPath = await getInitialPath();
     setTargetPath(initialPath); // Starts with base root directory path selected
     const existsUrl = await fetch(`http://${window.location.hostname}:7000/destinationExists`, {
@@ -525,6 +532,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
       setIsModalOpen(true);
       await loadRootFolders();
     }
+    setLoading(false);
   };
 
   const handleCreateFolder = async () => {
@@ -928,6 +936,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
           </div>
         </div>
       )}
+      {loading && <div className="absolute"> <Loading /> </div>}
     </div>
   );
 }

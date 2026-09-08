@@ -258,34 +258,59 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     e.stopPropagation();
     
     if (isFolderInternal) {
-      toast.error("Folder download is not supported.");
-      return;
+      try {
+        // 1. Create a hidden, throwaway HTML form element
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = `http://${window.location.hostname}:7000/downloadFolderToClient`;
+        form.style.display = "none";
+
+        // 2. Add the filePath parameter to match application/x-www-form-urlencoded
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "filePath";
+        input.value = itemPath; // The variable holding your path
+        form.appendChild(input);
+
+        // 3. Append to body, trigger the native stream download, and remove immediately
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+
+        // This alert fires instantly now!
+        toast.success("Download started!");
+      } catch (err) {
+        console.error("Download error:", err);
+        toast.error("Failed to initiate file download.");
+      }
     }
+    else {
 
-    try {
-      // 1. Create a hidden, throwaway HTML form element
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = `http://${window.location.hostname}:7000/downloadFileToClient`;
-      form.style.display = "none";
+      try {
+        // 1. Create a hidden, throwaway HTML form element
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = `http://${window.location.hostname}:7000/downloadFileToClient`;
+        form.style.display = "none";
 
-      // 2. Add the filePath parameter to match application/x-www-form-urlencoded
-      const input = document.createElement("input");
-      input.type = "hidden";
-      input.name = "filePath";
-      input.value = itemPath; // The variable holding your path
-      form.appendChild(input);
+        // 2. Add the filePath parameter to match application/x-www-form-urlencoded
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "filePath";
+        input.value = itemPath; // The variable holding your path
+        form.appendChild(input);
 
-      // 3. Append to body, trigger the native stream download, and remove immediately
-      document.body.appendChild(form);
-      form.submit();
-      form.remove();
+        // 3. Append to body, trigger the native stream download, and remove immediately
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
 
-      // This alert fires instantly now!
-      toast.success("Download started!");
-    } catch (err) {
-      console.error("Download error:", err);
-      toast.error("Failed to initiate file download.");
+        // This alert fires instantly now!
+        toast.success("Download started!");
+      } catch (err) {
+        console.error("Download error:", err);
+        toast.error("Failed to initiate file download.");
+      }
     }
   };
 
@@ -374,7 +399,6 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
               onClick={(e) => e.stopPropagation()}
               className={`absolute right-0 mt-1 w-28 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl py-1 z-30 transform-gpu transition-all duration-150 ease-out origin-top-right ${isMenuReady ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-1"}`}
             >
-              {!isFolder && (
                 <button
                   onClick={(e) => {
                     setIsMenuOpen(false);
@@ -385,7 +409,6 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 <img src="/download.png" alt="Download" className="w-4 h-4" />
                 Download
               </button>
-              )}
               {isFolder && (
                 <button
                   onClick={(e) => {

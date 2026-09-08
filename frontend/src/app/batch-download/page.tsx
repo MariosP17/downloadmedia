@@ -232,13 +232,15 @@ function FolderTreeItem({ name, size, numberOfItems, numberOfFolders, currentPat
         className={`flex items-center justify-between group py-2 px-2 rounded cursor-pointer transition-colors ${
           isSelected ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-300"
         }`}
-      >
-          <button 
-            onClick={handleToggleExpand} 
-            className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors p-0.5 pr-5"
-          >
-            {isOpen ? "▼" : "▶"}
-          </button>
+      >   
+          {numberOfFolders > 0 && (
+            <button 
+              onClick={handleToggleExpand} 
+              className="w-4 h-4 text-xs font-bold text-zinc-500 hover:text-zinc-200 transition-colors p-0.5 pr-5"
+            >
+              {isOpen ? "▼" : "▶"}
+            </button>
+          )}
         <div className="flex items-center gap-2 overflow-x-auto truncate truncate min-w-0 flex-1">
           {/* <span className=""> */}
             <img
@@ -246,15 +248,17 @@ function FolderTreeItem({ name, size, numberOfItems, numberOfFolders, currentPat
               alt=""
               className="w-4 h-4 object-contain flex-shrink-0"
             />
-            <span className="text-sm font-medium break-words whitespace-normal">
-              {cleanName}
-            </span>
-            {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
-            {!loading && (
-              <span className={`text-xs ${isSelected ? "text-white" : "text-zinc-500"} font-mono`}>
-                ({numberOfFolders} {numberOfFolders === 1 ? "folder" : "folders"})
+            <div>
+              <span className="text-sm font-medium break-words whitespace-normal">
+                {cleanName}
               </span>
-            )}
+              {loading && <span className="text-xs text-zinc-500 animate-pulse">...</span>}
+              {!loading && numberOfFolders == 0 && (
+                <span className={`text-xs pl-1 no-break ${isSelected ? "text-white" : "text-zinc-500"} font-mono`}>
+                  ({numberOfItems} {numberOfItems === 1 ? "file" : "files"})
+                </span>
+              )}
+          </div>
           {/* </span> */}
         </div>
 

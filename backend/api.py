@@ -4,11 +4,13 @@ import os
 from time import time
 import requests
 from threading import Lock
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, after_this_request
 from flask_cors import CORS
 from pathlib import Path
 import shutil
 import ffmpeg
+import zipfile
+import tempfile
 from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
 
@@ -160,6 +162,62 @@ def download_and_save_subtitle(file_id, filename="subtitle.srt", is_retry=False)
         print(f"Success! Subtitle securely saved to disk as '{filename}'")
     else:
         print("Failed to stream the raw subtitle file from the generated link.")
+
+@app.route('/getRemainingSubtitleDownloads', methods=['GET'])
+def getRemainingSubtitleDownloads(is_retry=False):
+    """ Gets remimaining available subtitle downloads from the OpenSubtitles API. """
+    # Step 1: Force a reload of the file to ensure we read the latest token value
+    load_dotenv(override=True)
+    token = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
+    
+    # If no token exists in the .env file yet, go get one
+    if not token:
+        try:
+            token = refresh_login_token()
+        except Exception as e:
+            print(f"Initial login attempt failed: {e}")
+            return jsonify({"error": "Failed to authenticate with OpenSubtitles."}), 500
+
+    url = "https://api.opensubtitles.com/api/v1/infos/user"
+    headers = {
+        "Content-Type": "application/json",
+        "Api-Key": OPEN_SUBTITLES_API_KEY,
+        "Authorization": f"Bearer {token}",
+        "User-Agent": OPEN_SUBTITLES_CURRENT_USER_AGENT
+    }
+    
+    response = requests.get(url, headers=headers)
+    
+    is_invalid_token = False
+    if response.status_code != 200:
+        try:
+            error_data = response.json()
+            # Check if the text "invalid" is in the message or string payload
+            if "invalid" in str(error_data).lower():
+                is_invalid_token = True
+        except ValueError:
+            # Fallback if response isn't clean JSON but contains the string
+            if "invalid" in response.text.lower():
+                is_invalid_token = True
+
+    if is_invalid_token and not is_retry:
+        print(" Server reported 'invalid' token. Token expired! Refreshing...")
+        try:
+            refresh_login_token()
+            # Retry the calculation sequence, flagging is_retry to prevent loops
+            return getRemainingSubtitleDownloads(is_retry=True)
+        except Exception as e:
+            print(f"Failed to refresh token during retry layout: {e}")
+            return jsonify({"error": "Failed to refresh token during retry."}), 500
+    # ---------------------------------------------------------
+
+    # Handle any actual system/network errors
+    if response.status_code != 200:
+        print(f"Download endpoint error ({response.status_code}): {response.text}")
+        return jsonify({"error": f"Download endpoint error ({response.status_code})"}), response.status_code
+
+    subtitle_info = response.json()
+    return subtitle_info, 200
 
 def checkForSubsAndDownload(filename, ttid):
     # Check for subtitle files in the media metadata ussing ffmpeg or similar tools, and download them if available.
@@ -523,7 +581,58 @@ def download_file_to_client():
         )
     except Exception as e:
         return jsonify({"error": f"Failed to stream file payload: {str(e)}", "status": "Failed"}), 500
-    
+
+@app.route('/downloadFolderToClient', methods=['POST'])
+def download_folder_to_client():
+    """
+    POST Endpoint: Streams the requested folder as a ZIP to the client browser.
+    """
+    folder_path = request.form.get('filePath', None)  
+
+    if not folder_path:
+        return jsonify({"error": "The 'filePath' parameter is required.", "status": "Failed"}), 400
+
+    absolute_path = os.path.join("/media", folder_path)
+    if not os.path.exists(absolute_path) or not os.path.isdir(absolute_path):
+        return jsonify({"error": "Target folder path not found on server.", "status": "Failed"}), 404
+
+    clean_folder_name = os.path.basename(absolute_path)
+
+    try:
+            # Create a temporary file on disk rather than RAM
+            temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+            temp_zip_path = temp_zip.name
+            temp_zip.close()  # Close file handle so zipfile can open it safely
+
+            # Write files into the on-disk zip archive
+            with zipfile.ZipFile(temp_zip_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for root, dirs, files in os.walk(absolute_path):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.relpath(file_path, absolute_path)
+                        zip_file.write(file_path, arcname)
+
+            # Ensure the file is deleted from disk after the download finishes
+            @after_this_request
+            def cleanup(response):
+                try:
+                    if os.path.exists(temp_zip_path):
+                        os.remove(temp_zip_path)
+                except Exception as cleanup_err:
+                    print(f"Error removing temporary zip: {cleanup_err}")
+                return response
+
+            # send_file streams from disk in small chunks — RAM stays around ~60-80MB
+            return send_file(
+                temp_zip_path,
+                mimetype='application/zip',
+                as_attachment=True,
+                download_name=f"{clean_folder_name}.zip"
+            )
+
+    except Exception as e:
+        return jsonify({"error": f"Failed to stream folder payload: {str(e)}", "status": "Failed"}), 500
+
 @app.route('/cancel', methods=['POST'])
 def cancel_download():
     data = request.get_json() or {}
