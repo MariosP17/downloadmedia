@@ -115,14 +115,16 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
   }
   if (!data) return null;
   const decodedId = decodeURIComponent(id);
-  const episodeData = !decodedId.includes(":") ? null : data.videos.filter((v: any) => v.id == decodedId)[0];
+  const type = data.type || data.mediaType || data.category;
+  const episodeData = type==="movie" ? null : data.videos.filter((v: any) => v.id == decodedId)[0];
   let omdbData = null;
   if (episodeData && OMDB_API_KEY){
     const omdbUrl = `https://www.omdbapi.com/?i=${data.imdb_id}&Season=${episodeData.season}&Episode=${episodeData.episode}&apikey=${OMDB_API_KEY}`;
     omdbData = await fetch(omdbUrl).then(res => res.json());
   }
+  const name = (data.name || data.title || data.originalTitle || data.originalName || "Unknown Title");
+  const episodeName = episodeData ? (episodeData.name || episodeData.title || episodeData.originalTitle || episodeData.originalName || "Unknown Episode Title") : null;
   const seasonAndEpisode = episodeData ? `S${episodeData.season?.toString().padStart(2, "0") || "00"}E${episodeData.episode?.toString().padStart(2, "0") || "00"}` : null;
-  const name = episodeData == null ? (data.name || data.title || data.originalTitle || data.originalName || "Unknown Title") : (episodeData.name || "Unknown Title");
   const cast = Array.isArray(data.cast) ? data.cast.slice(0, 3) : [];
   const releaseYear = episodeData == null ? (data.releaseInfo || data.year || data.released?.slice(0, 4)) : (new Intl.DateTimeFormat("en-UK", {
                     day: "numeric",
@@ -130,7 +132,8 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
                     year: "numeric",
                 }).format(new Date(episodeData.released || episodeData.airDate)).replace(",", ""));
   let rating = episodeData == null ? (data.imdbRating || data.rating) : (parseFloat(episodeData.rating) === 0 ? omdbData?.imdbRating || omdbData?.Rating : episodeData.rating);
-  const duration = episodeData==null ? data.runtime || data.duration || data.runtimeMinutes : omdbData?.Runtime || null;
+  const duration = type === "movie" ? data.runtime || data.duration || data.runtimeMinutes : !episodeData ? null : omdbData?.Runtime || null;
+  console.log(type, duration, data.runtime, data.duration, data.runtimeMinutes, episodeData, omdbData?.Runtime);
   const description = episodeData == null ? (data.description || data.plot || data.overview || data.summary) : (episodeData.description || data.description || data.plot || data.overview || data.summary);
   let link = episodeData == null ? data.links.filter((l:any) => l.category === "imdb")[0]?.url  : `https://www.imdb.com/title/${omdbData?.imdbId || omdbData?.imdbID || omdbData?.imdb}/`;
   if (!rating || rating === 0 || !rating) {
@@ -145,12 +148,14 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
   return (
     <div className="rounded-lg border border-white/10 bg-zinc-900 p-4 shadow-md">
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <h2 className="text-xl font-semibold text-white"><span className="text-zinc-300 italic">{seasonAndEpisode}</span> {name}</h2>
-        {releaseYear && <span className="text-sm text-zinc-400">{releaseYear}</span>}
+        <div>
+        <h2 className="text-2xl font-bold text-white">{name} <span className="ml-2 text-sm text-zinc-400">{releaseYear}</span></h2>
+        <h3 className="text-xl font-semibold text-white"><span className="text-zinc-300 italic text-lg">{seasonAndEpisode}</span> {episodeName}</h3>
+        </div>
       </div>
       <div className="mt-2 flex flex-col flex-wrap gap-y-1 text-sm text-zinc-300">
         {cast.length > 0 && <span> <b>Cast:</b> {cast.join(", ")}</span>}
-        {((rating && rating >0) || duration) && <span className="flex">{rating && rating !=0 && <span className="flex"><a href={link} target="_blank" rel="noopener noreferrer"><img src='../../../../../../imdb.png' alt='IMDb' className={`w-10 h-5 mr-2 ${link ? 'cursor-pointer' : ''}`} /></a> {rating}&nbsp; • &nbsp;</span>}{duration && <> <b>Duration:</b> &nbsp;{duration}</>}</span>}
+        {((rating && rating >0) || duration) && <span className="flex">{rating && rating !=0 && <span className="flex"><a href={link} target="_blank" rel="noopener noreferrer"><img src='../../../../../../imdb.png' alt='IMDb' className={`w-10 h-5 mr-2 ${link ? 'cursor-pointer' : ''}`} /></a> {rating}</span>}{rating && duration &&<>&nbsp; • &nbsp;</>}{duration && <> <b>Duration:</b> &nbsp;{duration}</>}</span>}
         {description && <p className="mt-2 text-sm text-zinc-300">{description}</p>}
       </div>
     </div>
@@ -244,7 +249,6 @@ export default async function ItemPage({ params, searchParams }: Props) {
         <div id="info" className="mb-6 sticky top-1">
           <MediaInfo data={mediaData} id={id} />
         </div>
-        <h1 className="text-2xl font-bold mb-6">Torrentio results for {decodeURIComponent(name)}</h1>
   
         {streams.length === 0 ? (
           <div className="text-zinc-400">No streams available.</div>

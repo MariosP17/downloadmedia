@@ -237,6 +237,11 @@ function FolderTreeItem({ name, size, numberOfItems, numberOfFolders, currentPat
                 ({numberOfItems} {numberOfItems === 1 ? "file" : "files"})
               </span>
             )}
+            {!loading && numberOfFolders == numberOfItems && (
+                <span className={`text-xs pl-1 no-break ${isSelected ? "text-white" : "text-zinc-500"} font-mono`}>
+                  ({numberOfFolders} {numberOfFolders === 1 ? "folder" : "folders"})
+                </span>
+              )}
           </div>
         </div>
 
