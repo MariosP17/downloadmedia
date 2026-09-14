@@ -1374,7 +1374,7 @@ def get_logs():
     # one stopped, so the query cost stays constant instead of growing with page number
     # (as it did when we asked journalctl for `-n page*50` lines every time).
     cursor = request.args.get('cursor', default=None, type=str)
-    logs_per_page = 50
+    logs_per_page = getOptions().get("logs_page_size", 50)
 
     cmd = [
         "journalctl",
@@ -1441,6 +1441,20 @@ def get_all_logs_lines():
     return jsonify({
         "total_lines": total_lines
     }), 200
+
+def getOptions():
+    """Reads settings.json and returns the 'settings' dictionary."""
+    try:
+        with open("settings.json", "r", encoding="utf-8") as settings_file:
+            content = settings_file.read().strip()
+            if content:
+                data = json.loads(content)
+                if isinstance(data, dict):
+                    settings = data.get("options", {})
+                    return settings if isinstance(settings, dict) else {}
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        pass
+    return {}
 
 def write_refresh_libraries_log(initiator):
     log_data = {

@@ -3,18 +3,21 @@ type OptionType = {
   typeKey: string;
   value: any;
   type: "<boolean>" | "<string>" | "<number>";
+  min?: number;
+  max?: number;
   onChange?: (newValue: any) => void;
 }
 import { OptionsNames } from "../../../Props";
 
-export default function OptionType({typeKey, value, type, onChange}: OptionType) {
+export default function OptionType({typeKey, value, type,min,max, onChange}: OptionType) {
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
       onChange(newValue);
     }
   };
 
-  if (type === "<boolean>") {
+  switch (type) {
+    case "<boolean>":
     return (
       <div className="mb-4 flex justify-between">
         <p>{OptionsNames[typeKey]}</p>
@@ -30,10 +33,23 @@ export default function OptionType({typeKey, value, type, onChange}: OptionType)
         </label>
       </div>
     );
-  }
-  else{
-    return (
-        <p>Unknown type</p>
-    );
+    case "<number>":
+      return (
+        <div className="mb-4 flex justify-between">
+          <p>{OptionsNames[typeKey]}</p>
+          <input 
+            type="number" 
+            value={value}
+            onChange={(event) => onChange && onChange(Number(event.target.value))}
+            min={min}
+            max={max}
+            className="border rounded px-2 py-1"
+          />
+        </div>
+      );
+    default:
+      return (
+          <p>Unknown type</p>
+      );
   }
 }

@@ -27,5 +27,6 @@ export const initiator: Record<string, string> = {
 
 export const OptionsNames : Record<string, string> = 
 {
-    "sticky_media_info" : "Media Info panel to stick on top"    
+    "sticky_media_info" : "Media Info panel to stick on top",
+    "logs_page_size" : "Number of logs to display per page"  
 };

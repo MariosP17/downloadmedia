@@ -47,6 +47,7 @@ export default function Options() {
     return (
         <div className="mt-4 flex flex-col">
             <OptionType typeKey="sticky_media_info" value={options["sticky_media_info"] || false} type="<boolean>" onChange={(newValue) => setOptions((prev) => ({ ...prev, sticky_media_info: newValue }))} />
+            <OptionType typeKey="logs_page_size" value={options["logs_page_size"] || 0} type="<number>" min={1} onChange={(newValue) => setOptions((prev) => ({ ...prev, logs_page_size: newValue }))} />
             
             <div className="flex justify-end">
                 <button onClick={saveOptions} disabled={disabledSave} className="bg-blue-700 cursor-pointer enabled:hover:bg-blue-900 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
