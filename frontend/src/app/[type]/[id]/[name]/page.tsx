@@ -133,9 +133,8 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
                 }).format(new Date(episodeData.released || episodeData.airDate)).replace(",", ""));
   let rating = episodeData == null ? (data.imdbRating || data.rating) : (parseFloat(episodeData.rating) === 0 ? omdbData?.imdbRating || omdbData?.Rating : episodeData.rating);
   const duration = type === "movie" ? data.runtime || data.duration || data.runtimeMinutes : !episodeData ? null : omdbData?.Runtime || null;
-  console.log(type, duration, data.runtime, data.duration, data.runtimeMinutes, episodeData, omdbData?.Runtime);
   const description = episodeData == null ? (data.description || data.plot || data.overview || data.summary) : (episodeData.description || data.description || data.plot || data.overview || data.summary);
-  let link = episodeData == null ? data.links.filter((l:any) => l.category === "imdb")[0]?.url  : `https://www.imdb.com/title/${omdbData?.imdbId || omdbData?.imdbID || omdbData?.imdb}/`;
+  let link = episodeData == null ? data.links?.filter((l:any) => l.category === "imdb")[0]?.url ?? `https://www.imdb.com/title/${omdbData?.imdbId || omdbData?.imdbID || omdbData?.imdb}/` : `https://www.imdb.com/title/${omdbData?.imdbId || omdbData?.imdbID || omdbData?.imdb}/`;
   if (!rating || rating === 0 || !rating) {
     const omdbData = await getMovieOmdbData();
     if (omdbData && omdbData.imdbRating && omdbData.imdbRating !== "N/A") {
@@ -180,6 +179,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
         // ignore and try next
       }
   }
+  const options = await fetch(`http://${host}:7000/getOptions`).then(res => res.json());
 
   if (type === "series" && !decodeURIComponent(id).includes(":")) {
     const seasons = normalizeSeasons(mediaData);
@@ -187,7 +187,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
     if (type === "series" && seasons.length > 0) {
       return (
         <main className="p-8 bg-zinc-950 min-h-screen text-white">
-          <div id="info" className="mb-6 sticky top-1 z-10">
+            <div id="info" className={`mb-6 z-10 ${options["sticky_media_info"] ? "sticky top-20" : ""}`}>
             <MediaInfo data={mediaData} id={id} />
           </div>
           <h1 className="text-2xl font-bold mb-6">Season results for {decodeURIComponent(name)}</h1>
@@ -199,7 +199,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
     else if (type === "series") {
       return (
         <main className="p-8 bg-zinc-950 min-h-screen text-white">
-          <div id="info" className="mb-6 sticky top-1">
+          <div id="info" className={`mb-6 z-10 ${options["sticky_media_info"] ? "sticky top-20" : ""}`}>
             <MediaInfo data={mediaData} id={id} />
           </div>
           <h1 className="text-2xl font-bold mb-6">Season results for {decodeURIComponent(name)}</h1>
@@ -245,8 +245,8 @@ export default async function ItemPage({ params, searchParams }: Props) {
     })
 );
     return (
-      <main className="p-8 pt-20 bg-zinc-950 min-h-screen text-white">
-        <div id="info" className="mb-6 sticky top-1">
+      <main className="px-8 pt-8 bg-zinc-950 min-h-screen text-white">
+        <div id="info" className={`mb-6 z-10 ${options["sticky_media_info"] ? "sticky top-20" : ""}`}>
           <MediaInfo data={mediaData} id={id} />
         </div>
   
@@ -254,13 +254,13 @@ export default async function ItemPage({ params, searchParams }: Props) {
           <div className="text-zinc-400">No streams available.</div>
         ) : (
           <div className="space-y-3 flex">
-            <div>
+            <div className="w-full">
             {streamsWithProgress.map((s: any, idx: number) => {
               return (
                 <div
                 key={`${s.infoHash}-${idx}`}
                 data-stream-name={s.name}
-                className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center bg-zinc-900 rounded-lg p-4 hover:bg-zinc-800 transition-colors gap-4 w-full overflow-hidden"
+                className="mb-4 flex flex-col sm:flex-row items-stretch sm:items-center bg-zinc-900 rounded-lg p-4 hover:bg-zinc-800 transition-colors duration-300 gap-4 w-full overflow-hidden border border-transparent"
               >
                 {/* 1. Bookmark Button - First item in the flex engine flow */}
                 <div className="flex items-center justify-between sm:justify-start flex-shrink-0">
@@ -302,7 +302,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
               );
             })}
           </div>
-          <div className="fixed top-37 right-6 z-51">
+          <div className="fixed top-29 right-6 z-51">
             <StreamScroller 
               streamsnames={Array.from(new Set(streamsWithProgress.map(s => s.name)))} 
               counts={streamsWithProgress.reduce((acc, s) => {

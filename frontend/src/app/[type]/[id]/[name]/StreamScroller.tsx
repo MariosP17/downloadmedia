@@ -11,6 +11,25 @@ export default function StreamScroller({ streamsnames, counts }: Props) {
     const [expanded, setExpanded] = useState(false);
     const scrollerRef = useRef<HTMLElement>(null);
     const [isPhone, setIsPhone] = useState(false);
+    const [highlightedStream, setHighlightedStream] = useState<HTMLElement | null>(null);
+
+    useEffect(() => {
+        if (highlightedStream) {
+            highlightedStream.classList.add("border-white", "border-opacity-50");
+            highlightedStream.classList.remove("border-transparent");
+            highlightedStream.onmouseenter = () => {
+                setHighlightedStream(null);
+                highlightedStream.classList.remove("border-white", "border-opacity-50");
+                highlightedStream.classList.add("border-transparent");
+                highlightedStream.onmouseenter = null;
+
+            };
+            return () => {
+                highlightedStream.classList.remove("border-white", "border-opacity-50");
+                highlightedStream.classList.add("border-transparent");
+            };
+        }
+    }, [highlightedStream]);
 
     useEffect(() => {
         const handleOutsideClick = (event: PointerEvent) => {
@@ -27,23 +46,19 @@ export default function StreamScroller({ streamsnames, counts }: Props) {
         return () => document.removeEventListener("pointerdown", handleOutsideClick);
     }, [expanded]);
 
-    useEffect(() => {
-    // Only runs in the browser, after mount
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
-    
-    // Set initial value
-    setIsPhone(mediaQuery.matches);
+        useEffect(() => {
+        const mediaQuery = window.matchMedia("(pointer: fine) and (hover: hover)");
+        
+        const update = () => setIsPhone(!mediaQuery.matches);
+        update();
 
-    // Listen for resize changes
-    const handler = (e: MediaQueryListEvent) => setIsPhone(e.matches);
-    mediaQuery.addEventListener("change", handler);
+        mediaQuery.addEventListener("change", update);
+        return () => mediaQuery.removeEventListener("change", update);
+    }, []);
 
-    return () => mediaQuery.removeEventListener("change", handler);
-  }, []);
-
-    function isPhoneScreen() {
-        return isPhone;
-    }
+        function isPhoneScreen() {
+            return isPhone;
+        }
 
     const scrollToFirstStream = (name: string) => {
         const firstStream = Array.from(
@@ -62,10 +77,12 @@ export default function StreamScroller({ streamsnames, counts }: Props) {
         const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
         // Convert rem value to pixels
-        const spacingPx = parseFloat(spacingProp) * rootFontSize * 4;
+        const spacingPx = (parseFloat(spacingProp) * rootFontSize + 20) * 4;
 
         const offset = infoHeight + spacingPx;
         if (firstStream) {
+            setHighlightedStream(null);
+            setHighlightedStream(firstStream);
             const elementPosition = firstStream.getBoundingClientRect().top;
             const offsetPosition = elementPosition + window.scrollY - offset;
 

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, use } from "react";
 import { toast } from "react-hot-toast";
+import Loading from "../loader";
+
 
 type TreeItemProps = {
   name: string;
@@ -27,6 +29,8 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   
   // Calculate this item's full path parameter for the backend API query
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
+  const isMovieOrSeriesFolder = isFolder && (itemPath.split("/").length === 2 || itemPath.split("/").length === 3);
+  const type = isMovieOrSeriesFolder ? itemPath.split("/")[0].toLowerCase() === "movies" ? "movie" : "series" : "";
 
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -34,6 +38,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const [newItemName, setNewItemName] = useState(cleanName);
   const [children, setChildren] = useState<{ name: string; size: string; numberOfItems: number, numberOfFolders: number }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMenuReady, setIsMenuReady] = useState(false);
@@ -82,6 +87,11 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       if (archivePollRef.current) clearInterval(archivePollRef.current);
     };
   }, [itemPath, isFolder, activeRefreshRef]);
+
+  useEffect(() => {
+    
+    return () => {setPageLoading(false);};
+  }, []);
 
   // Helper function to fetch folder contents (moved out to reuse during refreshes)
   const fetchDirectoryContents = async (setLoadingInternal: boolean = true) => {
@@ -391,6 +401,57 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
 
   const regex = /\b(?:S(\d{1,2})E|(\d{1,2})X)(\d{1,2})\b/gi;
   const match = regex.exec(cleanName);
+  function parseTitleAndYear(input: string): { title: string; year: string | null } {
+    // Matches optional '(' or '[', followed by 19xx/20xx, followed by optional ')' or ']'
+    const yearPattern = /[([]?\b((?:19|20)\d{2})\b[)\]]?/;
+
+    const match = input.match(yearPattern);
+
+    if (!match) {
+      return {
+        title: input.trim(),
+        year: null,
+      };
+    }
+
+    const year = match[1]; // Captured 4-digit year
+
+    const title = input
+      .replace(match[0], "") // Removes the year along with its surrounding brackets/parentheses
+      .replace(/[._]/g, " ") // Converts dots/underscores to spaces (common in scene releases)
+      .replace(/\s+/g, " ")  // Collapses leftover multi-spaces into a single space
+      .trim();
+
+    return { title, year };
+  }
+  async function navigateToMedia(cleanName: string, path: string) {
+    if (!isMovieOrSeriesFolder || !type) return;
+    setPageLoading(true);
+    let isSeasonFolder=  itemPath.split("/").length === 3;
+    let season = isSeasonFolder ? parseInt(path.split("/")[2].match(/\d+/)?.[0] || "-1", 10) : undefined;
+    console.log("isSeasonFolder:", isSeasonFolder, "season:", season);
+    try {
+      const { title, year } = parseTitleAndYear(isSeasonFolder ? path.split("/")[1] : cleanName);
+      if (!title) return;
+      console.log("Navigating to media with title and year:", { title, year });
+      const omdbUrl = `http://${window.location.hostname}:7000/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}`;
+      const OMDBResponse = await fetch(omdbUrl);
+      const OMDBData = await OMDBResponse.json();
+      if (!OMDBData || OMDBData.Response === "False") {
+        toast.error("Error navigating to " + cleanName);
+        return;
+      }
+      console.log("OMDB Data:", OMDBData);
+      if (OMDBData.Title && OMDBData.imdbID) {
+        window.location.href = `/${type}/${encodeURIComponent(OMDBData.imdbID)}/${encodeURIComponent(title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : "");
+      }
+    } catch (error) {
+      toast.error("Error navigating to " + cleanName);
+      console.error("Error navigating to media:", error);
+    } finally {
+      setPageLoading(false);
+    }
+  }
 
   return (
     <div className="select-none">
@@ -410,7 +471,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           alt=""
           className="w-5 h-5 object-contain flex-shrink-0"
         />
-        <span className="text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-none">
+        <span onClick={async (e) => { isMovieOrSeriesFolder && (e.stopPropagation(), e.preventDefault(), await navigateToMedia(cleanName,itemPath)) }} className={`text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-none ${isMovieOrSeriesFolder ? "hover:text-blue-500 hover:underline" : ""}`}>
           {cleanName}
         </span>
         {loading && <span className="text-xs text-zinc-500 animate-pulse">loading...</span>}
@@ -638,6 +699,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           </div>
         </div>
       )}
+      {pageLoading && <Loading />}
     </div>
   );
 }

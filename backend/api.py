@@ -1,6 +1,8 @@
+from datetime import datetime, timezone
 import re
 import threading
 import os
+import subprocess
 from time import time
 import requests
 from threading import Lock
@@ -12,6 +14,7 @@ import ffmpeg
 import zipfile
 import tempfile
 import uuid
+import json
 from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
 
@@ -27,11 +30,14 @@ OPEN_SUBTITLES_API_CURRENT_JWT = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
 OPEN_SUBTITLES_CURRENT_USER_AGENT = os.getenv("OPEN_SUBTITLES_CURRENT_USER_AGENT")
 JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
 PLEX_API_KEY = os.getenv("PLEX_API_KEY")
+OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 
 # Global dictionary to keep track of download progress
 # Format: { "identifier_idx": percentage_float }
-# progress_store = {"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_5": {"ttid": "tt6741278:2:4", "progress": -1.0},"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_6": {"ttid": "tt6741278:2:5", "progress": 100},"fc72b75b1275cc5a93f638c552da62d90f9b2853_2": {"ttid": "tt11198330:3:3", "progress": -2.0},"a3882ea6609c0332594ddce04bc462a8c1955574_2": {"ttid": "tt17490712", "progress": 100}}
+# progress_store = {"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_5": {"ttid": "tt6741278:2:4", "progress": 12.0},"dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_6": {"ttid": "tt6741278:2:5", "progress": 100},"fc72b75b1275cc5a93f638c552da62d90f9b2853_2": {"ttid": "tt11198330:3:3", "progress": -2.0},"a3882ea6609c0332594ddce04bc462a8c1955574_2": {"ttid": "tt17490712", "progress": 100}}
 progress_store = {}
+# batch_progress_store = ["dbf2bf8259fcce3c74040f24416b8dad6fbeadf3_5"]
+
 batch_progress_store = []
 archive_jobs = {}
 
@@ -299,6 +305,7 @@ def checkIfDoneAndRefreshLibraries():
         try:
             refresh_jellyfin_libraries()
             refresh_plex_libraries()
+            write_refresh_libraries_log(initiator='file_download')
         except Exception as e:
             print(f"Error occurred while refreshing libraries: {e}")
     else:
@@ -307,7 +314,7 @@ def checkIfDoneAndRefreshLibraries():
 def refresh_jellyfin_libraries():
         url = "http://localhost:8096/Library/Refresh"
         headers = {
-            "X-MediaBrowser-Token": JELLYFIN_API_KEY,
+            "Authorization": f"MediaBrowser Token={JELLYFIN_API_KEY}",
             "Content-Type": "application/json"
         }
         while True:
@@ -1003,6 +1010,14 @@ def get_progress_store():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/clearProgressStore', methods=['POST'])
+def clear_progress_store():
+    with progress_lock:
+        cleared_count = len(progress_store)
+        progress_store.clear()
+    print(f"Cleared {cleared_count} download progress store entries")
+    return jsonify({"status": "Progress store cleared", "cleared": cleared_count}), 200
+
 @app.route('/getBatchProgressStore', methods=['GET'])
 def get_batch_progress_store():
     try:
@@ -1017,6 +1032,14 @@ def get_batch_progress_store():
         return jsonify(filtered_store), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/clearBatchProgressStore', methods=['POST'])
+def clear_batch_progress_store():
+    with batch_progress_lock:
+        cleared_count = len(batch_progress_store)
+        batch_progress_store.clear()
+    print(f"Cleared {cleared_count} batch progress store entries")
+    return jsonify({"status": "Batch progress store cleared", "cleared": cleared_count}), 200
 
 EPISODE_REGEX = re.compile(r'\b(?:S(\d{1,2})E|(\d{1,2})X)(\d{1,2})\b', re.IGNORECASE)
 def extract_season_episode(filename):
@@ -1153,6 +1176,7 @@ def delete_folder():
     finally:
         refresh_jellyfin_libraries()
         refresh_plex_libraries()
+        write_refresh_libraries_log(initiator='folder_delete')
 
 
 
@@ -1176,6 +1200,7 @@ def delete_file():
     finally:
         refresh_jellyfin_libraries()
         refresh_plex_libraries()
+        write_refresh_libraries_log(initiator='file_delete')
 
 
 @app.route('/renameFolder', methods=['POST'])
@@ -1207,6 +1232,7 @@ def rename_folder():
     finally:
         refresh_jellyfin_libraries()
         refresh_plex_libraries()
+        write_refresh_libraries_log(initiator='folder_rename')
 
 
 @app.route('/renameFile', methods=['POST'])
@@ -1236,6 +1262,7 @@ def rename_file():
     finally:
         refresh_jellyfin_libraries()
         refresh_plex_libraries()
+        write_refresh_libraries_log(initiator='file_rename')
 
 
 @app.route('/createFolder', methods=['POST'])
@@ -1256,11 +1283,15 @@ def create_folder():
     except OSError as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/refreshLibraries', methods=['GET'])
-def refresh_libraries():
+@app.route('/refreshLibraries', methods=['POST'])
+def refresh_libraries(initiator='settings'):
+    initiator = request.json.get('initiator', initiator)
+
     try:
         refresh_jellyfin_libraries()
         refresh_plex_libraries()
+        write_refresh_libraries_log(initiator)
+
         return jsonify({"message": "Libraries refreshed successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1275,6 +1306,167 @@ def destination_exists():
 
     destination_path = os.path.join('/media', destination)
     return jsonify({"exists": os.path.exists(destination_path)}), 200
+
+@app.route('/getRefreshLibrariesLog', methods=['GET'])
+def get_refresh_libraries_log():
+    if not os.path.exists('settings.json'):
+        return jsonify({"error": "Settings file not found"}), 404
+
+    with open('settings.json', 'r') as log_file:
+        log_data = json.load(log_file).get("libraries", {})
+    return jsonify(log_data), 200
+
+@app.route('/getOptions', methods=['GET'])
+def get_options():
+    if not os.path.exists('settings.json'):
+        return jsonify({"error": "Settings file not found"}), 404
+
+    with open('settings.json', 'r') as settings_file:
+        file_content = json.load(settings_file)
+        settings_data = file_content["options"] if "options" in file_content else {}
+    return jsonify(settings_data), 200
+
+@app.route('/updateOptions', methods=['POST'])
+def update_options():
+    data = request.get_json() or {}
+
+    if not data:
+        return jsonify({"error": "No options data provided"}), 400
+
+    settings_data = {}
+    try:
+        with open('settings.json', 'r', encoding='utf-8') as settings_file:
+            content = settings_file.read().strip()
+            if content:
+                settings_data = json.loads(content)
+    except (FileNotFoundError, json.JSONDecodeError):
+        settings_data = {}
+
+    if not isinstance(settings_data, dict):
+        settings_data = {}
+
+    settings_data["options"] = data
+
+    with open('settings.json', 'w', encoding='utf-8') as settings_file:
+        json.dump(settings_data, settings_file, indent=2, ensure_ascii=False)
+
+    return jsonify({"message": "Settings updated successfully"}), 200
+
+@app.route('/getOmdbData', methods=['GET'])
+def get_omdb_data():
+    t = request.args.get('t')
+    y = request.args.get('y')
+    type = request.args.get('type')
+
+    if not t:
+        return jsonify({"error": "Title or TTID is required"}), 400
+
+    try:
+        response = requests.get(f"http://www.omdbapi.com/?t={t}{f'&y={y}' if y else ''}{f'&type={type}' if type else ''}&apikey={OMDB_API_KEY}")
+        response.raise_for_status()
+        return jsonify(response.json()), 200
+    except requests.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/getLogs', methods=['GET'])
+def get_logs():
+    # Cursor-based pagination: each request walks backwards from where the previous
+    # one stopped, so the query cost stays constant instead of growing with page number
+    # (as it did when we asked journalctl for `-n page*50` lines every time).
+    cursor = request.args.get('cursor', default=None, type=str)
+    logs_per_page = 50
+
+    cmd = [
+        "journalctl",
+        "-u", "stremio-downloader-api.service",
+        "--no-pager",
+        "-r", "--show-cursor",
+    ]
+    if cursor:
+        # --cursor re-includes the entry it points at, so fetch one extra to drop it.
+        cmd += ["--cursor", cursor, "-n", str(logs_per_page + 1)]
+    else:
+        cmd += ["-n", str(logs_per_page)]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError as e:
+        return jsonify({"error": "Failed to fetch logs", "details": e.stderr}), 500
+
+    lines = result.stdout.splitlines()
+
+    next_cursor = None
+    if lines and lines[-1].startswith("-- cursor:"):
+        next_cursor = lines[-1].split("-- cursor:", 1)[1].strip()
+        lines = lines[:-1]
+
+    if cursor and lines:
+        lines = lines[1:]  # drop the duplicate entry --cursor re-included
+
+    has_more = bool(lines) and len(lines) == logs_per_page
+
+    # journalctl -r returns newest-first; flip back to chronological order for display.
+    page_logs = list(reversed(lines))
+
+    return jsonify({
+        "logs": page_logs,
+        "cursor": next_cursor if has_more else None,
+        "hasMore": has_more
+    }), 200
+
+@app.route('/getAllLogsLines', methods=['GET'])
+def get_all_logs_lines():
+    cmd = "journalctl -u stremio-downloader-api.service --no-pager -q | wc -l"
+
+    try:
+        count_res = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        total_lines = int(count_res.stdout.strip() or 0)
+    except (subprocess.CalledProcessError, ValueError) as e:
+        return jsonify({
+            "error": "Failed to fetch total log lines",
+            "details": str(e)
+        }), 500
+
+    return jsonify({
+        "total_lines": total_lines
+    }), 200
+
+def write_refresh_libraries_log(initiator):
+    log_data = {
+        "lastRefreshed": datetime.now(timezone.utc).isoformat(),
+        "lastRefreshedBy": initiator
+    }
+    settings_data = {}
+
+    try:
+        with open("settings.json", "r", encoding="utf-8") as log_file:
+            content = log_file.read().strip()
+            if content:
+                settings_data = json.loads(content)
+    except (FileNotFoundError, json.JSONDecodeError):
+        settings_data = {}
+
+    # Ensure root structure is a dictionary
+    if not isinstance(settings_data, dict):
+        settings_data = {}
+
+    # 2. Add or update the node
+    settings_data["libraries"] = log_data
+
+    # 3. Save (creates file if it didn't exist)
+    with open("settings.json", "w", encoding="utf-8") as log_file:
+        json.dump(settings_data, log_file, indent=2, ensure_ascii=False)
 
 if __name__ == '__main__':
     # Start the Flask app explicitly on Port 7000

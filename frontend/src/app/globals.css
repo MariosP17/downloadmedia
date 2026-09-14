@@ -169,9 +169,59 @@ input:checked + .slider:before {
   background-color: white;
 }
 
+/* The slider track (The background) */
+.slider-options {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: white;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 34px;
+}
+/* The moving circle indicator inside the track */
+.slider-options:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #1e7dbd;
+  transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Background changes to blue/green when checked */
+input:checked + .slider-options {
+  background-color: #1e7dbd;
+}
+
+/* Slide the white circle to the right side when checked */
+input:checked + .slider-options:before {
+  transform: translateX(24px);
+  background-color: white;
+}
+
+
 /* Visual states for text labels */
 .status-text {
   font-weight: bold;
   min-width: 30px;
 }
-   
+
+.log-loader {
+  width: 50px;
+  aspect-ratio: 1;
+  --_c:no-repeat radial-gradient(farthest-side,#1e7dbd 92%,#0000);
+  background: 
+    var(--_c) top,
+    var(--_c) left,
+    var(--_c) right,
+    var(--_c) bottom;
+  background-size: 12px 12px;
+  animation: l7 1s infinite;
+}
+@keyframes l7 {to{transform: rotate(.5turn)}}

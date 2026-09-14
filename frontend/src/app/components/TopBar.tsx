@@ -18,7 +18,7 @@ export default function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => vo
   }
 
   return (
-    <header className="w-full bg-zinc-900 border-b border-zinc-800">
+    <header className="sticky top-0 w-full bg-zinc-900 border-b border-zinc-800 z-55">
   <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
     
     {/* Logo + Sidebar Button Container */}
