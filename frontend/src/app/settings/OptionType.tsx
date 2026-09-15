@@ -43,7 +43,7 @@ export default function OptionType({typeKey, value, type,min,max, onChange}: Opt
             onChange={(event) => onChange && onChange(Number(event.target.value))}
             min={min}
             max={max}
-            className="border rounded px-2 py-1"
+            className="border rounded px-2 py-1 max-w-20"
           />
         </div>
       );

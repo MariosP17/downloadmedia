@@ -1374,6 +1374,13 @@ def get_logs():
     # one stopped, so the query cost stays constant instead of growing with page number
     # (as it did when we asked journalctl for `-n page*50` lines every time).
     cursor = request.args.get('cursor', default=None, type=str)
+    if cursor in ("null", "undefined", "", "None"):
+        cursor = None
+
+    date_str = request.args.get('date', default=None, type=str)
+    if date_str in ("null", "undefined", "", "None"):
+        date_str = None
+
     logs_per_page = getOptions().get("logs_page_size", 50)
 
     cmd = [
@@ -1382,6 +1389,32 @@ def get_logs():
         "--no-pager",
         "-r", "--show-cursor",
     ]
+
+    target_start_dt = None
+    if date_str:
+        clean_date = date_str.strip()
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", clean_date):
+            since_val = f"{clean_date} 00:00:00"
+            until_val = f"{clean_date} 23:59:59"
+            try:
+                target_start_dt = datetime.strptime(since_val, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                pass
+        else:
+            since_val = clean_date
+            until_val = None
+
+        if cursor:
+            # journalctl disallows specifying both --since and --cursor at the same time.
+            # Using --until with --cursor bounds the upper end safely.
+            if until_val:
+                cmd += ["--until", until_val]
+        else:
+            if since_val:
+                cmd += ["--since", since_val]
+            if until_val:
+                cmd += ["--until", until_val]
+
     if cursor:
         # --cursor re-includes the entry it points at, so fetch one extra to drop it.
         cmd += ["--cursor", cursor, "-n", str(logs_per_page + 1)]
@@ -1408,7 +1441,26 @@ def get_logs():
     if cursor and lines:
         lines = lines[1:]  # drop the duplicate entry --cursor re-included
 
+    lines = [l for l in lines if l != "-- No entries --"]
+
     has_more = bool(lines) and len(lines) == logs_per_page
+
+    # When date filtering with cursor pagination, discard any entries older than the target start date
+    if target_start_dt and lines:
+        filtered_lines = []
+        for line in lines:
+            match = re.match(r"^([A-Z][a-z]{2}\s+\d+\s+\d{2}:\d{2}:\d{2})", line)
+            if match:
+                try:
+                    line_dt = datetime.strptime(f"{target_start_dt.year} {match.group(1)}", "%Y %b %d %H:%M:%S")
+                    if line_dt < target_start_dt:
+                        has_more = False
+                        next_cursor = None
+                        break
+                except ValueError:
+                    pass
+            filtered_lines.append(line)
+        lines = filtered_lines
 
     # journalctl -r returns newest-first; flip back to chronological order for display.
     page_logs = list(reversed(lines))
