@@ -4,6 +4,7 @@ import threading
 import os
 import subprocess
 from time import time
+from click import File
 import requests
 from threading import Lock
 from flask import Flask, Response, request, jsonify, send_file
@@ -17,6 +18,8 @@ import uuid
 import json
 from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
+from download_parallel import enqueue_download as enqueue_parallel_download
+from download_serial import SerialDownloadDispatcher
 
 load_dotenv()
 
@@ -89,6 +92,110 @@ def refresh_login_token():
     print("New JWT Token securely written to .env file!")
     
     return new_token
+
+@app.route("/getSubtitles", methods=["GET"])
+def get_subtitles():
+    load_dotenv(override=True)
+    ttid = request.args.get("ttid")
+    language = request.args.get("language", "en")
+    if not ttid:
+        return {"error": "Missing ttid parameter"}, 400
+    try:
+        subs = getSubtitles(ttid, language)
+        if not subs:
+            return {"error": "Subtitle not found"}, 404
+        return {"subtitles": subs}
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+def getSubtitles(ttid, language="en"):
+    """Fetches the subtitles for a given ttid and language."""
+    isMovie = False if ":" in ttid else True
+    url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid}&languages={language}" if isMovie else f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid.split(':')[0]}&languages={language}&season_number={ttid.split(':')[1]}&episode_number={ttid.split(':')[2]}"
+    headers = {
+        "Content-Type": "application/json",
+        "Api-Key": OPEN_SUBTITLES_API_KEY,
+        "Authorization": f"Bearer {OPEN_SUBTITLES_API_CURRENT_JWT}",
+        "User-Agent": OPEN_SUBTITLES_CURRENT_USER_AGENT
+    }
+    
+    response = requests.get(url, headers=headers)
+    
+    if response.status_code != 200:
+        raise Exception(f"Subtitle fetch failed ({response.status_code}): {response.text}")
+        
+    data = response.json()
+    subtitles = data.get("data", [])
+    
+    if not subtitles:
+        print(f"No subtitles found for ttid: {ttid} in language: {language}")
+        return None
+    
+    # Return the first subtitle ID found
+    return subtitles
+
+@app.route("/downloadSubtitle", methods=["POST"])
+def download_subtitle():
+    """Downloads the subtitle file and saves it to disk."""
+    file_id = request.json.get("file_id")
+    filepath = request.json.get("filepath")
+
+    if not file_id or not filepath:
+        return {"error": "Missing required parameters"}, 400
+
+    filepath = os.path.join("/media", filepath)
+    url = "https://api.opensubtitles.com/api/v1/download"
+    headers = {
+        "Content-Type": "application/json",
+        "Api-Key": OPEN_SUBTITLES_API_KEY,
+        "Authorization": f"Bearer {OPEN_SUBTITLES_API_CURRENT_JWT}",
+        "User-Agent": OPEN_SUBTITLES_CURRENT_USER_AGENT
+    }
+    payload = {
+        "file_id": file_id
+    }
+    
+    print(f"Requesting download link for File ID: {file_id}...")
+    response = requests.post(url, json=payload, headers=headers)
+
+    # Handle any actual system/network errors
+    if response.status_code != 200:
+        print(f"Download endpoint error ({response.status_code}): {response.text}")
+        return {"error": f"Download endpoint error ({response.status_code}): {response.text}"}, response.status_code
+
+    # Extract and pull down raw subtitle stream data
+    download_json = response.json()
+    download_url = download_json.get("link")
+    remaining_downloads = download_json.get("remaining")
+    reset_time = download_json.get("reset_time")
+    print(f"Remaining downloads: {remaining_downloads} resets in {reset_time}")
+    
+    print("Link received. Fetching raw subtitle text...")
+    file_content_response = requests.get(download_url)
+    
+    if file_content_response.status_code == 200:
+        filename = os.path.basename(filepath)
+        if os.path.exists(filepath):
+            base_name, extension = os.path.splitext(filename)
+            counter = 1
+            
+            # Loop until an unused file name is found
+            while os.path.exists(filepath):
+                filename = f"{base_name} ({counter}){extension}"
+                filepath = os.path.join(os.path.dirname(filepath), filename)
+                counter += 1
+
+        # Write to the final available path
+        with open(filepath, "w", encoding="utf-8") as file:
+            file.write(file_content_response.text)
+            print(f"Success! Subtitle securely saved to disk as '{filepath}'")
+            refresh_jellyfin_libraries()
+            refresh_plex_libraries()
+            write_refresh_libraries_log(initiator="file_download")
+        return {"name": filename, "size": format_size(os.path.getsize(filepath))}, 200
+    else:
+        print("Failed to stream the raw subtitle file from the generated link.")
+        return {"error": "Failed to stream the raw subtitle file from the generated link."}, 500
 
 def getSubtitleId(ttid, language="en"):
     """Fetches the subtitle ID for a given ttid and language."""
@@ -176,6 +283,9 @@ def download_and_save_subtitle(file_id, filename="subtitle.srt", is_retry=False)
     # Extract and pull down raw subtitle stream data
     download_json = response.json()
     download_url = download_json.get("link")
+    remaining_downloads = download_json.get("remaining")
+    reset_time = download_json.get("reset_time")
+    print(f"Remaining downloads: {remaining_downloads} resets in {reset_time}")
     
     print("Link received. Fetching raw subtitle text...")
     file_content_response = requests.get(download_url)
@@ -187,8 +297,8 @@ def download_and_save_subtitle(file_id, filename="subtitle.srt", is_retry=False)
     else:
         print("Failed to stream the raw subtitle file from the generated link.")
 
-@app.route('/getRemainingSubtitleDownloads', methods=['GET'])
-def getRemainingSubtitleDownloads(is_retry=False):
+@app.route('/getOpenSubtitlesInfo', methods=['GET'])
+def getOpenSubtitlesInfo(is_retry=False):
     """ Gets remimaining available subtitle downloads from the OpenSubtitles API. """
     # Step 1: Force a reload of the file to ensure we read the latest token value
     load_dotenv(override=True)
@@ -229,7 +339,7 @@ def getRemainingSubtitleDownloads(is_retry=False):
         try:
             refresh_login_token()
             # Retry the calculation sequence, flagging is_retry to prevent loops
-            return getRemainingSubtitleDownloads(is_retry=True)
+            return getOpenSubtitlesInfo(is_retry=True)
         except Exception as e:
             print(f"Failed to refresh token during retry layout: {e}")
             return jsonify({"error": "Failed to refresh token during retry."}), 500
@@ -459,6 +569,36 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
             try: os.remove(filename)
             except: pass
 
+def _is_download_cancelled(task_key):
+    with progress_lock:
+        return progress_store.get(task_key, {}).get("progress") == -1.0
+
+def _discard_queued_task(task_key):
+    with progress_lock:
+        progress_store.pop(task_key, None)
+    with batch_progress_lock:
+        if task_key in batch_progress_store:
+            batch_progress_store.remove(task_key)
+
+serial_download_dispatcher = SerialDownloadDispatcher(
+    download_stream_task,
+    _is_download_cancelled,
+    _discard_queued_task,
+)
+
+def enqueue_download(identifier, idx, path, name, ttid):
+    """Dispatch a download using the configured mode, defaulting to parallel."""
+    task_key = f"{identifier}_{idx}"
+    with progress_lock:
+        progress_store[task_key] = {"ttid": ttid, "progress": 0.0}
+
+    mode = getOptions().get("download_mode", "parallel")
+    print(f"Dispatching download in {mode} mode for task {task_key}")
+    if mode == "serial":
+        serial_download_dispatcher.enqueue(identifier, idx, path, name, ttid)
+    else:
+        enqueue_parallel_download(download_stream_task, identifier, idx, path, name, ttid)
+
 # def batchDownloadsInitialiseAndStart(items: list):
 #     """
 #     Initializes and starts batch downloads for a list of task identifiers.
@@ -495,10 +635,7 @@ def start_download():
         if task_key in progress_store and progress_store[task_key].get("progress") >= 0 and progress_store[task_key].get("progress") < 100:
             return jsonify({"message": "Download already in progress", "task_id": task_key}), 200
 
-    # Start the download process in a separate background thread
-    thread = threading.Thread(target=download_stream_task, args=(identifier, idx, path, name, ttid))
-    thread.daemon = True # Allows application to close cleanly
-    thread.start()
+    enqueue_download(identifier, idx, path, name, ttid)
     
     return jsonify({
         "status": "Started", 
@@ -559,16 +696,9 @@ def batch_download():
             continue
         
         local_task_ids.append({"identifier": identifier, "idx": str(idx),"path": path, "name": name, "ttid": ttid})
-        # This aligns perfectly with task key formatting and downstream network buffer logic
-        thread = threading.Thread(
-            target=download_stream_task, 
-            args=(identifier, str(idx), path, name, ttid)
-        )
-        thread.daemon = True # Allows application to close cleanly
-        thread.start()
-        
         with batch_progress_lock:
             batch_progress_store.append(task_key)
+        enqueue_download(identifier, str(idx), path, name, ttid)
         task_ids.append(task_key)
 
     # batchDownloadsInitialiseAndStart(local_task_ids)
@@ -686,12 +816,13 @@ def create_archive_job(job_id, absolute_path, temp_zip_path):
             archive_jobs[job_id]["updated_at"] = time()
         print(f"job {job_id}: found {len(files)} files ({total_bytes} bytes); packaging without compression")
 
-        with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_STORED) as zip_file:
+        with zipfile.ZipFile(temp_zip_path, "w", zipfile.ZIP_STORED,allowZip64=True) as zip_file:
             for source_path, archive_name in files:
                 if archive_job_cancelled(job_id):
                     raise InterruptedError("Archive creation cancelled")
                 print(f"job {job_id}: adding {archive_name}")
-                with source_path.open("rb") as source, zip_file.open(archive_name, "w") as destination:
+                zip_info = zipfile.ZipInfo.from_file(source_path, archive_name)
+                with source_path.open("rb") as source, zip_file.open(zip_info, "w", force_zip64=True) as destination:
                     while True:
                         chunk = source.read(ARCHIVE_CHUNK_SIZE)
                         if not chunk:
@@ -1074,6 +1205,7 @@ def get_items():
     """
     folder = request.args.get('folder', "")
     show_files = request.args.get('showFiles', 'true').lower() == 'true'
+    only_subs = request.args.get('onlySubs', 'false').lower() == 'true'
     folder_path = os.path.join('/media', folder)
 
     if not os.path.exists(folder_path):
@@ -1085,7 +1217,10 @@ def get_items():
 
     for filename in os.listdir(folder_path):
         filepath = os.path.join(folder_path, filename)
-        
+
+        if only_subs and not filename.lower().endswith(('.srt', '.sub', '.vtt' , '.ass')):
+            continue
+
         if os.path.isdir(filepath):
             if filename != "stremio-server":
                 total_size = 0

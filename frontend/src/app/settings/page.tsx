@@ -36,6 +36,7 @@ export default function SettingsPage() {
   const [progressStore, setProgressStore] = useState<Record<string, ProgressEntry>>({});
   const [batchProgressStore, setBatchProgressStore] = useState<Record<string, ProgressEntry>>({});
   const [archiveJobs, setArchiveJobs] = useState<ArchiveJob[]>([]);
+  const [subtitlesInfo, setSubtitlesInfo] = useState<any>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [isRefreshingLibraries, setIsRefreshingLibraries] = useState(false);
@@ -44,6 +45,12 @@ export default function SettingsPage() {
   const [refreshLibrariesLog, setRefreshLibrariesLog] = useState<{ lastRefreshed: string; lastRefreshedBy: string } | null>(null);
 
   const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
+
+  const fetchSubtitlesInfo = async () => {
+            const res = await fetch(apiUrl("/getOpenSubtitlesInfo"));
+            const data = (await res.json())?.data ?? {};
+            setSubtitlesInfo(data);
+  };
 
   const loadOperationalState = async () => {
     setIsLoading(true);
@@ -80,6 +87,7 @@ export default function SettingsPage() {
   useEffect(() => {
     void loadOperationalState();
     void loadRefreshLibrariesLog();
+    void fetchSubtitlesInfo();
   }, []);
 
   const refreshLibraries = async () => {
@@ -158,7 +166,7 @@ export default function SettingsPage() {
             <h1 className="text-2xl font-bold text-zinc-100">Settings</h1>
             <button
               type="button"
-              onClick={() => { loadOperationalState(); loadRefreshLibrariesLog(); }}
+              onClick={() => { loadOperationalState(); loadRefreshLibrariesLog(); fetchSubtitlesInfo(); }}
               disabled={isLoading}
               className="h-9 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
             >
@@ -211,6 +219,7 @@ export default function SettingsPage() {
           </section>
           <section>
             <h2 className="text-xl font-bold text-zinc-100">Logs</h2>
+            {subtitlesInfo && <div className="text-sm text-zinc-400 text-right">Remaining subtitle downloads {subtitlesInfo?.remaining_downloads}</div>}
             <LogComponent/>
           </section>
         </div>

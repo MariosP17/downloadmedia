@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, use } from "react";
 import { toast } from "react-hot-toast";
 import Loading from "../loader";
+import SubsModal from "./SubsModal";
 
 
 type TreeItemProps = {
@@ -26,11 +27,19 @@ type ArchiveJob = {
 export default function FileTreeItem({ name, size, numberOfItems, numberOfFolders, currentPath, refreshStats, onRefreshParent, activeRefreshRef }: TreeItemProps) {
   const isFolder = name.endsWith("/");
   const cleanName = isFolder ? name.slice(0, -1) : name;
-  
+  const cleanNameWithoutExtension = isFolder ? cleanName : cleanName.replace(/\.[^/.]+$/, "");
+
+  const isVideoExtension = (fileName: string) => {
+  const ext = fileName.split(".").pop()?.toLowerCase() || "";
+  const videoExtensions = ["mp4", "mkv", "avi", "mov", "wmv", "flv", "webm"];
+  return videoExtensions.includes(ext);
+};
   // Calculate this item's full path parameter for the backend API query
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
   const isMovieOrSeriesFolder = isFolder && (itemPath.split("/").length === 2 || itemPath.split("/").length === 3);
-  const type = isMovieOrSeriesFolder ? itemPath.split("/")[0].toLowerCase() === "movies" ? "movie" : "series" : "";
+  const isMovie = (isFolder &&  (itemPath.split("/").length === 2 && itemPath.split("/")[0].toLowerCase() === "movies"));
+  const isEpisode = !isFolder && itemPath.split("/").length === 4 && itemPath.split("/")[0].toLowerCase() === "tv-shows" && isVideoExtension(cleanName);
+  const type = isEpisode ? "series" : isMovieOrSeriesFolder ? itemPath.split("/")[0].toLowerCase() === "movies" ? "movie" : "series" : "";
 
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -43,6 +52,24 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [archiveJob, setArchiveJob] = useState<ArchiveJob | null>(null);
+  const [isSubsModalOpen, setSubsModalOpen] = useState(false);
+  const [ttid, setTtid] = useState("");
+  const [options, setOptions] = useState<{ [key: string]: any }[]>([]);
+  
+  const loadOptions = async () => {
+    try {
+      const response = await fetch(`http://${window.location.hostname}:7000/getOptions`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not load options");
+      setOptions(data || []);
+    } catch (error) {
+      console.error(error instanceof Error ? error.message : "Could not load options");
+    }
+  };
+
+  useEffect(() => {
+    void loadOptions(); 
+  }, []);
   const archivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Reference hook assigned to the dropdown container to check for outside clicks
@@ -399,8 +426,10 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     return "/unknown.png";
   };
 
-  const regex = /\b(?:S(\d{1,2})E|(\d{1,2})X)(\d{1,2})\b/gi;
+
+  const regex = /\b(?:S(\d{1,2})\s*E|(\d{1,2})\s*X)(\d{1,2})\b/gi;
   const match = regex.exec(cleanName);
+
   function parseTitleAndYear(input: string): { title: string; year: string | null } {
     // Matches optional '(' or '[', followed by 19xx/20xx, followed by optional ')' or ']'
     const yearPattern = /[([]?\b((?:19|20)\d{2})\b[)\]]?/;
@@ -424,30 +453,45 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
 
     return { title, year };
   }
+
+  async function getAndSetTtid(cleanName: string, path: string) {
+    try {
+        let isSeasonFolder=  itemPath.split("/").length === 3;
+        const { title, year } = parseTitleAndYear(isSeasonFolder ? path.split("/")[1] : isEpisode ? path.split("/")[1] : cleanName);
+        if (!title) return;
+        console.log("Getting data with title and year:", { title, year });
+        const omdbUrl = `http://${window.location.hostname}:7000/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}`;
+        const OMDBResponse = await fetch(omdbUrl);
+        const OMDBData = await OMDBResponse.json();
+        if (!OMDBData || OMDBData.Response === "False") {
+          toast.error("Error getting ttid for " + cleanName);
+          return;
+        }
+        if (OMDBData.imdbID) {
+          const season = match ? parseInt(match[1] || match[2], 10) : undefined;
+          const episode = match ? parseInt(match[3], 10) : undefined;
+          const finalttid = isEpisode ? OMDBData.imdbID+ (season !== undefined && episode !== undefined ? `:${season}:${episode}` : "") : OMDBData.imdbID
+          setTtid(finalttid);
+          return finalttid;
+        }
+      } catch (error) {
+        toast.error("Error getting ttid for " + cleanName);
+        console.error("Error getting ttid for media:", error);
+      }
+  }
+
   async function navigateToMedia(cleanName: string, path: string) {
     if (!isMovieOrSeriesFolder || !type) return;
     setPageLoading(true);
     let isSeasonFolder=  itemPath.split("/").length === 3;
     let season = isSeasonFolder ? parseInt(path.split("/")[2].match(/\d+/)?.[0] || "-1", 10) : undefined;
     console.log("isSeasonFolder:", isSeasonFolder, "season:", season);
+    let targetTtid = ttid;
     try {
-      const { title, year } = parseTitleAndYear(isSeasonFolder ? path.split("/")[1] : cleanName);
-      if (!title) return;
-      console.log("Navigating to media with title and year:", { title, year });
-      const omdbUrl = `http://${window.location.hostname}:7000/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}`;
-      const OMDBResponse = await fetch(omdbUrl);
-      const OMDBData = await OMDBResponse.json();
-      if (!OMDBData || OMDBData.Response === "False") {
-        toast.error("Error navigating to " + cleanName);
-        return;
+      if (targetTtid == ""){
+        targetTtid = await getAndSetTtid(cleanName, path);
       }
-      console.log("OMDB Data:", OMDBData);
-      if (OMDBData.Title && OMDBData.imdbID) {
-        window.location.href = `/${type}/${encodeURIComponent(OMDBData.imdbID)}/${encodeURIComponent(title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : "");
-      }
-    } catch (error) {
-      toast.error("Error navigating to " + cleanName);
-      console.error("Error navigating to media:", error);
+      window.location.href = `/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(cleanName)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : "");
     } finally {
       setPageLoading(false);
     }
@@ -532,6 +576,33 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 Rename
               </button>
 
+              {(isMovie || isEpisode) && (
+                <button
+                  onClick={async(e) => {
+                    let targetTtid = ttid;
+                    setPageLoading(true);
+                    try{
+                    setIsMenuOpen(false);
+                    if (targetTtid == "") {
+                      targetTtid = await getAndSetTtid(cleanNameWithoutExtension, itemPath);
+                    }
+                    if (isEpisode && targetTtid.split(":").length != 3) {
+                      return;
+                    }
+                    setSubsModalOpen(true);
+                    } catch (error) {
+                      console.error(error);
+                    } finally {
+                      setPageLoading(false);
+                    }
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <img src="/subs.svg" alt="Subtitles" className="w-4 h-4" />
+                  Edit Subtitles
+                </button>
+              )}
+              
               <button
                 onClick={(e) => {
                   setIsMenuOpen(false);
@@ -542,6 +613,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 <img src="/delete.png" alt="Delete" className="w-4 h-4" />
                 Delete
               </button>
+
             </div>
           )}
         </div>
@@ -564,8 +636,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 // Recursively link the reload pipeline downwards 
                 onRefreshParent={fetchDirectoryContents}
                 refreshStats={refreshStats}
-                activeRefreshRef={activeRefreshRef}
-              />
+                activeRefreshRef={activeRefreshRef}              />
             ))
           )}
           {loading && (
@@ -700,6 +771,24 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         </div>
       )}
       {pageLoading && <Loading />}
+      {isSubsModalOpen && (
+        <SubsModal
+          pathname={itemPath}
+          ttid={ttid}
+          onClose={() => setSubsModalOpen(false)}
+          onChanged={() => {
+            if (isEpisode) {
+              void onRefreshParent?.();
+            } else {
+              void fetchDirectoryContents(false);
+              void RefreshAllChildren();
+            }
+            refreshStats();
+          }}
+          isEpisode={isEpisode}
+          options={options}
+        />
+      )}
     </div>
   );
 }

@@ -12,6 +12,21 @@ export default function StreamScroller({ streamsnames, counts }: Props) {
     const scrollerRef = useRef<HTMLElement>(null);
     const [isPhone, setIsPhone] = useState(false);
     const [highlightedStream, setHighlightedStream] = useState<HTMLElement | null>(null);
+    const [options, setOptions] = useState<any>(null);
+
+    const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
+    
+    useEffect(() => {
+        async function fetchOptions() {
+            try{
+                const response = await fetch(apiUrl("/getOptions")).then(res => res.json());
+                setOptions(response);
+            } catch (error) {
+                console.error("Failed to fetch options:", error);
+            }
+        }
+        fetchOptions();
+    }, []);
 
     useEffect(() => {
         if (highlightedStream) {
@@ -76,10 +91,11 @@ export default function StreamScroller({ streamsnames, counts }: Props) {
         // Get root font size in pixels (defaults to 16px in browsers)
         const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
+        const extra = options.sticky_media_info ? 20 : 15;
         // Convert rem value to pixels
-        const spacingPx = (parseFloat(spacingProp) * rootFontSize + 20) * 4;
+        const spacingPx = (parseFloat(spacingProp) * rootFontSize +extra) * 4;
 
-        const offset = infoHeight + spacingPx;
+        const offset = options.sticky_media_info ? infoHeight + spacingPx : spacingPx;
         if (firstStream) {
             setHighlightedStream(null);
             setHighlightedStream(firstStream);
@@ -109,7 +125,7 @@ export default function StreamScroller({ streamsnames, counts }: Props) {
                     <button
                         key={name}
                         type="button"
-                        onClick={() => { scrollToFirstStream(name); }}
+                            onClick={() => { scrollToFirstStream(name); }}
                         className="cursor-pointer sm:w-30 w-20 flex-shrink-0 rounded-lg p-3 text-left text-sm text-gray-900 text-white transition-all hover:bg-zinc-800 hover:text-white hover:text-sm"
                     >
                         {name} <br></br> <span className="text-zinc-400"> {counts[name] > 1 ? `${counts[name]} streams` : `${counts[name]} stream`} </span>

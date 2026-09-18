@@ -27,15 +27,18 @@ export default function SearchDropdown({
     }
 
     let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     const timeout = setTimeout(async () => {
       try {
         const movieRes = await fetch(
-          `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(query)}.json`
+          `https://v3-cinemeta.strem.io/catalog/movie/top/search=${encodeURIComponent(query)}.json`,
+          { signal: controller.signal }
         );
 
         const seriesRes = await fetch(
-          `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(query)}.json`
+          `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(query)}.json`,
+          { signal: controller.signal }
         );
 
         const movieData = await movieRes.json();
@@ -46,7 +49,7 @@ export default function SearchDropdown({
           setSeries(seriesData.metas || []);
         }
       } catch (e) {
-        if (!cancelled) {
+        if (!cancelled && (e as any)?.name !== "AbortError") {
           setMovies([]);
           setSeries([]);
         }
@@ -57,6 +60,7 @@ export default function SearchDropdown({
 
     return () => {
       cancelled = true;
+      controller.abort();
       clearTimeout(timeout);
     };
   }, [query]);
