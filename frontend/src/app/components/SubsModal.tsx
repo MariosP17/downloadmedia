@@ -196,7 +196,7 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 
 					<section className="mt-6 border-t border-zinc-800 pt-5">
 						<h3 className="mb-3 text-sm font-semibold text-zinc-300">Search OpenSubtitles</h3>
-						<div className="flex flex-col gap-2 sm:flex-row justify-between">
+						<div className="flex gap-2 sm:flex-row justify-between">
 							<div className="flex gap-2">
 								<div className="relative inline-flex w-fit self-start">
 								<select value={language} onChange={(event) => setLanguage(event.target.value)} className="appearance-none bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 text-xs font-medium rounded-md pl-3 pr-8 py-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]">
@@ -232,21 +232,21 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 						</div>
 
 						{results.length > 0 && (
-							<div className="mt-4 space-y-2">
+							<div className="mt-4 space-y-2 max-w-full overflow-x-auto">
 								{results.sort((a,b) => (b.attributes?.download_count || 0) - (a.attributes?.download_count || 0)).map((result, index) => {
 									const attributes = result.attributes;
 									const file = attributes?.files?.[0];
 									return (
                                         <div key={file?.file_id ?? file?.file_name ?? Math.random()} className="flex justify-between rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
-                                            <div>
+                                            <div className="max-w-[50%] min-w-0 overflow-x-auto">
                                                 <p className="break-words text-sm text-zinc-200">{file?.file_name || "Unknown file"} </p>
                                                 <p className="mt-1 break-words text-xs text-zinc-500">{attributes?.feature_details?.movie_name || "Unknown title"}</p>
                                             </div>
-										<div className="flex gap-2">
-											<span className="self-center text-xs self-end text-orange-300">Downloads: {attributes?.download_count ?? 0}</span>
-											<button type="button" onClick={() => void downloadSubtitle(file?.file_id)} className="shrink-0 rounded-md px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 cursor-pointer">
+										<div className="flex flex-col gap-2 justify-center">
+											<button type="button" onClick={() => void downloadSubtitle(file?.file_id)} className="max-h-10 mx-5 shrink-0 rounded-md px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 cursor-pointer">
 												<img src="download.png" alt="Download" className="inline-block w-4 h-4 mr-1" />Download
 											</button>
+											<span className="self-center text-xs text-orange-300">Downloads: {attributes?.download_count ?? 0}</span>
 										</div>
                                         </div>
 									);
