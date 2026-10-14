@@ -26,14 +26,36 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-OPEN_SUBTITLES_API_KEY = os.getenv("OPEN_SUBTITLES_API_KEY")
-OPEN_SUBTITLES_API_USERNAME = os.getenv("OPEN_SUBTITLES_API_USERNAME")
-OPEN_SUBTITLES_API_PASSWORD = os.getenv("OPEN_SUBTITLES_API_PASSWORD")
-OPEN_SUBTITLES_API_CURRENT_JWT = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
-OPEN_SUBTITLES_CURRENT_USER_AGENT = os.getenv("OPEN_SUBTITLES_CURRENT_USER_AGENT")
-JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
-PLEX_API_KEY = os.getenv("PLEX_API_KEY")
-OMDB_API_KEY = os.getenv("OMDB_API_KEY")
+# OPEN_SUBTITLES_API_KEY = os.getenv("OPEN_SUBTITLES_API_KEY")
+# OPEN_SUBTITLES_API_USERNAME = os.getenv("OPEN_SUBTITLES_API_USERNAME")
+# OPEN_SUBTITLES_API_PASSWORD = os.getenv("OPEN_SUBTITLES_API_PASSWORD")
+# OPEN_SUBTITLES_API_CURRENT_JWT = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
+# OPEN_SUBTITLES_CURRENT_USER_AGENT = os.getenv("OPEN_SUBTITLES_CURRENT_USER_AGENT")
+# JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
+# PLEX_API_KEY = os.getenv("PLEX_API_KEY")
+# OMDB_API_KEY = os.getenv("OMDB_API_KEY")
+
+def refresh_all_environment_variables():
+    global OPEN_SUBTITLES_API_KEY
+    global OPEN_SUBTITLES_API_USERNAME
+    global OPEN_SUBTITLES_API_PASSWORD
+    global OPEN_SUBTITLES_API_CURRENT_JWT
+    global OPEN_SUBTITLES_CURRENT_USER_AGENT
+    global JELLYFIN_API_KEY
+    global PLEX_API_KEY
+    global OMDB_API_KEY
+
+    OPEN_SUBTITLES_API_KEY = os.getenv("OPEN_SUBTITLES_API_KEY")
+    OPEN_SUBTITLES_API_USERNAME = os.getenv("OPEN_SUBTITLES_API_USERNAME")
+    OPEN_SUBTITLES_API_PASSWORD = os.getenv("OPEN_SUBTITLES_API_PASSWORD")
+    OPEN_SUBTITLES_API_CURRENT_JWT = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
+    OPEN_SUBTITLES_CURRENT_USER_AGENT = os.getenv("OPEN_SUBTITLES_CURRENT_USER_AGENT")
+    JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
+    PLEX_API_KEY = os.getenv("PLEX_API_KEY")
+    OMDB_API_KEY = os.getenv("OMDB_API_KEY")
+
+# Initialize environment variables at startup
+refresh_all_environment_variables()
 
 # Global dictionary to keep track of download progress
 # Format: { "identifier_idx": percentage_float }
@@ -96,6 +118,8 @@ def refresh_login_token():
 @app.route("/getSubtitles", methods=["GET"])
 def get_subtitles():
     load_dotenv(override=True)
+    refresh_all_environment_variables()
+    
     ttid = request.args.get("ttid")
     language = request.args.get("language", "en")
     if not ttid:
@@ -136,6 +160,9 @@ def getSubtitles(ttid, language="en"):
 
 @app.route("/downloadSubtitle", methods=["POST"])
 def download_subtitle():
+    load_dotenv(override=True)
+    refresh_all_environment_variables()
+
     """Downloads the subtitle file and saves it to disk."""
     file_id = request.json.get("file_id")
     filepath = request.json.get("filepath")
@@ -199,6 +226,9 @@ def download_subtitle():
 
 def getSubtitleId(ttid, language="en"):
     """Fetches the subtitle ID for a given ttid and language."""
+    load_dotenv(override=True)
+    refresh_all_environment_variables()
+    
     isMovie = False if ":" in ttid else True
     url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid}&languages={language}" if isMovie else f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid.split(':')[0]}&languages={language}&season_number={ttid.split(':')[1]}&episode_number={ttid.split(':')[2]}"
     headers = {
@@ -228,6 +258,7 @@ def download_and_save_subtitle(file_id, filename="subtitle.srt", is_retry=False)
     
     # Step 1: Force a reload of the file to ensure we read the latest token value
     load_dotenv(override=True)
+    refresh_all_environment_variables()
     token = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
     
     # If no token exists in the .env file yet, go get one
@@ -299,11 +330,12 @@ def download_and_save_subtitle(file_id, filename="subtitle.srt", is_retry=False)
 
 @app.route('/getOpenSubtitlesInfo', methods=['GET'])
 def getOpenSubtitlesInfo(is_retry=False):
-    """ Gets remimaining available subtitle downloads from the OpenSubtitles API. """
+    """ Gets remaining available subtitle downloads from the OpenSubtitles API. """
     # Step 1: Force a reload of the file to ensure we read the latest token value
     load_dotenv(override=True)
-    token = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
+    refresh_all_environment_variables()
     
+    token = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
     # If no token exists in the .env file yet, go get one
     if not token:
         try:
