@@ -211,7 +211,6 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
     if (!editableFolderPath.trim()) return;
 
     try {
-      console.log(`Creating folder at path: ${targetPath}`); // Debug log for folder creation
       const res = await fetch(`http://${window.location.hostname}:7000/createFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

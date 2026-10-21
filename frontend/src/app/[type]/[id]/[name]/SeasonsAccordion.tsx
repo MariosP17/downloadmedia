@@ -104,13 +104,11 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
       const bookmarkStream = { infoHash: stream.infoHash, fileIdx: stream.fileIdx, ttid: encodeURIComponent(decodeURIComponent(ttid)+":"+seasonid+":"+i),type: "series", filename: stream.behaviorHints?.filename || "Raw Output Stream", provider: stream.title.match(/⚙️\s*([^\n]+)/)?.[1] ?? "-"};
       if (freshBookmarks.some((b: any) => b.infoHash === bookmarkStream.infoHash && b.fileIdx === bookmarkStream.fileIdx && b.ttid === bookmarkStream.ttid && b.type === bookmarkStream.type && b.filename === bookmarkStream.filename && b.provider === bookmarkStream.provider)) {
         // If the episode is already bookmarked, skip to the next one
-        console.log(`Episode ${i} of season ${seasonid} is already bookmarked, skipping.`);
         infoMessage = `\nSome episodes were already bookmarked and were skipped.`;
         continue;
       }
       const updatedBookmarks = [...freshBookmarks, bookmarkStream];
       setBookmarks(JSON.stringify(updatedBookmarks));
-      console.log(`Added episode ${i} of season ${seasonid} to batch:`, bookmarkStream);
       toast.loading(`Episode ${i} added to batch!`, { id: toastId });
       episodesadded++;
       } catch (error) {

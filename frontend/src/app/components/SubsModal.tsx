@@ -146,7 +146,6 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
         let videoItem = null;
         if (!isEpisode){
             const items = await fetch(apiUrl(`/getItems?folder=${encodeURIComponent(pathname)}`)).then(res => res.json());
-            console.log("Fetched items for subtitle search:", items);
             videoItem = (items.items ?? []).filter((item: any) => isVideoExtension(item.name))[0];
         }
         if (!videoItem && !isEpisode) {
@@ -157,7 +156,6 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
         const mediaName = isEpisode ? `${pathname.split("/").pop()}-${language}.srt` : `${cleanExtension(videoItem.name)}-${language}.srt`;
         const filePath = isEpisode ? `${pathname.split("/").slice(0, -1).join("/")}/${mediaName}` : `${pathname}/${mediaName}`;
         try {
-            console.log("Downloading subtitle with fileId:", fileId, "to filePath:", filePath);
             const response = await fetch(apiUrl("/downloadSubtitle"), {
                 method: "POST",
                 headers: {

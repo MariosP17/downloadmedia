@@ -505,7 +505,6 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
         });
 
         // 3. Update all your states exactly ONCE
-        console.log("Updated bookmarks after batch download:", updatedBookmarks, "before was:", freshBookmarks);
         setItems(updatedBookmarks);
         setCheckedItems(new Set()); // Clear checked list since they are gone
         setBookmarks(JSON.stringify(updatedBookmarks));

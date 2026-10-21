@@ -43,14 +43,12 @@ export default function BookmarkButton({ infoHash, fileIdx, ttid, type, filename
       if (isBookmarked) {
         // Remove bookmark
         const updated = existing.filter((b: any) => !(b.infoHash === infoHash && b.fileIdx === fileIdx && b.ttid === ttid && b.type === type && b.filename === filename && b.provider === provider));
-        console.log("Updated bookmarks after removal:", updated);
         setBookmarks(JSON.stringify(updated));
         setIsBookmarked(false); // Triggers visual re-render safely
         toast.success("Stream unbookmarked successfully.");
       } else {
         // Add bookmark
         existing.push(bookmarkData);
-        console.log("Updated bookmarks after adding:", existing);
         setBookmarks(JSON.stringify(existing));
         setIsBookmarked(true); // Triggers visual re-render safely
         toast.success("Stream bookmarked successfully!");

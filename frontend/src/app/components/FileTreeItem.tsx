@@ -145,7 +145,6 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       if (!sizeres.ok) throw new Error("Could not retrieve folder size");
       const sizeData = await sizeres.json();
       setFolderSize(sizeData.size);
-      console.log("Fetched directory contents for:", itemPath, "Data:", data, "Size Data:", sizeData);
       setChildren(data.items || []);
       setHasFetched(true);
 
@@ -481,7 +480,6 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         let isSeasonFolder=  itemPath.split("/").length === 3;
         const { title, year } = parseTitleAndYear(isSeasonFolder ? path.split("/")[1] : isEpisode ? path.split("/")[1] : cleanName);
         if (!title) return;
-        console.log("Getting data with title and year:", { title, year });
         const omdbUrl = `http://${window.location.hostname}:7000/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}`;
         const OMDBResponse = await fetch(omdbUrl);
         const OMDBData = await OMDBResponse.json();
@@ -507,7 +505,6 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     setPageLoading(true);
     let isSeasonFolder=  itemPath.split("/").length === 3;
     let season = isSeasonFolder ? parseInt(path.split("/")[2].match(/\d+/)?.[0] || "-1", 10) : undefined;
-    console.log("isSeasonFolder:", isSeasonFolder, "season:", season);
     let targetTtid = ttid;
     try {
       if (targetTtid == ""){
