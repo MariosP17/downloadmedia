@@ -41,6 +41,23 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
     const [subtitleToDelete, setSubtitleToDelete] = useState<string | null>(null);
 	const [subtitleInfo, setSubtitleInfo] = useState<any>({});
 
+	useEffect(() => {
+		const bodyOverflow = document.body.style.overflow;
+		const rootOverflow = document.documentElement.style.overflow;
+		const header = document.querySelector("#top-bar") as HTMLElement | null;
+		const headerDisplay = header?.style.display; 
+
+		document.body.style.overflow = "hidden";
+		document.documentElement.style.overflow = "hidden";
+		if (header) header.style.display = "none";
+
+		return () => {
+			document.body.style.overflow = bodyOverflow;
+			document.documentElement.style.overflow = rootOverflow;
+			if (header) header.style.display = headerDisplay || "";
+		};
+	}, []);
+
 	const loadExistingSubs = async () => {
 		setLoadingExisting(true);
 		try {
@@ -161,7 +178,7 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-			<div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+			<div className="flex max-h-[75vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
 				<div className="flex items-center justify-between border-b border-zinc-800 p-5">
 					<div>
 						<h2 className="text-lg font-semibold text-white">Manage subtitles</h2>
@@ -170,7 +187,7 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 					<button type="button" onClick={onClose} className="text-xl text-zinc-400 hover:text-white cursor-pointer" aria-label="Close subtitles">✕</button>
 				</div>
 
-				<div className="overflow-y-auto p-5 search-scrollbar">
+				<div className="overflow-y-auto overscroll-contain p-1 search-scrollbar">
 					<section>
 						<h3 className="mb-3 text-sm font-semibold text-zinc-300">Existing subtitles</h3>
 						{loadingExisting ? (

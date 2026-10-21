@@ -23,17 +23,21 @@ const parseSizeToBytes = (value: string) => {
 
   return amount * (multipliers[unit] ?? 0);
 };
-
+export type Config = {
+  [key: string]: any;
+};
 export default function MediaExplorerPage() {
   const [rootItems, setRootItems] = useState<{ name: string; size: string; numberOfItems: number, numberOfFolders: number }[]>([]);
   const [isMediaOpen, setIsMediaOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [usageStats, setUsageStats] = useState<{ total: string; used: string; usedStremio: string }>({ total: "0 B", used: "0 B", usedStremio: "0 B" });
+  const [config, setConfig] = useState<Config>({});
   const activeRefreshRef = useRef<{ [path: string]: () => Promise<void> }>({});
 
   useEffect(() => {
     fetchUsageStats();
+    fetchConfig();
   }, []);
   
   const fetchUsageStats = async () => {
@@ -46,6 +50,18 @@ export default function MediaExplorerPage() {
       console.error("Error fetching usage stats:", error);
     }
   };
+
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
+      if (!res.ok) throw new Error("Failed to fetch config");
+      const data = await res.json();
+      setConfig(data);
+    } catch (error) {
+      console.error("Error fetching config:", error);
+    }
+  };
+
   const toggleMediaFolder = async () => {
     const nextState = !isMediaOpen;
     setIsMediaOpen(nextState);
@@ -133,7 +149,7 @@ export default function MediaExplorerPage() {
               alt="Root Directory"
               className="w-6 h-6 object-contain flex-shrink-0"
             />
-            <span className="text-base">media</span>
+            <span className={`text-base ${!config.MediaFolder ? 'text-zinc-500 animate-pulse' : ''}`}>{!config.MediaFolder? "Loading..." : config.MediaFolder}</span>
             {loading && <span className="text-xs text-zinc-500 font-normal animate-pulse">loading root assets...</span>}
           </div>
 

@@ -48,6 +48,7 @@ export default function Options() {
             <OptionType typeKey="sticky_media_info" value={options["sticky_media_info"] || false} type="<boolean>" onChange={(newValue) => setOptions((prev) => ({ ...prev, sticky_media_info: newValue }))} />
             <OptionType typeKey="logs_page_size" value={options["logs_page_size"] || 0} type="<number>" min={1} onChange={(newValue) => setOptions((prev) => ({ ...prev, logs_page_size: newValue }))} />
             <OptionType typeKey="download_mode" value={options["download_mode"] || ""} type="<dropdown>" options={[{key: "serial", value: "Serial"}, {key: "parallel", value: "Parallel"}]} onChange={(newValue) => setOptions((prev) => ({ ...prev, download_mode: newValue }))} />
+            <OptionType typeKey="auto_download_subs" value={options["auto_download_subs"] || false} type="<boolean>" onChange={(newValue) => setOptions((prev) => ({ ...prev, auto_download_subs: newValue }))} />
             <OptionType typeKey="subtitle_languages" value={options["subtitle_languages"] || ""} type="<string>" onChange={(newValue) => setOptions((prev) => ({ ...prev, subtitle_languages: newValue }))} />
 
             <div className="flex justify-end">

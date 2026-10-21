@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, use } from "react";
 import { toast } from "react-hot-toast";
 import Loading from "../loader";
 import SubsModal from "./SubsModal";
+import EditSubtitlesModal from "./EditSubtitlesModal";
+import { chown } from "fs";
 
 
 type TreeItemProps = {
@@ -40,6 +42,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const isMovie = (isFolder &&  (itemPath.split("/").length === 2 && itemPath.split("/")[0].toLowerCase() === "movies"));
   const isEpisode = !isFolder && itemPath.split("/").length === 4 && itemPath.split("/")[0].toLowerCase() === "tv-shows" && isVideoExtension(cleanName);
   const type = isEpisode ? "series" : isMovieOrSeriesFolder ? itemPath.split("/")[0].toLowerCase() === "movies" ? "movie" : "series" : "";
+  const isSubtitleFile = !isFolder && (cleanName.endsWith(".srt") || cleanName.endsWith(".vtt") || cleanName.endsWith(".sub") || cleanName.endsWith(".ass") || cleanName.endsWith(".idx"));
 
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -55,6 +58,12 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const [isSubsModalOpen, setSubsModalOpen] = useState(false);
   const [ttid, setTtid] = useState("");
   const [options, setOptions] = useState<{ [key: string]: any }[]>([]);
+  const [folderSize, setFolderSize] = useState<string>(size);
+  const [isEditSubtitlesModalOpen, setIsEditSubtitlesModalOpen] = useState(false);
+
+  useEffect(() => {
+    setFolderSize(size);
+  }, [size]);
   
   const loadOptions = async () => {
     try {
@@ -130,6 +139,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       if (!res.ok) throw new Error("Could not retrieve contents");
       
       const data = await res.json();
+      const sizeres = await fetch(
+        `http://${window.location.hostname}:7000/getFolderSize?folder=${encodeURIComponent(itemPath)}`
+      );
+      if (!sizeres.ok) throw new Error("Could not retrieve folder size");
+      const sizeData = await sizeres.json();
+      setFolderSize(sizeData.size);
+      console.log("Fetched directory contents for:", itemPath, "Data:", data, "Size Data:", sizeData);
       setChildren(data.items || []);
       setHasFetched(true);
 
@@ -148,6 +164,12 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
 
   const RefreshAllChildren = async () => {
     try {
+      // const childrenRes = await fetch(
+      //   `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(itemPath)}`
+      // );
+      // if (!childrenRes.ok) throw new Error("Could not retrieve contents");
+      // const childrenData = await childrenRes.json();
+      // setChildren(childrenData.items || []);
       // 1. Fetch only subfolders for the current folder path
       const res = await fetch(
         `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`
@@ -520,7 +542,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         </span>
         {loading && <span className="text-xs text-zinc-500 animate-pulse">loading...</span>}
         <span className="text-xs text-zinc-500 font-mono">
-          {size}
+          {folderSize}
         </span>
         {/* --- THREE DOTS OPTIONS DROPDOWN CONTEXT MENU --- */}
         <div className="relative flex-shrink-0" ref={menuRef}>
@@ -602,7 +624,18 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                   Edit Subtitles
                 </button>
               )}
-              
+              {isSubtitleFile && (
+                <button
+                  onClick={(e) => {
+                    setIsMenuOpen(false);
+                    setIsEditSubtitlesModalOpen(true);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <img src="/text.svg" alt="Edit Subtitles" className="w-4 h-4" />
+                  Edit
+                </button>
+              )}
               <button
                 onClick={(e) => {
                   setIsMenuOpen(false);
@@ -622,6 +655,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       {/* Nested Children Tree Sub-Loop Render Block */}
       {isFolder && isOpen && (
         <div className="sm:pl-6 border-l border-zinc-800 sm:ml-4 ml-1 mt-0.5 space-y-0.5">
+          
           {children.length === 0 && !loading ? (
             <div className="text-xs text-zinc-600 py-1 pl-2 italic">Empty folder</div>
           ) : (
@@ -787,6 +821,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           }}
           isEpisode={isEpisode}
           options={options}
+        />
+      )}
+      {isEditSubtitlesModalOpen && (
+        <EditSubtitlesModal
+          cleanName={cleanName}
+          fullPath={itemPath}
+          onClose={async () => { await onRefreshParent?.();setIsEditSubtitlesModalOpen(false);}}
         />
       )}
     </div>

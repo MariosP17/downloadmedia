@@ -65,6 +65,7 @@ progress_store = {}
 
 batch_progress_store = []
 archive_jobs = {}
+# archive_jobs = {"1": {"status": "pending", "progress": 7.0, "total_bytes": 10485760, "processed_bytes": 5242880, "folder_name": "/tmp/archive_1.zip", "error": "hi"}}
 
 # Create a thread lock to ensure safe cross-talk between Flask routes and download threads
 progress_lock = Lock()
@@ -170,7 +171,7 @@ def download_subtitle():
     if not file_id or not filepath:
         return {"error": "Missing required parameters"}, 400
 
-    filepath = os.path.join("/media", filepath)
+    filepath = os.path.join(get_media_root(), filepath)
     url = "https://api.opensubtitles.com/api/v1/download"
     headers = {
         "Content-Type": "application/json",
@@ -501,8 +502,21 @@ def refresh_plex_libraries():
         print(f"Exception occurred while refreshing Plex libraries: {e}")
         return False
 
-def download_stream_task(identifier: str, idx: str, path: str = "/media", name: str = "", ttid: str = "",add: bool = True):
+def get_media_root():
+    configuration = getConfigurationInternal()
+    media_folder = configuration.get("MediaFolder", "media")
+    return os.path.join("/", str(media_folder).lstrip("/\\"))
+
+
+def get_configured_media_folder(configuration_key, default_name):
+    configuration = getConfigurationInternal()
+    folder_name = configuration.get(configuration_key, default_name)
+    return os.path.join(get_media_root(), str(folder_name).lstrip("/\\"))
+
+
+def download_stream_task(identifier: str, idx: str, path: str = None, name: str = "", ttid: str = "",add: bool = True):
     task_key = f"{identifier}_{idx}"
+    path = path or get_media_root()
     
     if add:
         with progress_lock:
@@ -582,7 +596,10 @@ def download_stream_task(identifier: str, idx: str, path: str = "/media", name: 
                     print(f"Download completed successfully for {task_key}")
         with progress_lock:
             progress_store[task_key] = { "ttid": ttid, "progress": 100.0 }
-        checkForSubsAndDownload(filename,unquote(ttid))  # Check for subtitles after download
+        auto_download = getOptions().get("auto_download_subs", False)
+        print(f"Auto-download subtitles setting is {'enabled' if auto_download else 'disabled'}.")
+        if auto_download:
+            checkForSubsAndDownload(filename,unquote(ttid))  # Check for subtitles after download
         checkIfDoneAndRefreshLibraries()  # Refresh libraries after download completion
 
     except Exception as e:
@@ -653,7 +670,7 @@ def start_download():
     data = request.get_json() or {}
     identifier = data.get('identifier')
     idx = data.get('idx')
-    path = data.get('path', '/media')
+    path = data.get('path', get_media_root())
     name = data.get('name', "")
     ttid = data.get('ttid', "") 
 
@@ -682,16 +699,17 @@ def batch_download():
     """
     data = request.get_json() or {}
     items = data.get("items", [])
-    path = data.get("path", "/media")
+    media_root = get_media_root()
+    path = data.get("path", media_root)
     
     if not items or not isinstance(items, list):
         return jsonify({"error": "A list of items is required."}), 400
     if not path:
         return jsonify({"error": "A valid path is required."}), 400
         
-    path = os.path.join("/media", path)  # Ensure all downloads are under /media
+    path = os.path.join(media_root, path)
     
-    if os.path.abspath(path) == os.path.abspath("/media/stremio-server") or os.path.abspath(path) == os.path.abspath("/media"):
+    if os.path.abspath(path) == os.path.abspath(os.path.join(media_root, "stremio-server")) or os.path.abspath(path) == os.path.abspath(media_root):
         return jsonify({"error": "Cannot download to protected folder"}), 403
         
     if not os.path.exists(path):
@@ -754,7 +772,7 @@ def download_file_to_client():
         return jsonify({"error": "The 'filePath' parameter is required.", "status": "Failed"}), 400
 
     # Clean and resolve the absolute system path
-    absolute_path = os.path.join("/media", file_path)
+    absolute_path = os.path.join(get_media_root(), file_path)
     if not os.path.exists(absolute_path) or os.path.isdir(absolute_path):
         return jsonify({"error": "Target file path not found on server.", "status": "Failed"}), 404
 
@@ -786,7 +804,7 @@ def cleanup_archive_jobs():
 
 def resolve_archive_folder(folder_path):
     print(f"resolving folder path: {folder_path!r}")
-    media_root = Path("/media").resolve()
+    media_root = Path(get_media_root()).resolve()
     absolute_path = (media_root / str(folder_path).lstrip("/\\")).resolve()
     if absolute_path != media_root and media_root not in absolute_path.parents:
         print(f"rejected folder outside media root: {folder_path!r}")
@@ -1238,7 +1256,7 @@ def get_items():
     folder = request.args.get('folder', "")
     show_files = request.args.get('showFiles', 'true').lower() == 'true'
     only_subs = request.args.get('onlySubs', 'false').lower() == 'true'
-    folder_path = os.path.join('/media', folder)
+    folder_path = os.path.join(get_media_root(), folder)
 
     if not os.path.exists(folder_path):
         return jsonify({"error": "Folder not found"}), 404
@@ -1288,6 +1306,22 @@ def get_items():
     
     return jsonify({"items": combined_items}), 200
 
+
+@app.route('/getFolderSize', methods=['GET'])
+def get_folder_size_endpoint():
+        """Calculates total size of a specific directory in bytes."""
+        folder = request.args.get('folder', "")
+        folder_path = os.path.join(get_media_root(), folder)
+        total_size = 0
+        if not os.path.exists(folder_path):
+            return jsonify({"error": "Folder not found"}), 404
+        for root, dirs, files in os.walk(folder_path):
+            for f in files:
+                fp = os.path.join(root, f)
+                if os.path.exists(fp):
+                    total_size += os.path.getsize(fp)
+        return jsonify({"size": format_size(total_size)}), 200
+
 def get_folder_size(folder_path):
     """Calculates total size of a specific directory in bytes."""
     total_size = 0
@@ -1306,8 +1340,9 @@ def get_usage_stats():
     total, _, _ = shutil.disk_usage("/")
     
     # Specific folder sizes must be calculated manually
-    used_media = get_folder_size("/media")
-    used_stremio = get_folder_size("/media/stremio-server")
+    media_root = get_media_root()
+    used_media = get_folder_size(media_root)
+    used_stremio = get_folder_size(os.path.join(media_root, "stremio-server"))
     
     return jsonify({
         "total": format_size(total),
@@ -1323,8 +1358,15 @@ def delete_folder():
     if not folder:
         return jsonify({"error": "Folder name is required"}), 400
 
-    folder_path = os.path.join('/media', folder)
-    if folder_path == "/media/stremio-server" or folder_path == "/media" or folder_path == "/media/Movies" or folder_path == "/media/TV-Shows":
+    media_root = get_media_root()
+    protected_folders = {
+        os.path.abspath(os.path.join(media_root, "stremio-server")),
+        os.path.abspath(media_root),
+        os.path.abspath(get_configured_media_folder("MoviesFolder", "Movies")),
+        os.path.abspath(get_configured_media_folder("TVShowsFolder", "TV-Shows")),
+    }
+    folder_path = os.path.join(media_root, folder)
+    if os.path.abspath(folder_path) in protected_folders:
         return jsonify({"error": "Cannot delete protected folder"}), 403
     if not os.path.exists(folder_path):
         return jsonify({"error": "Folder not found"}), 404
@@ -1355,7 +1397,7 @@ def delete_file():
     if not file_path:
         return jsonify({"error": "File path is required"}), 400
 
-    full_file_path = os.path.join('/media', file_path)
+    full_file_path = os.path.join(get_media_root(), file_path)
     if not os.path.exists(full_file_path):
         return jsonify({"error": "File not found"}), 404
 
@@ -1379,11 +1421,18 @@ def rename_folder():
     if not folder or not newName:
         return jsonify({"error": "Both 'folder' and 'newName' are required"}), 400
     
-    folder_path = os.path.join('/media', folder)
-    if folder_path == "/media/stremio-server" or folder_path == "/media" or folder_path == "/media/Movies" or folder_path == "/media/TV-Shows":
+    media_root = get_media_root()
+    protected_folders = {
+        os.path.abspath(os.path.join(media_root, "stremio-server")),
+        os.path.abspath(media_root),
+        os.path.abspath(get_configured_media_folder("MoviesFolder", "Movies")),
+        os.path.abspath(get_configured_media_folder("TVShowsFolder", "TV-Shows")),
+    }
+    folder_path = os.path.join(media_root, folder)
+    if os.path.abspath(folder_path) in protected_folders:
         return jsonify({"error": "Cannot rename protected folder"}), 403
     parent_dir = os.path.dirname(folder_path)
-    new_folder_path = os.path.join('/media', parent_dir, newName)
+    new_folder_path = os.path.join(parent_dir, newName)
 
     if not os.path.exists(folder_path):
         return jsonify({"error": "Folder not found"}), 404
@@ -1411,7 +1460,7 @@ def rename_file():
     if not filePath or not newName:
         return jsonify({"error": "Both 'filePath' and 'newName' are required"}), 400
     
-    full_file_path = os.path.join('/media', filePath)
+    full_file_path = os.path.join(get_media_root(), filePath)
     parent_dir = os.path.dirname(full_file_path)
     new_file_path = os.path.join(parent_dir, newName)
 
@@ -1440,7 +1489,7 @@ def create_folder():
     if not folder:
         return jsonify({"error": "Folder name is required"}), 400
 
-    folder_path = os.path.join('/media', folder)
+    folder_path = os.path.join(get_media_root(), folder)
     if os.path.exists(folder_path):
         return jsonify({"error": "Folder already exists"}), 400
 
@@ -1471,7 +1520,7 @@ def destination_exists():
     if not destination:
         return jsonify({"error": "Destination path is required"}), 400
 
-    destination_path = os.path.join('/media', destination)
+    destination_path = os.path.join(get_media_root(), destination)
     return jsonify({"exists": os.path.exists(destination_path)}), 200
 
 @app.route('/getRefreshLibrariesLog', methods=['GET'])
@@ -1492,6 +1541,7 @@ def get_options():
         file_content = json.load(settings_file)
         settings_data = file_content["options"] if "options" in file_content else {}
     return jsonify(settings_data), 200
+
 
 @app.route('/updateOptions', methods=['POST'])
 def update_options():
@@ -1519,6 +1569,51 @@ def update_options():
 
     return jsonify({"message": "Settings updated successfully"}), 200
 
+def getConfigurationInternal():
+    if not os.path.exists('settings.json'):
+        return {}
+
+    with open('settings.json', 'r') as settings_file:
+        file_content = json.load(settings_file)
+        settings_data = file_content["configuration"] if "configuration" in file_content else {}
+    return settings_data
+
+@app.route('/getConfiguration', methods=['GET'])
+def get_configuration():
+    if not os.path.exists('settings.json'):
+        return jsonify({"error": "Settings file not found"}), 404
+
+    with open('settings.json', 'r') as settings_file:
+        file_content = json.load(settings_file)
+        settings_data = file_content["configuration"] if "configuration" in file_content else {}
+    return jsonify(settings_data), 200
+
+@app.route('/updateConfiguration', methods=['POST'])
+def update_configuration():
+    data = request.get_json() or {}
+
+    if not data:
+        return jsonify({"error": "No configuration data provided"}), 400
+
+    settings_data = {}
+    try:
+        with open('settings.json', 'r', encoding='utf-8') as settings_file:
+            content = settings_file.read().strip()
+            if content:
+                settings_data = json.loads(content)
+    except (FileNotFoundError, json.JSONDecodeError):
+        settings_data = {}
+
+    if not isinstance(settings_data, dict):
+        settings_data = {}
+
+    settings_data["configuration"] = data
+
+    with open('settings.json', 'w', encoding='utf-8') as settings_file:
+        json.dump(settings_data, settings_file, indent=2, ensure_ascii=False)
+
+    return jsonify({"message": "Configuration updated successfully"}), 200
+
 @app.route('/getOmdbData', methods=['GET'])
 def get_omdb_data():
     t = request.args.get('t')
@@ -1535,6 +1630,42 @@ def get_omdb_data():
     except requests.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/getSubtitlesContent', methods=['GET'])
+def get_subtitles_content():
+    filename = request.args.get('filename')
+    if not filename:
+        return jsonify({"error": "Filename is required"}), 400
+    filename = os.path.join(get_media_root(), filename)
+    if not os.path.exists(filename):
+        return jsonify({"error": "File not found"}), 404
+    # Implement the logic to fetch subtitles content based on the filename
+    try:
+        with open(filename, 'r', encoding='utf-8') as f:
+            subtitles_content = f.read()
+        return jsonify({"content": subtitles_content}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/saveSubtitlesContent', methods=['POST'])
+def save_subtitles_content():
+    data = request.get_json() or {}
+    filename = data.get('filename')
+    content = data.get('content')
+
+    if not filename or content is None:
+        return jsonify({"error": "Both 'filename' and 'content' are required"}), 400
+
+    filename = os.path.join(get_media_root(), filename)
+    if not os.path.exists(filename):
+        return jsonify({"error": "File not found"}), 404
+    try:
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(content)
+        return jsonify({"message": "Subtitles content saved successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+EXCLUDED_LOG_ENTRIES = {"/getConfiguration", "/getOptions", "/getRefreshLibrariesLog", "/getLogs", "/getAllLogsLines", "/getProgressStore", "/getBatchProgressStore", "/archiveJobs", "/getOpenSubtitlesInfo"}
 @app.route('/getLogs', methods=['GET'])
 def get_logs():
     # Cursor-based pagination: each request walks backwards from where the previous
@@ -1548,6 +1679,7 @@ def get_logs():
     if date_str in ("null", "undefined", "", "None"):
         date_str = None
 
+    search_term = request.args.get('search', default="", type=str).strip()
     logs_per_page = getOptions().get("logs_page_size", 50)
 
     cmd = [
@@ -1556,6 +1688,9 @@ def get_logs():
         "--no-pager",
         "-r", "--show-cursor",
     ]
+
+    if len(search_term) >= 3:
+        cmd += ["--case-sensitive=no", "--grep", escape_journalctl_search(search_term)]
 
     target_start_dt = None
     if date_str:
@@ -1608,9 +1743,10 @@ def get_logs():
     if cursor and lines:
         lines = lines[1:]  # drop the duplicate entry --cursor re-included
 
-    lines = [l for l in lines if l != "-- No entries --"]
-
-    has_more = bool(lines) and len(lines) == logs_per_page
+    # Pagination is based on journal entries read, not the entries shown after filtering.
+    lines = [line for line in lines if line != "-- No entries --"]
+    has_more = len(lines) == logs_per_page
+    lines = [line for line in lines if should_keep(line)]
 
     # When date filtering with cursor pagination, discard any entries older than the target start date
     if target_start_dt and lines:
@@ -1637,6 +1773,24 @@ def get_logs():
         "cursor": next_cursor if has_more else None,
         "hasMore": has_more
     }), 200
+
+
+def escape_journalctl_search(value: str) -> str:
+    regex_special_characters = set(r".\^$*+?{}[]()|")
+    return "".join(f"\\{character}" if character in regex_special_characters else character for character in value)
+
+
+def should_keep(line: str) -> bool:
+    pattern = re.compile(r'\\?"(?:GET|POST|PUT|DELETE)\s+([^ "?]+)')
+    if line.strip() == "-- No entries --":
+        return False
+
+    match = pattern.search(line)
+    # If it is an HTTP request and the path is in the excluded set, drop it
+    if match and match.group(1) in EXCLUDED_LOG_ENTRIES:
+        return False
+
+    return True
 
 @app.route('/getAllLogsLines', methods=['GET'])
 def get_all_logs_lines():

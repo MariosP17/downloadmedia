@@ -7,14 +7,15 @@ export const qualityPriority: Record<string, number> = {
   "Torrentio\n4k HDR": 6,
   "Torrentio\n4k DV": 7,
   "Torrentio\n4k": 8,
-  "Torrentio\n1080p HDR": 9,
-  "Torrentio\n1080p": 10,
-  "Torrentio\n1078p": 11,
-  "Torrentio\n720p": 12,
-  "Torrentio\n480p": 13,
-  "Torrentio\nBluRay": 14,
-  "Torrentio\nWEB-DL": 15,
-  "Torrentio\nWEBRip": 16,
+  "Torrentio\n20160p": 9,
+  "Torrentio\n1080p HDR": 10,
+  "Torrentio\n1080p": 11,
+  "Torrentio\n1078p": 12,
+  "Torrentio\n720p": 13,
+  "Torrentio\n480p": 14,
+  "Torrentio\nBluRay": 15,
+  "Torrentio\nWEB-DL": 16,
+  "Torrentio\nWEBRip": 17,
 };
 
 export const initiator: Record<string, string> = {
@@ -31,7 +32,11 @@ export const OptionsNames : Record<string, string> =
     "sticky_media_info" : "Media Info panel to stick on top",
     "logs_page_size" : "Number of logs to display per page",
     "download_mode" : "Download mode",
-    "subtitle_languages" : "Subtitle languages"
+    "subtitle_languages" : "Subtitle languages",
+    "auto_download_subs" : "Automatically download subtitles if they're missing",
+    "MoviesFolder" : "Movies Folder",
+    "TVShowsFolder" : "TV Shows Folder",
+    "MediaFolder" : "Media Folder"
 };
 
 export const isVideoExtension = (fileName: string) => {
