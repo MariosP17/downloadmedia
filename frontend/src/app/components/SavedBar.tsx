@@ -116,7 +116,7 @@ export default function SavedBar({
 
       {/* Sidebar Navigation Panel */}
       <aside
-        className={`fixed right-0 top-0 h-full w-74 bg-zinc-900 border-l border-zinc-800 z-60 p-4 transform transition-transform duration-200 ease-in-out ${
+        className={`fixed overflow-y-auto search-scrollbar right-0 top-0 h-full w-74 bg-zinc-900 border-l border-zinc-800 z-60 p-4 transform transition-transform duration-200 ease-in-out ${
           visible ? "translate-x-0" : "translate-x-full"
         }`}
       >
