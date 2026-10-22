@@ -36,7 +36,8 @@ export const OptionsNames : Record<string, string> =
     "auto_download_subs" : "Automatically download subtitles if they're missing",
     "MoviesFolder" : "Movies Folder",
     "TVShowsFolder" : "TV Shows Folder",
-    "MediaFolder" : "Media Folder"
+    "MediaFolder" : "Media Folder",
+    "DBConnectionString" : "Database Connection String"
 };
 
 export const isVideoExtension = (fileName: string) => {
@@ -48,3 +49,8 @@ export const isVideoExtension = (fileName: string) => {
 export const cleanExtension = (fileName: string) => {
     return fileName.replace(/\.[^/.]+$/, "");
 };
+
+export enum MediaType {
+    movie = 1,
+    series = 2,
+}

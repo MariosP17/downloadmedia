@@ -6,7 +6,8 @@ import SeasonsAccordion from "./SeasonsAccordion";
 import BookMarkButton from "./BookMarkButton";
 import ScrollToTopButton from "./ScrollToTopButton";
 import StreamScroller from "./StreamScroller";
-import { qualityPriority } from "../../../../../Props";
+import { MediaType, qualityPriority } from "../../../../../Props";
+import SaveMediaButton from "../../../components/SaveMediaButton";
 
 type Props = {
   params: {
@@ -122,6 +123,7 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
     const omdbUrl = `https://www.omdbapi.com/?i=${data.imdb_id}&Season=${episodeData.season}&Episode=${episodeData.episode}&apikey=${OMDB_API_KEY}`;
     omdbData = await fetch(omdbUrl).then(res => res.json());
   }
+  const posterUrl = episodeData ? episodeData.thumbnail || episodeData.poster || null : data.poster || data.posterUrl || null;
   const name = (data.name || data.title || data.originalTitle || data.originalName || "Unknown Title");
   const episodeName = episodeData ? (episodeData.name || episodeData.title || episodeData.originalTitle || episodeData.originalName || "Unknown Episode Title") : null;
   const seasonAndEpisode = episodeData ? `S${episodeData.season?.toString().padStart(2, "0") || "00"}E${episodeData.episode?.toString().padStart(2, "0") || "00"}` : null;
@@ -145,7 +147,8 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
     }
   }
   return (
-    <div className="rounded-lg border border-white/10 bg-zinc-900 p-4 shadow-md">
+    <div className="rounded-lg border border-white/10 bg-zinc-900 p-4 shadow-md flex justify-between">
+    <div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <div>
         <h2 className="text-2xl font-bold text-white">{name} <span className="ml-2 text-sm text-zinc-400">{releaseYear}</span></h2>
@@ -157,6 +160,8 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
         {((rating && rating >0) || duration) && <span className="flex">{rating && rating !=0 && <span className="flex"><a href={link} target="_blank" rel="noopener noreferrer"><img src='../../../../../../imdb.png' alt='IMDb' className={`w-10 h-5 mr-2 ${link ? 'cursor-pointer' : ''}`} /></a> {rating}</span>}{rating && duration &&<>&nbsp; • &nbsp;</>}{duration && <> <b>Duration:</b> &nbsp;{duration}</>}</span>}
         {description && <p className="mt-2 text-sm text-zinc-300">{description}</p>}
       </div>
+      </div>
+      <SaveMediaButton ttid={decodedId} name={episodeName || name} year={episodeData == null ?releaseYear : new Date(episodeData.released || episodeData.airDate).getFullYear()} type={type === "movie" ? MediaType.movie : MediaType.series} poster_url={posterUrl} series_name={episodeData == null ? undefined : name} episode_info={seasonAndEpisode || undefined} />
     </div>
   );
 }
@@ -180,6 +185,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
       }
   }
   const options = await fetch(`http://${host}:7000/getOptions`).then(res => res.json());
+  const configuration = await fetch(`http://${host}:7000/getConfiguration`).then(res => res.json());
 
   if (type === "series" && !decodeURIComponent(id).includes(":")) {
     const seasons = normalizeSeasons(mediaData);
@@ -296,7 +302,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
 
                 {/* 3. Stream Actions (Stretches completely across the screen on phone viewports) */}
                 <div className="w-full sm:w-auto flex items-center justify-stretch sm:justify-end mt-1 sm:mt-0 transition-colors rounded-md">
-                  <StreamActions hash={s.infoHash} filename={s.behaviorHints?.filename} title={s.title} id={s.fileIdx} ttid={id} data={s.progressData} />
+                  <StreamActions hash={s.infoHash} filename={s.behaviorHints?.filename} title={s.title} id={s.fileIdx} ttid={id} data={s.progressData} opts={options} config={configuration} />
                 </div>
               </div>
               );
@@ -309,6 +315,8 @@ export default async function ItemPage({ params, searchParams }: Props) {
                 acc[s.name] = (acc[s.name] || 0) + 1;
                 return acc;
               }, {} as Record<string, number>)} 
+              opts={options}
+              config={configuration}
             />
           </div>
         </div>

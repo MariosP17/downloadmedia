@@ -7,6 +7,7 @@ import TopBar from "./components/TopBar";
 import Sidebar from "./components/Sidebar";
 import { Toaster } from "react-hot-toast";
 import { useState } from "react";
+import SavedBar from "./components/SavedBar"; // Assuming you have a SavedBar component
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,6 +26,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [savedBarOpen, setSavedBar] = useState(false);
+
+  function ToggleSidebar() {
+    if (savedBarOpen) setSavedBar(false);
+    setSidebarOpen((s) => !s);
+  }
+  function ToggleSavedBar() {
+    if (sidebarOpen) setSidebarOpen(false);
+    setSavedBar((s) => !s);
+  }
+
   return (
     <html
       lang="en"
@@ -35,8 +47,10 @@ export default function RootLayout({
         <meta name="description" content="A media downloader built with Next.js and Stremio's Cinemeta API." />
       </head>
       <body className="min-h-full flex flex-col">
-        <TopBar onToggleSidebar={() => setSidebarOpen((s) => !s)} />
+        <TopBar onToggleSidebar={() => ToggleSidebar()} onToggleSaved={() => ToggleSavedBar()} />
+          
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <SavedBar open={savedBarOpen} onClose={() => setSavedBar(false)} />
         {children}
         <Toaster position="bottom-right" reverseOrder={false} />
       </body>

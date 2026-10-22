@@ -5,12 +5,14 @@ type OptionType = {
   type: "<boolean>" | "<string>" | "<number>" | "<dropdown>";
   min?: number;
   max?: number;
+  maxWidth?: string;
+  minWidth?: string;
   onChange?: (newValue: any) => void;
   options?: { [key: string]: any }[];
 }
 import { OptionsNames } from "../../../Props";
 
-export default function OptionType({typeKey, value, type,min,max, onChange, options}: OptionType) {
+export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth, onChange, options}: OptionType) {
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
       onChange(newValue);
@@ -94,9 +96,13 @@ export default function OptionType({typeKey, value, type,min,max, onChange, opti
           <p>{OptionsNames[typeKey]}</p>
           <input 
             type="text" 
+            style={{
+              minWidth: minWidth ? `${minWidth}` : "calc(var(--spacing) * 1)", 
+              maxWidth: maxWidth ? `${maxWidth}` : "calc(var(--spacing) * 100)",
+            }}
             value={value}
             onChange={(event) => onChange && onChange(event.target.value)}
-            className="border border-zinc-700 rounded px-2 py-1 max-w-100 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]"
+            className={`border border-zinc-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]`}
           />
         </div>
       );

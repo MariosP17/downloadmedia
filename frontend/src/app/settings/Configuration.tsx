@@ -48,6 +48,7 @@ export default function Configuration() {
             <OptionType typeKey="MoviesFolder" value={config["MoviesFolder"] || ""} type="<string>" onChange={(newValue) => setConfig((prev) => ({ ...prev, MoviesFolder: newValue }))} />
             <OptionType typeKey="TVShowsFolder" value={config["TVShowsFolder"] || ""} type="<string>" onChange={(newValue) => setConfig((prev) => ({ ...prev, TVShowsFolder: newValue }))} />
             <OptionType typeKey="MediaFolder" value={config["MediaFolder"] || ""} type="<string>" onChange={(newValue) => setConfig((prev) => ({ ...prev, MediaFolder: newValue }))} />
+            <OptionType minWidth="40vw" typeKey="DBConnectionString" value={config["DBConnectionString"] || ""} type="<string>" onChange={(newValue) => setConfig((prev) => ({ ...prev, DBConnectionString: newValue }))} />
             
 
             <div className="flex justify-end">

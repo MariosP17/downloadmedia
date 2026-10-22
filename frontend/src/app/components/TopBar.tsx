@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import SearchDropdown from "./SearchDropdown";
 
-export default function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
+export default function TopBar({ onToggleSidebar,onToggleSaved }: { onToggleSidebar?: () => void, onToggleSaved?: () => void }) {
   const [query, setQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
   const router = useRouter();
@@ -19,10 +19,15 @@ export default function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => vo
 
   return (
     <header id="top-bar" className="sticky top-0 w-full bg-zinc-900 border-b border-zinc-800 z-55">
-  <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+  <div className=" mx-auto px-4 py-3 flex items-center justify-between gap-4">
     
     {/* Logo + Sidebar Button Container */}
     <div className="flex items-center gap-2 flex-shrink-0">
+      <div>
+        <Link href="/" className="flex items-center">
+          <img src="/stremio.png" alt="Stremio" className="h-8 w-8 object-contain" />
+        </Link>
+      </div>
       <button
         aria-label="Open sidebar"
         onClick={() => onToggleSidebar && onToggleSidebar()}
@@ -32,11 +37,6 @@ export default function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => vo
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
         </svg>
       </button>
-      <div>
-        <Link href="/" className="flex items-center">
-          <img src="/stremio.png" alt="Stremio" className="h-8 w-8 object-contain" />
-        </Link>
-      </div>
     </div>
 
     {/* Search Container - Grows to fill space but respects the logo */}
@@ -66,6 +66,13 @@ export default function TopBar({ onToggleSidebar }: { onToggleSidebar?: () => vo
 
     {/* Invisible spacer to perfectly center the search bar on desktop */}
     <div className="hidden md:block w-8 flex-shrink-0" aria-hidden="true" />
+     <button
+        aria-label="Open saved"
+        onClick={() => onToggleSaved && onToggleSaved()}
+        className="p-1 rounded-md hover:bg-zinc-800 hover:cursor-pointer text-zinc-200"
+      >
+        <img src="/bookmarks.svg" alt="Bookmarks" className="h-7 w-7 object-contain" />
+      </button>
 
   </div>
 </header>

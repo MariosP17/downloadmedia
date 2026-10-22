@@ -17,6 +17,8 @@ type TreeItemProps = {
   refreshStats:() => void; // Callback to refresh the size of the parent folder
   onRefreshParent?: () => void; // Callback to tell the parent directory to refresh its list
   activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>;
+  opts: { [key: string]: any }[];
+  config: { [key: string]: any };
 }
 
 type ArchiveJob = {
@@ -26,7 +28,7 @@ type ArchiveJob = {
   error?: string | null;
 };
 
-export default function FileTreeItem({ name, size, numberOfItems, numberOfFolders, currentPath, refreshStats, onRefreshParent, activeRefreshRef }: TreeItemProps) {
+export default function FileTreeItem({ name, size, numberOfItems, numberOfFolders, currentPath, refreshStats, onRefreshParent, activeRefreshRef,opts,config }: TreeItemProps) {
   const isFolder = name.endsWith("/");
   const cleanName = isFolder ? name.slice(0, -1) : name;
   const cleanNameWithoutExtension = isFolder ? cleanName : cleanName.replace(/\.[^/.]+$/, "");
@@ -39,9 +41,9 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   // Calculate this item's full path parameter for the backend API query
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
   const isMovieOrSeriesFolder = isFolder && (itemPath.split("/").length === 2 || itemPath.split("/").length === 3);
-  const isMovie = (isFolder &&  (itemPath.split("/").length === 2 && itemPath.split("/")[0].toLowerCase() === "movies"));
-  const isEpisode = !isFolder && itemPath.split("/").length === 4 && itemPath.split("/")[0].toLowerCase() === "tv-shows" && isVideoExtension(cleanName);
-  const type = isEpisode ? "series" : isMovieOrSeriesFolder ? itemPath.split("/")[0].toLowerCase() === "movies" ? "movie" : "series" : "";
+  const isMovie = (isFolder &&  (itemPath.split("/").length === 2 && itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase()));
+  const isEpisode = !isFolder && itemPath.split("/").length === 4 && itemPath.split("/")[0].toLowerCase() === config["TVShowsFolder"].toLowerCase() && isVideoExtension(cleanName);
+  const type = isEpisode ? "series" : isMovieOrSeriesFolder ? itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase() ? "movie" : "series" : "";
   const isSubtitleFile = !isFolder && (cleanName.endsWith(".srt") || cleanName.endsWith(".vtt") || cleanName.endsWith(".sub") || cleanName.endsWith(".ass") || cleanName.endsWith(".idx"));
 
   const [isOpen, setIsOpen] = useState(false);
@@ -57,7 +59,8 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const [archiveJob, setArchiveJob] = useState<ArchiveJob | null>(null);
   const [isSubsModalOpen, setSubsModalOpen] = useState(false);
   const [ttid, setTtid] = useState("");
-  const [options, setOptions] = useState<{ [key: string]: any }[]>([]);
+  const [options, setOptions] = useState<{ [key: string]: any }[]>(opts);
+  const [configuration, setConfiguration] = useState(config);
   const [folderSize, setFolderSize] = useState<string>(size);
   const [isEditSubtitlesModalOpen, setIsEditSubtitlesModalOpen] = useState(false);
 
@@ -65,20 +68,20 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     setFolderSize(size);
   }, [size]);
   
-  const loadOptions = async () => {
-    try {
-      const response = await fetch(`http://${window.location.hostname}:7000/getOptions`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Could not load options");
-      setOptions(data || []);
-    } catch (error) {
-      console.error(error instanceof Error ? error.message : "Could not load options");
-    }
-  };
+  // const loadOptions = async () => {
+  //   try {
+  //     const response = await fetch(`http://${window.location.hostname}:7000/getOptions`);
+  //     const data = await response.json();
+  //     if (!response.ok) throw new Error(data.error || "Could not load options");
+  //     setOptions(data || []);
+  //   } catch (error) {
+  //     console.error(error instanceof Error ? error.message : "Could not load options");
+  //   }
+  // };
 
-  useEffect(() => {
-    void loadOptions(); 
-  }, []);
+  // useEffect(() => {
+  //   void loadOptions(); 
+  // }, []);
   const archivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Reference hook assigned to the dropdown container to check for outside clicks
@@ -664,6 +667,8 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 numberOfFolders={numberOfFolders}
                 name={name}
                 currentPath={itemPath}
+                opts={options}
+                config={configuration}
                 // Recursively link the reload pipeline downwards 
                 onRefreshParent={fetchDirectoryContents}
                 refreshStats={refreshStats}

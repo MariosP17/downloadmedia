@@ -20,6 +20,8 @@ from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
 from download_parallel import enqueue_download as enqueue_parallel_download
 from download_serial import SerialDownloadDispatcher
+import backend.SavedMedia.SavedMediaUtils as smut
+import backend.Abstract.Responses as resp
 
 load_dotenv()
 
@@ -504,7 +506,9 @@ def refresh_plex_libraries():
 
 def get_media_root():
     configuration = getConfigurationInternal()
-    media_folder = configuration.get("MediaFolder", "media")
+    media_folder = configuration.get("MediaFolder")
+    if not media_folder:
+        raise ValueError("Media folder is not configured in the settings.")
     return os.path.join("/", str(media_folder).lstrip("/\\"))
 
 
@@ -1253,58 +1257,61 @@ def get_items():
     """
     GET Endpoint: Retrieve items from a specific folder, sorting matching files by Season/Episode.
     """
-    folder = request.args.get('folder', "")
-    show_files = request.args.get('showFiles', 'true').lower() == 'true'
-    only_subs = request.args.get('onlySubs', 'false').lower() == 'true'
-    folder_path = os.path.join(get_media_root(), folder)
+    try:
+        folder = request.args.get('folder', "")
+        show_files = request.args.get('showFiles', 'true').lower() == 'true'
+        only_subs = request.args.get('onlySubs', 'false').lower() == 'true'
+        folder_path = os.path.join(get_media_root(), folder)
 
-    if not os.path.exists(folder_path):
-        return jsonify({"error": "Folder not found"}), 404
+        if not os.path.exists(folder_path):
+            return jsonify({"error": "Folder not found"}), 404
 
-    folders = []
-    files_matching = []
-    files_other = []
+        folders = []
+        files_matching = []
+        files_other = []
 
-    for filename in os.listdir(folder_path):
-        filepath = os.path.join(folder_path, filename)
+        for filename in os.listdir(folder_path):
+            filepath = os.path.join(folder_path, filename)
 
-        if only_subs and not filename.lower().endswith(('.srt', '.sub', '.vtt' , '.ass')):
-            continue
+            if only_subs and not filename.lower().endswith(('.srt', '.sub', '.vtt' , '.ass')):
+                continue
 
-        if os.path.isdir(filepath):
-            if filename != "stremio-server":
-                total_size = 0
-                for root, dirs, files in os.walk(filepath):
-                    for f in files:
-                        fp = os.path.join(root, f)
-                        if os.path.exists(fp):
-                            total_size += os.path.getsize(fp)
+            if os.path.isdir(filepath):
+                if filename != "stremio-server":
+                    total_size = 0
+                    for root, dirs, files in os.walk(filepath):
+                        for f in files:
+                            fp = os.path.join(root, f)
+                            if os.path.exists(fp):
+                                total_size += os.path.getsize(fp)
 
-                folders.append({
-                    "name": filename + "/",
-                    "size": format_size(total_size), 
-                    "numberOfItems": len(os.listdir(filepath)),
-                    "numberOfFolders": len([d for d in os.listdir(filepath) if os.path.isdir(os.path.join(filepath, d))])
-                })
-                
-        elif os.path.isfile(filepath) and show_files:
-            # Check if file matches the Season/Episode regex pattern
-            if EPISODE_REGEX.search(filename) and filename.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.wmv')):
-                files_matching.append({"name": filename, "size": format_size(os.path.getsize(filepath))})
-            else:
-                files_other.append({"name": filename, "size": format_size(os.path.getsize(filepath))})
+                    folders.append({
+                        "name": filename + "/",
+                        "size": format_size(total_size), 
+                        "numberOfItems": len(os.listdir(filepath)),
+                        "numberOfFolders": len([d for d in os.listdir(filepath) if os.path.isdir(os.path.join(filepath, d))])
+                    })
+                    
+            elif os.path.isfile(filepath) and show_files:
+                # Check if file matches the Season/Episode regex pattern
+                if EPISODE_REGEX.search(filename) and filename.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.wmv')):
+                    files_matching.append({"name": filename, "size": format_size(os.path.getsize(filepath))})
+                else:
+                    files_other.append({"name": filename, "size": format_size(os.path.getsize(filepath))})
 
-    # 1. Sort the matching files cleanly by Season number, then Episode number
-    files_matching.sort(key=lambda x: extract_season_episode(x['name'] if isinstance(x, dict) else x))
-    
-    # 2. Sort other files and folders alphabetically
-    folders.sort(key=lambda x: x['name'].lower())
-    files_other.sort(key=lambda x: x['name'].lower())
+        # 1. Sort the matching files cleanly by Season number, then Episode number
+        files_matching.sort(key=lambda x: extract_season_episode(x['name'] if isinstance(x, dict) else x))
+        
+        # 2. Sort other files and folders alphabetically
+        folders.sort(key=lambda x: x['name'].lower())
+        files_other.sort(key=lambda x: x['name'].lower())
 
-    # Combine them: Folders first, then beautifully ordered episodes, then misc files
-    combined_items = folders + files_matching + files_other
-    
-    return jsonify({"items": combined_items}), 200
+        # Combine them: Folders first, then beautifully ordered episodes, then misc files
+        combined_items = folders + files_matching + files_other
+        
+        return jsonify({"items": combined_items}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/getFolderSize', methods=['GET'])
@@ -1336,19 +1343,22 @@ def get_folder_size(folder_path):
 
 @app.route('/getUsageStats', methods=['GET'])
 def get_usage_stats():
+    try:
     # Drive-wide stats come from shutil (based on the root partition)
-    total, _, _ = shutil.disk_usage("/")
-    
-    # Specific folder sizes must be calculated manually
-    media_root = get_media_root()
-    used_media = get_folder_size(media_root)
-    used_stremio = get_folder_size(os.path.join(media_root, "stremio-server"))
-    
-    return jsonify({
-        "total": format_size(total),
-        "used": format_size(used_media-used_stremio),
-        "usedStremio": format_size(used_stremio)
-    }), 200
+        total, _, _ = shutil.disk_usage("/")
+        
+        # Specific folder sizes must be calculated manually
+        media_root = get_media_root()
+        used_media = get_folder_size(media_root)
+        used_stremio = get_folder_size(os.path.join(media_root, "stremio-server"))
+        
+        return jsonify({
+            "total": format_size(total),
+            "used": format_size(used_media-used_stremio),
+            "usedStremio": format_size(used_stremio)
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/deleteFolder', methods=['POST'])
 def delete_folder():
@@ -1358,20 +1368,20 @@ def delete_folder():
     if not folder:
         return jsonify({"error": "Folder name is required"}), 400
 
-    media_root = get_media_root()
-    protected_folders = {
-        os.path.abspath(os.path.join(media_root, "stremio-server")),
-        os.path.abspath(media_root),
-        os.path.abspath(get_configured_media_folder("MoviesFolder", "Movies")),
-        os.path.abspath(get_configured_media_folder("TVShowsFolder", "TV-Shows")),
-    }
-    folder_path = os.path.join(media_root, folder)
-    if os.path.abspath(folder_path) in protected_folders:
-        return jsonify({"error": "Cannot delete protected folder"}), 403
-    if not os.path.exists(folder_path):
-        return jsonify({"error": "Folder not found"}), 404
-
     try:
+        media_root = get_media_root()
+        protected_folders = {
+            os.path.abspath(os.path.join(media_root, "stremio-server")),
+            os.path.abspath(media_root),
+            os.path.abspath(get_configured_media_folder("MoviesFolder", "Movies")),
+            os.path.abspath(get_configured_media_folder("TVShowsFolder", "TV-Shows")),
+        }
+        folder_path = os.path.join(media_root, folder)
+        if os.path.abspath(folder_path) in protected_folders:
+            return jsonify({"error": "Cannot delete protected folder"}), 403
+        if not os.path.exists(folder_path):
+            return jsonify({"error": "Folder not found"}), 404
+
         if os.path.isdir(folder_path) and not os.listdir(folder_path):
             os.rmdir(folder_path)  # Only works for empty directories
             return jsonify({"message": "Folder deleted successfully"}), 200
@@ -1421,26 +1431,26 @@ def rename_folder():
     if not folder or not newName:
         return jsonify({"error": "Both 'folder' and 'newName' are required"}), 400
     
-    media_root = get_media_root()
-    protected_folders = {
-        os.path.abspath(os.path.join(media_root, "stremio-server")),
-        os.path.abspath(media_root),
-        os.path.abspath(get_configured_media_folder("MoviesFolder", "Movies")),
-        os.path.abspath(get_configured_media_folder("TVShowsFolder", "TV-Shows")),
-    }
-    folder_path = os.path.join(media_root, folder)
-    if os.path.abspath(folder_path) in protected_folders:
-        return jsonify({"error": "Cannot rename protected folder"}), 403
-    parent_dir = os.path.dirname(folder_path)
-    new_folder_path = os.path.join(parent_dir, newName)
-
-    if not os.path.exists(folder_path):
-        return jsonify({"error": "Folder not found"}), 404
-
-    if os.path.exists(new_folder_path):
-        return jsonify({"error": "A folder with that name already exists"}), 400
-
     try:
+        media_root = get_media_root()
+        protected_folders = {
+            os.path.abspath(os.path.join(media_root, "stremio-server")),
+            os.path.abspath(media_root),
+            os.path.abspath(get_configured_media_folder("MoviesFolder", "Movies")),
+            os.path.abspath(get_configured_media_folder("TVShowsFolder", "TV-Shows")),
+        }
+        folder_path = os.path.join(media_root, folder)
+        if os.path.abspath(folder_path) in protected_folders:
+            return jsonify({"error": "Cannot rename protected folder"}), 403
+        parent_dir = os.path.dirname(folder_path)
+        new_folder_path = os.path.join(parent_dir, newName)
+
+        if not os.path.exists(folder_path):
+            return jsonify({"error": "Folder not found"}), 404
+
+        if os.path.exists(new_folder_path):
+            return jsonify({"error": "A folder with that name already exists"}), 400
+
         os.rename(folder_path, new_folder_path)
         return jsonify({"message": "Folder renamed successfully"}), 200
     except OSError as e:
@@ -1514,14 +1524,17 @@ def refresh_libraries(initiator='settings'):
 
 @app.route('/destinationExists', methods=['POST'])
 def destination_exists():
-    data = request.get_json() or {}
-    destination = data.get('destination')
+    try:
+        data = request.get_json() or {}
+        destination = data.get('destination')
 
-    if not destination:
-        return jsonify({"error": "Destination path is required"}), 400
+        if not destination:
+            return jsonify({"error": "Destination path is required"}), 400
 
-    destination_path = os.path.join(get_media_root(), destination)
-    return jsonify({"exists": os.path.exists(destination_path)}), 200
+        destination_path = os.path.join(get_media_root(), destination)
+        return jsonify({"exists": os.path.exists(destination_path)}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/getRefreshLibrariesLog', methods=['GET'])
 def get_refresh_libraries_log():
@@ -1855,6 +1868,50 @@ def write_refresh_libraries_log(initiator):
     with open("settings.json", "w", encoding="utf-8") as log_file:
         json.dump(settings_data, log_file, indent=2, ensure_ascii=False)
 
+@app.route('/getAllSavedMedia', methods=['GET'])
+def get_all_saved_media():
+    return performAction(smut.get_all_saved_media_util)
+
+
+@app.route('/getSavedMedia', methods=['GET'])
+def get_saved_media():
+    ttid = request.args.get("ttid")
+    if not ttid:
+        return jsonify(resp.error_response("ttid is required")), 400
+    return performAction(smut.get_saved_media_util, ttid=ttid)
+    
+@app.route('/deleteSavedMedia', methods=['DELETE'])
+def delete_saved_media():
+    ttid = request.form.get("ttid")
+    if not ttid:
+        return jsonify(resp.error_response("ttid is required")), 400
+    return performAction(smut.delete_saved_media_util, ttid=ttid)
+
+@app.route('/updateSavedMedia', methods=['PUT'])
+def update_saved_media():
+    saved_media = request.get_json()
+    if not saved_media:
+        return jsonify(resp.error_response("SavedMedia data is required")), 400
+    return performAction(smut.update_saved_media_util, SavedMediaJSON=saved_media)
+
+@app.route('/addSavedMedia', methods=['POST'])
+def add_saved_media():
+    saved_media = request.get_json()
+    if not saved_media:
+        return jsonify(resp.error_response("SavedMedia data is required")), 400
+    if not saved_media.get("ttid") or not saved_media.get("type") or not saved_media.get("name") or not saved_media.get("year"):
+        return jsonify(resp.error_response("Fields (ttid, type, name, year) are required")), 400
+    return performAction(smut.add_saved_media_util, SavedMediaJSON=saved_media)
+
+def performAction(action, *args, **kwargs):
+    db_connection_string = getConfigurationInternal().get("DBConnectionString", "")
+    if not db_connection_string:
+        return jsonify(resp.error_response("DB connection string is not configured")), 500
+    try:
+        result = action(db_connection_string, *args, **kwargs)
+        return jsonify(resp.success_response(result)), 200
+    except Exception as e:
+        return jsonify(resp.error_response(f"{str(e)}")), 500
 if __name__ == '__main__':
     # Start the Flask app explicitly on Port 7000
     app.run(host='0.0.0.0', port=7000, debug=True)

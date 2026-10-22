@@ -176,7 +176,7 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 
 	return (
 		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-			<div className="flex max-h-[75vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+			<div className="flex max-h-[75vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl p-4 border border-zinc-800 bg-zinc-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
 				<div className="flex items-center justify-between border-b border-zinc-800 p-5">
 					<div>
 						<h2 className="text-lg font-semibold text-white">Manage subtitles</h2>

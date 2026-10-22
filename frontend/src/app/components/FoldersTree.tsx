@@ -16,6 +16,8 @@ type FolderTreeItemProps = {
   activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>,
   expandedFolders?: string;
   exists?: boolean;
+  config: any;
+  opts: { [key: string]: any }[];
 };
 
 let globalActiveCloseMenuFn: (() => void) | null = null;
@@ -37,7 +39,7 @@ const closeAnyOpenMenu = () => {
   globalActiveCloseMenuFn?.();
 };
 
-export default function FolderTree({ name, size, numberOfItems, numberOfFolders, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef, expandedFolders, exists }: FolderTreeItemProps) {
+export default function FolderTree({ name, size, numberOfItems, numberOfFolders, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef, expandedFolders, exists, config, opts }: FolderTreeItemProps) {
   const cleanName = name.endsWith("/") ? name.slice(0, -1) : name;
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
   const menuAnchorRef = useRef<HTMLDivElement>(null);
@@ -50,16 +52,17 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMenuReady, setIsMenuReady] = useState(false);
   const [menuPlacement, setMenuPlacement] = useState<"down" | "up">("down");
-  const [configuration, setConfiguration] = useState<any>({});
+  const [configuration, setConfiguration] = useState<any>(config);
+  const [options, setOptions] = useState<{ [key: string]: any }[]>(opts);
 
   const isSelected = selectedPath === itemPath;
-  useEffect(() => {
-    const getConfiguration = async () => {
-      const config = await fetch(`http://${window.location.hostname}:7000/getConfiguration`).then(res => res.json());
-      setConfiguration(config);
-    };
-    getConfiguration();
-  }, []);
+  // useEffect(() => {
+  //   const getConfiguration = async () => {
+  //     const config = await fetch(`http://${window.location.hostname}:7000/getConfiguration`).then(res => res.json());
+  //     setConfiguration(config);
+  //   };
+  //   getConfiguration();
+  // }, []);
   useEffect(() => {
     const fetchSubFoldersOnConditions = async () => {
         if (exists && expandedFolders != null && expandedFolders.split("/").includes(cleanName)) {
@@ -315,6 +318,8 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
                 activeRefreshRef={activeRefreshRef}
                 expandedFolders={expandedFolders}
                 exists={exists}
+                config={configuration}
+                opts={options}
               />
             ))
           )}

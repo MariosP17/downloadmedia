@@ -11,13 +11,15 @@ type Props = {
   id: string;
   ttid: string;
   data: { progress: number; status: string };
+  opts: { [key: string]: any }[];
+  config: any;
 };
 
 type ServerDownloadState = "idle" | "loading" | "downloading" | "completed" | "failed" | "cancelling";
 
 
 // Main Downloader Component Module
-export default function StreamActions({ hash, filename, title, id, ttid,data }: Props) {
+export default function StreamActions({ hash, filename, title, id, ttid,data,opts,config }: Props) {
   const [copiedServer, setCopiedServer] = useState(false);
   const [copiedDevice, setCopiedDevice] = useState(false);
   const [deviceLoading, setDeviceLoading] = useState(false);
@@ -34,24 +36,37 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
   const [targetName, setTargetName] = useState(filename || title || "");
   const [newFolderName, setNewFolderName] = useState("");
   const [exists, setExists] = useState(false);
-  const [configuration, setConfiguration] = useState<any>({});
+  const [configuration, setConfiguration] = useState<any>(config);
+  const [options, setOptions] = useState<{ [key: string]: any }[]>(opts);
+  
   const pattern = new RegExp(`^(${configuration.MoviesFolder}|${configuration.TVShowsFolder})/`);
   const folderRoot = targetPath.match(pattern)?.[0] ?? "";
   const editableFolderPath = targetPath.slice(folderRoot.length);
   
-  useEffect(() => {
-    const fetchConfiguration = async () => {
-      try {
-        const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
-        if (!res.ok) throw new Error("Failed to fetch configuration");
-        const configData = await res.json();
-        setConfiguration(configData);
-      } catch (error) {
-        console.error("Error fetching configuration:", error);
-      }
-    };
-    fetchConfiguration();
-  }, []);
+  // useEffect(() => {
+  //   const fetchConfiguration = async () => {
+  //     try {
+  //       const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
+  //       if (!res.ok) throw new Error("Failed to fetch configuration");
+  //       const configData = await res.json();
+  //       setConfiguration(configData);
+  //     } catch (error) {
+  //       console.error("Error fetching configuration:", error);
+  //     }
+  //   };
+  //   const fetchOptions = async () => {
+  //     try {
+  //       const res = await fetch(`http://${window.location.hostname}:7000/getOptions`);
+  //       if (!res.ok) throw new Error("Failed to fetch options");
+  //       const optionsData = await res.json();
+  //       setOptions(optionsData);
+  //     } catch (error) {
+  //       console.error("Error fetching options:", error);
+  //     }
+  //   };
+  //   fetchConfiguration();
+  //   fetchOptions();
+  // }, []);
 
   const serverStateRef = useRef<ServerDownloadState>("idle");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -107,12 +122,12 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
   const loadRootFolders = async () => {
     try {
       const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=&showFiles=false`);
-      if (!res.ok) throw new Error();
+      if (!res.ok) throw new Error((await res.json()).error || `Failed to get items from server`);
       const data = await res.json();
       setRootFolders(data.items || []);
       scrollToSelectedPath();
-    } catch {
-      toast.error("Failed to map target media folder pathways.");
+    } catch (err : any) {
+      toast.error(`Failed to map target media folder pathways. ${err.message || ""}`);
     }
   };
 
@@ -155,15 +170,23 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
     }
   };
   const openSelectionModal = async () => {
+    try {
     setLoading(true);
     const initialPath = await getInitialPath();
     setTargetPath(initialPath); // Starts with base root directory path selected
-    const existsUrl = await fetch(`http://${window.location.hostname}:7000/destinationExists`, {
+    const existsRes = await fetch(`http://${window.location.hostname}:7000/destinationExists`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ destination: initialPath })
     })
-    const existsData = await existsUrl.json();
+    if (!existsRes.ok) {
+        const existsError = (await existsRes.json()).error || "";
+        toast.error(`Failed to check destination existence. ${existsError}`);
+        setIsModalOpen(true);
+        await loadRootFolders();
+        return;
+    }
+    const existsData = await existsRes.json();
     const newexists = existsData.exists;
     setExists(existsData.exists);
     if (!newexists) {
@@ -173,7 +196,13 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
       setIsModalOpen(true);
       await loadRootFolders();
     }
+  } 
+  // catch (err: any) {
+  //   toast.error(`Failed to open selection modal. ${err.message || ""}`);
+  // }
+  finally {
     setLoading(false);
+  }
   };
 
   const handleCreateFolder = async () => {
@@ -342,7 +371,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
     let path = "";
     const data = await getCinemetaData();
     if (data && data.meta && data.meta.name && data.meta.year && data.meta.type) {
-      path = `${data.meta.type === "series" ? "TV-Shows" : "Movies"}/${data.meta.name} (${data.meta.year.toString().split("–")[0]})`;
+      path = `${data.meta.type === "series" ? configuration["TVShowsFolder"] : configuration["MoviesFolder"]}/${data.meta.name} (${data.meta.year.toString().split("–")[0]})`;
       if (data.meta.type === "series" && decodeURIComponent(ttid).split(":").length > 1) {
         path += decodeURIComponent(ttid).split(":")[1] != "0" ? `/Season ${decodeURIComponent(ttid).split(":")[1].padStart(2, "0")}` : "/Specials";
       }
@@ -476,7 +505,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
                 }`}
               >
                 <img src="/folder.png" alt="" className="w-4 h-4 object-contain" />
-                <span className="text-sm">media /</span>
+                <span className="text-sm">{configuration["MediaFolder"]}/</span>
               </div>
               
               <div className="pl-3 border-l border-zinc-800 ml-2 space-y-0.5">
@@ -494,6 +523,8 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
                     activeRefreshRef={activeRefreshRef}
                     expandedFolders={targetPath.split("/").length > 0 ? targetPath.split("/").slice(0, -1).join("/") : undefined}
                     exists = {exists}
+                    config={configuration}
+                    opts={options}
                   />
                 ))}
               </div>
@@ -524,13 +555,13 @@ export default function StreamActions({ hash, filename, title, id, ttid,data }: 
                 <input
                   type="text"
                   readOnly
-                  value={`/media/${targetPath}`}
+                  value={`/${configuration["MediaFolder"]}/${targetPath}`}
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-400 outline-none select-all"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Assigned Filename</label>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase mb-1">Filename</label>
                 <input
                   type="text"
                   placeholder="Provide explicit valid output name..."

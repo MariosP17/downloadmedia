@@ -33,32 +33,48 @@ export default function MediaExplorerPage() {
   const [hasInitialized, setHasInitialized] = useState(false);
   const [usageStats, setUsageStats] = useState<{ total: string; used: string; usedStremio: string }>({ total: "0 B", used: "0 B", usedStremio: "0 B" });
   const [config, setConfig] = useState<Config>({});
+  const [options, setOptions] = useState<{ [key: string]: any }[]>([]);
   const activeRefreshRef = useRef<{ [path: string]: () => Promise<void> }>({});
 
   useEffect(() => {
     fetchUsageStats();
     fetchConfig();
+    fetchOptions();
   }, []);
   
   const fetchUsageStats = async () => {
     try {
       const res = await fetch(`http://${window.location.hostname}:7000/getUsageStats`);
-      if (!res.ok) throw new Error("Failed to fetch usage stats");
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch usage stats");
       const data = await res.json();
       setUsageStats(data);
     } catch (error) {
       console.error("Error fetching usage stats:", error);
+      toast.error(`Failed to fetch usage stats. ${error}`);
     }
   };
 
   const fetchConfig = async () => {
     try {
       const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
-      if (!res.ok) throw new Error("Failed to fetch config");
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch config");
       const data = await res.json();
       setConfig(data);
     } catch (error) {
       console.error("Error fetching config:", error);
+      toast.error(`Failed to fetch config. ${error}`);
+    }
+  };
+
+  const fetchOptions = async () => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:7000/getOptions`);
+      if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch options");
+      const data = await res.json();
+      setOptions(data || []);
+    } catch (error) {
+      console.error("Error fetching options:", error);
+      toast.error(`Failed to fetch options. ${error}`);
     }
   };
 
@@ -70,14 +86,14 @@ export default function MediaExplorerPage() {
       setLoading(true);
       try {
         const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=`);
-        if (!res.ok) throw new Error("Failed to load root files");
+        if (!res.ok) throw new Error((await res.json()).error || "Failed to load root media");
         
         const data = await res.json();
         setRootItems(data.items || []);
         setHasInitialized(true);
       } catch (error) {
         console.error("Error loading root media:", error);
-        toast.error("Failed to load root media items.");
+        toast.error(`Failed to load root media items. ${error}`);
       } finally {
         setLoading(false);
       }
@@ -166,6 +182,8 @@ export default function MediaExplorerPage() {
                     size={size}
                     numberOfItems={numberOfItems}
                     numberOfFolders={numberOfFolders}
+                    opts={options}
+                    config={config}
                     currentPath=""
                     refreshStats={fetchUsageStats}
                     activeRefreshRef={activeRefreshRef}

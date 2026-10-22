@@ -5,28 +5,30 @@ import { useEffect, useRef, useState } from "react";
 type Props = {
     streamsnames: string[];
     counts: Record<string, number>;
+    opts: { [key: string]: any }[];
+    config: { [key: string]: any };
 };
 
-export default function StreamScroller({ streamsnames, counts }: Props) {
+export default function StreamScroller({ streamsnames, counts, opts,config }: Props) {
     const [expanded, setExpanded] = useState(false);
     const scrollerRef = useRef<HTMLElement>(null);
     const [isPhone, setIsPhone] = useState(false);
     const [highlightedStream, setHighlightedStream] = useState<HTMLElement | null>(null);
-    const [options, setOptions] = useState<any>(null);
+    const [options, setOptions] = useState<any>(opts);
 
     const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
     
-    useEffect(() => {
-        async function fetchOptions() {
-            try{
-                const response = await fetch(apiUrl("/getOptions")).then(res => res.json());
-                setOptions(response);
-            } catch (error) {
-                console.error("Failed to fetch options:", error);
-            }
-        }
-        fetchOptions();
-    }, []);
+    // useEffect(() => {
+    //     async function fetchOptions() {
+    //         try{
+    //             const response = await fetch(apiUrl("/getOptions")).then(res => res.json());
+    //             setOptions(response);
+    //         } catch (error) {
+    //             console.error("Failed to fetch options:", error);
+    //         }
+    //     }
+    //     fetchOptions();
+    // }, []);
 
     useEffect(() => {
         if (highlightedStream) {

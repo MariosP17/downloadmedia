@@ -56,10 +56,9 @@ export default function BatchDownloadPage() {
   const [taskIds, setTaskIds] = useState<string[]>([]);
   const [isOn, setIsOn] = useState(false);
   const [globalExists, setGlobalExists] = useState<boolean>(false);
-  const [configuration, setConfiguration] = useState<{ MoviesFolder: string; TVShowsFolder: string } | null>(null);
-  const pattern = configuration
-    ? new RegExp(`^(${[configuration.MoviesFolder, configuration.TVShowsFolder].map(folder => folder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})/`)
-    : null;
+  const [configuration, setConfiguration] = useState<{ [key: string]: any }>({});
+  const [options, setOptions] = useState<{ [key: string]: any }[]>([]);
+  const [pattern, setPattern] = useState<RegExp | null>(null);
   const folderRoot = pattern ? temporarySelectedPath.match(pattern)?.[0] ?? "" : "";
   const editableFolderPath = temporarySelectedPath.slice(folderRoot.length);
 
@@ -67,14 +66,28 @@ export default function BatchDownloadPage() {
     const fetchConfiguration = async () => {
       try {
         const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
-        if (!res.ok) throw new Error("Failed to fetch configuration");
+        if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch configuration");
         const configData = await res.json();
+        if (!configData["MoviesFolder"] || !configData["TVShowsFolder"] || !configData["MediaFolder"]) throw new Error("Invalid configuration data");
         setConfiguration(configData);
+        setPattern(new RegExp(`^(${[configData["MoviesFolder"], configData["TVShowsFolder"]].map(folder => folder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})/`));
       } catch (error) {
         console.error("Error fetching configuration:", error);
-        toast.error("Failed to load media folder configuration.");
+        toast.error(`Failed to load media folder configuration. ${error}`);
       }
     };
+    const fetchOptions = async () => {
+      try {
+        const res = await fetch(`http://${window.location.hostname}:7000/getOptions`);
+        if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch options");
+        const optionsData = await res.json();
+        setOptions(optionsData);
+      } catch (error) {
+        console.error("Error fetching options:", error);
+        toast.error(`Failed to load options. ${error}`);
+      }
+    };
+    fetchOptions();
     fetchConfiguration();
   }, []);
 
@@ -337,7 +350,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
   const checkExists = async (meta: any, season: number = -1) => {
     let pathToCheck = "";
     if (meta && meta.type && meta.name && meta.year) {
-      pathToCheck = `${meta.type === "series" ? "TV-Shows" : "Movies"}/${meta.name} (${meta.year.toString().split("–")[0]})`;
+      pathToCheck = `${meta.type === "series" ? configuration["TVShowsFolder"] : configuration["MoviesFolder"]}/${meta.name} (${meta.year.toString().split("–")[0]})`;
       if (meta.type === "series" && season >= 0){
         pathToCheck += season != 0 ? `/Season ${season.toString().padStart(2, "0")}` : "/Specials";
       }
@@ -351,12 +364,15 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ destination: pathToCheck })
       });
+      if (!existsRes.ok) {
+        throw new Error((await existsRes.json()).error ||`Failed to check destination existence`);
+      }
       const existsData = await existsRes.json();
       return { exists: existsData.exists, path: pathToCheck };
     } 
     catch (err) {
         console.error("Failed to check destination existence:", err);
-        return { exists: false, path: pathToCheck }; // Return the path we tried to check for debugging
+        return { exists: false, path: `EXISTERROR ${err}` }; // Return the path we tried to check for debugging
     }
   };
 
@@ -374,6 +390,11 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
         await openModal();
       }
       else{
+        if (localExists.path.startsWith("EXISTERROR")) {
+          toast.error(`Couldn't check if the destination exists. ${localExists.path.replace("EXISTERROR ", "")}`);
+          await openModal();
+          return;
+        }
         setTemporarySelectedPath(localExists.path);
         setIsCreateFolderModalOpen(true);
       }
@@ -389,12 +410,13 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     setIsModalOpen(true);
     try {
       const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=&showFiles=false`);
-      if (res.ok) {
-        const data = await res.json();
-        setRootFolders(data.items || []);
+      if (!res.ok) {
+        throw new Error((await res.json()).error || `Failed to get items from server`);
       }
-    } catch {
-      toast.error("Failed to map destination options from target server.");
+      const data = await res.json();
+      setRootFolders(data.items || []);
+    } catch (err) {
+      toast.error(`Failed to get items from server. ${err || ""}`);
     }
     finally {
       scrollToSelectedPath();
@@ -919,9 +941,9 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                 <input
                   type="text"
                   readOnly
-                  value={targetPath === null ? "No target directory path chosen..." : `/media/${targetPath}`}
+                  value={targetPath === "" ? "No target directory path chosen..." : `/${configuration["MediaFolder"]}/${targetPath}`}
                   className={`w-full bg-zinc-950 border rounded-lg px-3 py-2 text-xs outline-none transition-colors ${
-                    targetPath === null ? "text-zinc-600 border-zinc-800 italic" : "text-green-400 border-green-900/60 font-semibold"
+                    targetPath === "" ? "text-zinc-600 border-zinc-800 italic" : "text-green-400 border-green-900/60 font-semibold"
                   }`}
                 />
 
@@ -995,7 +1017,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                 }`}
               >
                 <img src="/folder.png" alt="" className="w-4 h-4 object-contain" />
-                <span className="text-sm">media/</span>
+                <span className="text-sm">{configuration["MediaFolder"]}/</span>
               </div>
               
               <div className="pl-3 border-l border-zinc-800 ml-2 space-y-0.5">
@@ -1013,6 +1035,8 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     activeRefreshRef={activeRefreshRef}
                     expandedFolders={temporarySelectedPath.split("/").length > 0 ? temporarySelectedPath.split("/").slice(0, -1).join("/") : undefined}
                     exists={globalExists}
+                    config={configuration}
+                    opts={options}
                   />
                 ))}
               </div>
@@ -1035,7 +1059,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
               </button>
             </div>
             <label className="text-xs text-zinc-400 mb-2">
-              Selected Path: <span className="text-green-400 font-semibold">{temporarySelectedPath === "" ? "/media" : `/media/${temporarySelectedPath}`}</span>
+              Selected Path: <span className="text-green-400 font-semibold">{`/${configuration["MediaFolder"]}/${temporarySelectedPath}`}</span>
             </label>
             <div className="flex justify-end gap-2 border-t border-zinc-800 pt-3">
               <button
