@@ -38,7 +38,8 @@ export const OptionsNames : Record<string, string> =
     "TVShowsFolder" : "TV Shows Folder",
     "MediaFolder" : "Media Folder",
     "DBConnectionString" : "Database Connection String",
-    "sticky_streams_scroller" : "Show streams scroller"
+    "sticky_streams_scroller" : "Show streams scroller",
+    "show_embedded" : "Show embedded subtitles in the subs modal"
 };
 
 export const isVideoExtension = (fileName: string) => {

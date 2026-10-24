@@ -5,6 +5,7 @@ import os
 import subprocess
 from time import time
 from click import File
+import pycountry
 import requests
 from threading import Lock
 from flask import Flask, Response, request, jsonify, send_file
@@ -21,6 +22,7 @@ from dotenv import load_dotenv, set_key
 from download_parallel import enqueue_download as enqueue_parallel_download
 from download_serial import SerialDownloadDispatcher
 import backend.SavedMedia.SavedMediaUtils as smut
+import backend.Languages.LanguagesUtils as lut
 import backend.Abstract.Responses as resp
 
 load_dotenv()
@@ -1314,6 +1316,55 @@ def get_items():
         return jsonify({"error": str(e)}), 500
 
 
+
+@app.route('/getEmbeddedSubtitles', methods=['POST'])
+def get_embedded_subtitles():
+    """
+    POST Endpoint: Retrieve subtitle files embedded in a video file.
+    """
+    try:
+        file = request.get_json().get('file', "")
+        if not file or file.strip() == "":
+            return jsonify({"error": "File parameter is required"}), 400
+        file_path = os.path.join(get_media_root(), file)
+        print(f"Fetching subtitles for file: {file_path}")
+        if not os.path.exists(file_path):
+            return jsonify({"error": "File not found"}), 404
+        if not os.path.isfile(file_path):
+            return jsonify({"error": "Specified path is not a file"}), 400
+
+
+        # Probe the video file to extract its stream architecture
+        probe = ffmpeg.probe(file_path)
+        
+        # Filter the streams to look specifically for a subtitle track
+        subtitle_streams = [stream for stream in probe['streams'] if stream['codec_type'] == 'subtitle']
+
+        subtitles = []
+        for stream in subtitle_streams:
+            tags = stream.get('tags', {})
+            lang_code = tags.get('language', 'unknown')
+
+            # Translate the code using pycountry
+            full_language_name = 'unknown'
+            if lang_code != 'unknown':
+                try:
+                    # .lookup() works for both 2-letter and 3-letter codes (e.g., 'en', 'eng')
+                    full_language_name = pycountry.languages.lookup(lang_code).name
+                except LookupError:
+                    # If pycountry doesn't recognize the code, fallback to the raw code
+                    full_language_name = lang_code
+            title = tags.get('title', 'unknown')
+            subtitles.append(
+                title if title != 'unknown' else full_language_name + "-"+ str(stream.get('codec_name'))
+            )
+    
+        return jsonify({"subtitles": subtitles}), 200
+    except ffmpeg.Error as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/getFolderSize', methods=['GET'])
 def get_folder_size_endpoint():
         """Calculates total size of a specific directory in bytes."""
@@ -1906,6 +1957,42 @@ def add_saved_media():
 @app.route('/clearSavedMedia', methods=['DELETE'])
 def clear_saved_media():
     return performAction(smut.delete_all_saved_media_util)
+
+@app.route('/getLanguages', methods=['GET'])
+def get_all_languages():
+    return performAction(lut.get_all_languages_util)
+
+@app.route('/getLanguage', methods=['GET'])
+def get_language():
+    language_id = request.args.get("id")
+    if not language_id:
+        return jsonify(resp.error_response("id is required")), 400
+    return performAction(lut.get_language_util, language_id=int(language_id))
+
+@app.route('/addLanguage', methods=['POST'])
+def add_language():
+    language = request.get_json()
+    if not language:
+        return jsonify(resp.error_response("Language data is required")), 400
+    return performAction(lut.add_language_util, language_json=language)
+
+@app.route('/updateLanguage', methods=['PUT'])
+def update_language():
+    language = request.get_json()
+    if not language:
+        return jsonify(resp.error_response("Language data is required")), 400
+    return performAction(lut.update_language_util, language_json=language)
+
+@app.route('/deleteLanguage', methods=['DELETE'])
+def delete_language():
+    language_id = request.form.get("id")
+    if not language_id:
+        return jsonify(resp.error_response("id is required")), 400
+    return performAction(lut.delete_language_util, language_id=int(language_id))
+
+@app.route('/clearLanguages', methods=['DELETE'])
+def clear_languages():
+    return performAction(lut.delete_all_languages_util)
 
 def performAction(action, *args, **kwargs):
     db_connection_string = getConfigurationInternal().get("DBConnectionString", "")

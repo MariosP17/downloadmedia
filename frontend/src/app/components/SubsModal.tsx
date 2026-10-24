@@ -34,12 +34,19 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 	const [existingSubs, setExistingSubs] = useState<ExistingSubtitle[]>([]);
 	const [results, setResults] = useState<SubtitleResult[]>([]);
 	const [language, setLanguage] = useState("en");
+	const [languages, setLanguages] = useState<{ name: string; code: string,id: number }[]>([]);
 	const [loadingExisting, setLoadingExisting] = useState(true);
+	const [loadingEmbedded, setLoadingEmbedded] = useState(true);
+	const [loadingSubtitlesError, setLoadingSubtitlesError] = useState<boolean>(false);
+	const [loadingEmbeddedError, setLoadingEmbeddedError] = useState<boolean>(false);
 	const [searching, setSearching] = useState(false);
 	const [deleting, setDeleting] = useState<string | null>(null);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [subtitleToDelete, setSubtitleToDelete] = useState<string | null>(null);
 	const [subtitleInfo, setSubtitleInfo] = useState<any>({});
+	const [embeddedSubs, setEmbeddedSubs] = useState<string[]>([]);
+
+
 
 	useEffect(() => {
 		const bodyOverflow = document.body.style.overflow;
@@ -62,22 +69,82 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 		setLoadingExisting(true);
 		try {
 			const response = await fetch(
-				apiUrl(`/getItems?folder=${encodeURIComponent(isEpisode ? pathname.split("/").slice(0, -1).join("/") : pathname)}&onlySubs=true`)
+				apiUrl(`/getItems?folder=${encodeURIComponent(isEpisode ? pathname.split("/").slice(0, -1).join("/") : pathname.split("/").length == 3 ? pathname.split("/").slice(0, -1).join("/") : pathname)}&onlySubs=true`)
 			);
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Could not load subtitles");
+			setLoadingSubtitlesError(false);
 			setExistingSubs(
 				(data.items || []).filter((item: ExistingSubtitle) => /\.(srt|sub|vtt|ass)$/i.test(item.name)).filter((item: ExistingSubtitle) => isEpisode ? item.name.includes(pathname.split(".")[0]?.split("/").pop() || "") : true)
 			);
 		} catch (error) {
+			setLoadingSubtitlesError(true);
 			toast.error(error instanceof Error ? error.message : "Could not load subtitles");
 		} finally {
 			setLoadingExisting(false);
 		}
 	};
 
+	const getMovieFilePathFromFolder = async (folderPath: string): Promise<string> => {
+		try {
+			const response = await fetch(apiUrl(`/getItems?folder=${encodeURIComponent(folderPath)}`));
+			const data = await response.json();
+			if (!response.ok) throw new Error(data.error || "Could not fetch items from folder");
+			const movieFile = (data.items || []).find((item: ExistingSubtitle) => /\.(mp4|mkv|avi|mov|wmv)$/i.test(item.name));
+			if (!movieFile) throw new Error("No movie file found in the folder");
+			return `${folderPath}/${movieFile.name}`;
+		} catch (error) {
+			toast.error(error instanceof Error ? error.message : "Could not fetch movie file from folder");
+			throw error;
+		}
+	};
+
+	const getEmbeddedSubs = async () => {
+		setLoadingEmbedded(true);
+		try {
+			let finalpathname = pathname;
+			if (pathname.split("/").length === 2) {
+				try {
+				finalpathname = await getMovieFilePathFromFolder(pathname);
+				} catch (error) {
+					setLoadingEmbeddedError(true);
+					return [];
+				}
+			}
+			const response = await fetch(apiUrl(`/getEmbeddedSubtitles`),{
+				body: JSON.stringify({ file: finalpathname }),
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+			});
+			const data = await response.json();
+			if (!response.ok) throw new Error(data.error || "Could not fetch embedded subtitles");
+			setLoadingEmbeddedError(false);
+			setEmbeddedSubs(data.subtitles || []);
+		} catch (error) {
+			setLoadingEmbeddedError(true);
+			toast.error(error instanceof Error ? error.message : "Could not fetch embedded subtitles");
+			return [];
+		} finally {
+			setLoadingEmbedded(false);
+		}
+	};
+
+	const fetchLanguages = async () => {
+		try {
+			const res = await fetch(`http://${window.location.hostname}:7000/getLanguages`);
+			const data = await res.json();
+			if (data.success === false) throw new Error(data.message || "Failed to fetch languages");
+			setLanguages(data.data || []);
+		} catch (error) {
+			console.error("Error fetching languages:", error);
+			toast.error("Failed to fetch languages");
+		}
+	};
+
 	useEffect(() => {
 		void loadExistingSubs(); // eslint-disable-line react-hooks/set-state-in-effect
+		void fetchLanguages(); // eslint-disable-line react-hooks/set-state-in-effect
+		void getEmbeddedSubs(); // eslint-disable-line react-hooks/set-state-in-effect
 	}, [pathname]);
 
 	async function fetchSubtitleInfo() {
@@ -186,12 +253,37 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 				</div>
 
 				<div className="overflow-y-auto overscroll-contain p-1 search-scrollbar">
+					{options["show_embedded"] && (
 					<section>
-						<h3 className="mb-3 text-sm font-semibold text-zinc-300">Existing subtitles</h3>
+						<h3 className="mb-2 mt-2 text-sm font-semibold text-zinc-300">Embedded subtitles</h3>
+						{loadingEmbedded ? (
+							<p className="text-sm text-zinc-500">Loading embedded subtitles...</p>
+						) : loadingEmbeddedError ? (
+							<p className="text-sm text-red-500">Error loading embedded subtitles.</p>
+						) : embeddedSubs.length === 0 ? (
+							<p className="text-sm text-zinc-500">No embedded subtitles found.</p>
+						) : (
+							<div className="space-y-2">
+								{embeddedSubs.map((subtitle) => (
+									<div key={subtitle} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
+										<div className="min-w-0">
+											<p className="break-all text-sm text-zinc-200">{subtitle}</p>
+										</div>
+									</div>
+								))}
+							</div>
+						)}
+					</section>
+					)}
+
+					<section>
+						<h3 className="mb-2 mt-2 text-sm font-semibold text-zinc-300">Existing subtitles</h3>
 						{loadingExisting ? (
 							<p className="text-sm text-zinc-500">Loading subtitles...</p>
 						) : existingSubs.length === 0 ? (
 							<p className="text-sm text-zinc-500">No subtitle files found.</p>
+						) : loadingSubtitlesError ? (
+							<p className="text-sm text-red-500">Error loading existing subtitles.</p>
 						) : (
 							<div className="space-y-2">
 								{existingSubs.map((subtitle) => (
@@ -215,15 +307,11 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 							<div className="flex gap-2">
 								<div className="relative inline-flex w-fit self-start">
 								<select value={language} onChange={(event) => setLanguage(event.target.value)} className="appearance-none bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 text-xs font-medium rounded-md pl-3 pr-8 py-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]">
-									{(
-										typeof options["subtitle_languages"] === "string"
-											? JSON.parse(options["subtitle_languages"])
-											: options["subtitle_languages"] || []
-										).map((item: Record<string, string>) => {
-										const [code, label] = Object.entries(item)[0];
+									{
+										languages.map((language) => {
 										return (
-											<option key={code} value={code} className="bg-zinc-900 text-zinc-200 py-1">
-											{label}
+											<option key={language.code} value={language.code} className="bg-zinc-900 text-zinc-200 py-1">
+											{language.name}
 											</option>
 										);
 										})}

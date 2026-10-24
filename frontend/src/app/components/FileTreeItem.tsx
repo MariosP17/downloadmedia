@@ -41,7 +41,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   // Calculate this item's full path parameter for the backend API query
   const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
   const isMovieOrSeriesFolder = isFolder && (itemPath.split("/").length === 2 || itemPath.split("/").length === 3);
-  const isMovie = (isFolder &&  (itemPath.split("/").length === 2 && itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase()));
+  const isMovie = (itemPath.split("/").length === 2 && itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase()) || (itemPath.split("/").length === 3 && itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase() && itemPath.endsWith(".mp4") || itemPath.endsWith(".mkv") || itemPath.endsWith(".avi") || itemPath.endsWith(".mov") || itemPath.endsWith(".wmv") || itemPath.endsWith(".flv") || itemPath.endsWith(".webm"));
   const isEpisode = !isFolder && itemPath.split("/").length === 4 && itemPath.split("/")[0].toLowerCase() === config["TVShowsFolder"].toLowerCase() && isVideoExtension(cleanName);
   const type = isEpisode ? "series" : isMovieOrSeriesFolder ? itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase() ? "movie" : "series" : "";
   const isSubtitleFile = !isFolder && (cleanName.endsWith(".srt") || cleanName.endsWith(".vtt") || cleanName.endsWith(".sub") || cleanName.endsWith(".ass") || cleanName.endsWith(".idx"));

@@ -1,8 +1,10 @@
 "use client";
+import { LanguagesEditor } from "../components/LanguagesEditor";
+
 type OptionType = {
   typeKey: string;
   value: any;
-  type: "<boolean>" | "<string>" | "<number>" | "<dropdown>";
+  type: "<boolean>" | "<string>" | "<number>" | "<dropdown>" | "<languages>";
   min?: number;
   max?: number;
   maxWidth?: string;
@@ -13,6 +15,7 @@ type OptionType = {
 import { OptionsNames } from "../../../Props";
 
 export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth, onChange, options}: OptionType) {
+
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
       onChange(newValue);
@@ -103,6 +106,16 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
             value={value}
             onChange={(event) => onChange && onChange(event.target.value)}
             className={`border border-zinc-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]`}
+          />
+        </div>
+      );
+    case "<languages>":
+      return (
+        <div className="mb-4 flex justify-between">
+          <p>{OptionsNames[typeKey]}</p>
+          <LanguagesEditor
+            languages={value}
+            // afterAdd={fetch}
           />
         </div>
       );
