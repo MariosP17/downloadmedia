@@ -78,3 +78,13 @@ def delete_saved_media(conn, ttid):
         raise e
     finally:
         close_connection(conn)
+
+def delete_all_saved_media(conn):
+    try:
+        result = execute_query(conn, "DELETE FROM saved_media")
+        return "Successfully deleted all saved media"
+    except Exception as e:
+        print(f"Failed to delete all saved media: {e}")
+        raise e
+    finally:
+        close_connection(conn)

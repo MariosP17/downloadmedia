@@ -1,7 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { AnimatePresence, motion, PanInfo, useMotionValue, useTransform } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
 import Loader from "../loader";
 import toast from "react-hot-toast";
 import FallbackImage from "./fallbackimg";
@@ -12,9 +12,119 @@ interface SavedMediaItem {
     name: string;
     type: number;
     poster_url: string;
-    year: number;
+    year: string;
     series_name?: string;
     episode_info?: string;
+}
+
+const SWIPE_DELETE_THRESHOLD = -140;
+
+function SavedMediaCard({
+  media,
+  onNavigate,
+  onDelete,
+}: {
+  media: SavedMediaItem;
+  onNavigate: (media: SavedMediaItem) => void;
+  onDelete: (media: SavedMediaItem) => Promise<boolean>;
+}) {
+  const x = useMotionValue(0);
+  const deleteOpacity = useTransform(x, [-100, -20, 0], [1, 1, 0]);
+  const [deleting, setDeleting] = useState(false);
+  const dragged = useRef(false);
+  const resetDragged = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleDragEnd = async (
+    _event: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo,
+  ) => {
+    if (resetDragged.current) clearTimeout(resetDragged.current);
+    resetDragged.current = setTimeout(() => {
+      dragged.current = false;
+    }, 200);
+
+    if (info.offset.x < SWIPE_DELETE_THRESHOLD) {
+      setDeleting(true);
+      const deleted = await onDelete(media);
+      if (!deleted) {
+        setDeleting(false);
+      }
+    }
+  };
+
+  return (
+    <motion.div
+      layout
+      className="relative mb-2 overflow-hidden rounded bg-red-700"
+    >
+
+      <motion.div
+        className="pointer-events-none absolute inset-0 flex items-center justify-end pr-5 text-white"
+        style={{ opacity: deleteOpacity }}
+        aria-hidden
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
+          <img src="/delete.png" alt="" className="h-6 w-6 brightness-0 invert" />
+          Remove
+        </span>
+      </motion.div>
+      <motion.div
+        drag={deleting ? false : "x"}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={{ left: 0.9, right: 0.05 }}
+        animate={deleting ? { x: "-100%" } : { x: 0 }}
+        style={{ x }}
+        transition={{ type: "spring", stiffness: 500, damping: 35 }}
+        className="relative rounded bg-zinc-800 p-2"
+        onDragStart={() => {
+          dragged.current = true;
+        }}
+        onDragEnd={handleDragEnd}
+        onTap={(event) => {
+          if (event.target instanceof HTMLElement && event.target.closest("button")) {
+            return;
+          }
+          if (dragged.current) {
+            if (resetDragged.current) clearTimeout(resetDragged.current);
+            dragged.current = false;
+            return;
+          }
+          onNavigate(media);
+        }}
+        >
+        <p className="mb-1 text-zinc-200">
+          {media.series_name || media.name}{" "}
+          <span className="text-sm text-zinc-400">({media.year})</span>
+        </p>
+        {media.episode_info && (
+          <p className="mb-2 text-sm text-zinc-400">
+            {media.episode_info}{" "}
+            <span className="text-sm text-white">{media.name}</span>
+          </p>
+        )}
+        <div className="flex flex-col items-center">
+          <FallbackImage className="max-h-62 w-auto" src={media.poster_url} alt={media.name} />
+        </div>
+        <div className="mt-2 flex justify-end">
+          <button
+            type="button"
+            aria-label={`Delete ${media.name}`}
+            className="rounded p-1 hover:cursor-pointer hover:bg-zinc-700 hover:opacity-80"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              setDeleting(true);
+              void onDelete(media).then((deleted) => {
+                if (!deleted) setDeleting(false);
+              });
+            }}
+          >
+            <img src="/delete.png" alt="" className="h-5 w-5" />
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
 }
 
 export default function SavedBar({
@@ -28,6 +138,7 @@ export default function SavedBar({
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [savedMedia, setSavedMedia] = useState<SavedMediaItem[]>([]);
+  const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
 
@@ -81,7 +192,7 @@ export default function SavedBar({
     }
   };
 
-  const deleteSavedMedia = async (media: SavedMediaItem) => {
+  const deleteSavedMedia = async (media: SavedMediaItem): Promise<boolean> => {
     try {
       setLoading(true);
       const response = await fetch(apiUrl(`/deleteSavedMedia`), {
@@ -94,14 +205,39 @@ export default function SavedBar({
         throw new Error(data.message || "Failed to delete saved media");
       }
       setSavedMedia((prev) => prev.filter((item) => item.ttid !== media.ttid));
+      window.dispatchEvent(new CustomEvent("saved-media-deleted", { detail: { ttid: media.ttid } }));
       toast.success("Saved media deleted successfully");
+      return true;
     } catch (error) {
       console.error("Failed to delete saved media:", error);
+      return false;
     } finally {
       setLoading(false);
     }
   };
   
+
+
+  const deleteAllSavedMedia = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(apiUrl("/clearSavedMedia"), {
+        method: "DELETE"
+      });
+      const data = await response.json();
+      if (!data.success) {
+        toast.error(data.message || "Failed to delete all saved media");
+        throw new Error(data.message || "Failed to delete all saved media");
+      }
+      setSavedMedia([]);
+      window.dispatchEvent(new CustomEvent("saved-media-deleted-all"));
+      toast.success("All saved media deleted successfully");
+    } catch (error) {
+      console.error("Failed to delete all saved media:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <>
@@ -130,38 +266,68 @@ export default function SavedBar({
             ✕
           </button>
         </div>
-
+        {savedMedia.length > 0 && (
+        <div className="mb-4 flex items-center justify-end">
+          <button id='delete-all' className='cursor-pointer rounded bg-red-700 px-3 py-1 text-sm font-semibold text-white hover:bg-red-800' onClick={async () => {
+            setConfirmDeleteAll(true);
+          }}>
+            Delete All
+          </button>
+        </div>
+        )}
     <nav className="mt-6">
     {savedMedia.length === 0 && !loading && (
         <p className="text-zinc-400 text-sm">No saved media.</p>
     )}
-    {savedMedia.length > 0 && savedMedia.map((media, _) => (
-    <div key={media.ttid} className="mb-2 p-2 bg-zinc-800 rounded ">
-        <div onClick={async() => {await navigateToMedia(media)}} key={media.ttid} className="cursor-pointer hover:bg-zinc-700/60 transition-colors duration-200">
-            <p className="text-zinc-200 mb-1">{media.series_name || media.name} <span className="text-zinc-400 text-sm">({media.year})</span></p>
-            {media.episode_info && (
-                <p className="text-zinc-400 text-sm mb-2">{media.episode_info} <span className="text-white text-sm">{media.name}</span></p>
-            )}
-            <div className=" flex flex-col items-center">
-                <FallbackImage className="mb-2 w-32 h-auto" src={media.poster_url} alt={media.name} />
-            </div>
-        </div>
-        <div className="flex justify-end mt-2">
-            <img
-            src="/delete.png"
-            alt="Delete"
-            className="w-5 h-5 cursor-pointer hover:opacity-70"
-            onClick={async (e) => {
-                e.stopPropagation();
-                await deleteSavedMedia(media);
-             }}
-            />
-        </div>
-    </div>
-  ))}
+    {savedMedia.length > 0 && (
+      <AnimatePresence initial={false}>
+        {savedMedia.map((media) => (
+          <SavedMediaCard
+            key={media.ttid}
+            media={media}
+            onNavigate={(item) => void navigateToMedia(item)}
+            onDelete={deleteSavedMedia}
+          />
+        ))}
+      </AnimatePresence>
+    )}
 </nav>
 {loading && <Loader />}
       </aside>
+    {confirmDeleteAll && (
+      <div onClick={() => {setConfirmDeleteAll(false);}} className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <label className="block text-sm font-bold text-zinc-400 tracking-wider">Confirm Deletion</label>
+              <button 
+                onClick={() => {setConfirmDeleteAll(false);}} 
+                className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="mb-2">
+              <span className="block text-sm font-boldtext-zinc-400 tracking-wider mb-1">Are you sure you want to delete all saved media?</span>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={(e) => {deleteAllSavedMedia(); setConfirmDeleteAll(false);}}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
+              >
+                Yes
+              </button>
+              <button
+                onClick={() => {setConfirmDeleteAll(false);}}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 cursor-pointer"
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+    )}
     </>
   );
 }

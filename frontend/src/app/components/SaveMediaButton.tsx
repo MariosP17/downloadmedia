@@ -7,7 +7,7 @@ import Loader from "../loader";
 type SaveMediaButtonProps = {
   ttid: string,
   name: string,
-  year: number,
+  year: string,
   type: MediaType,
   poster_url: string,
   series_name?: string,
@@ -29,6 +29,7 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
             });
             const result = await res.json();
             if (!result.success) throw new Error(result.message || "");
+            window.dispatchEvent(new CustomEvent("saved-media-added", { detail: { ttid: ttid } }));
             toast.success("Media saved successfully!");
         } catch (e) {
             toast.error("Failed to save media. " + (e instanceof Error ? e.message : ""));
@@ -38,12 +39,12 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
     };
 
     return (
-        <div>
+        <div className="w-6 h-6 mr-2 mt-1.5">
             <img
                 onClick={handleSave}
                 src="/savemedia.svg"
                 alt={name}
-                className="mr-3 w-6 h-6 rounded hover:cursor-pointer hover:opacity-80"
+                className="rounded hover:cursor-pointer hover:opacity-80"
               />
         {loading && <Loader />}
         </div>

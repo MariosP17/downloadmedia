@@ -1903,6 +1903,10 @@ def add_saved_media():
         return jsonify(resp.error_response("Fields (ttid, type, name, year) are required")), 400
     return performAction(smut.add_saved_media_util, SavedMediaJSON=saved_media)
 
+@app.route('/clearSavedMedia', methods=['DELETE'])
+def clear_saved_media():
+    return performAction(smut.delete_all_saved_media_util)
+
 def performAction(action, *args, **kwargs):
     db_connection_string = getConfigurationInternal().get("DBConnectionString", "")
     if not db_connection_string:

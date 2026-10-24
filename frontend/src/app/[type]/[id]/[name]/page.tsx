@@ -147,7 +147,10 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
     }
   }
   return (
-    <div className="rounded-lg border border-white/10 bg-zinc-900 p-4 shadow-md flex justify-between">
+    <div className="rounded-lg border border-white/10 bg-zinc-900 p-4 shadow-md flex">
+      <div>
+      <SaveMediaButton ttid={decodedId} name={episodeName || name} year={episodeData == null ?releaseYear : new Date(episodeData.released || episodeData.airDate).getFullYear()} type={type === "movie" ? MediaType.movie : MediaType.series} poster_url={posterUrl} series_name={episodeData == null ? undefined : name} episode_info={seasonAndEpisode || undefined} />
+    </div>
     <div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <div>
@@ -161,7 +164,6 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
         {description && <p className="mt-2 text-sm text-zinc-300">{description}</p>}
       </div>
       </div>
-      <SaveMediaButton ttid={decodedId} name={episodeName || name} year={episodeData == null ?releaseYear : new Date(episodeData.released || episodeData.airDate).getFullYear()} type={type === "movie" ? MediaType.movie : MediaType.series} poster_url={posterUrl} series_name={episodeData == null ? undefined : name} episode_info={seasonAndEpisode || undefined} />
     </div>
   );
 }
@@ -308,6 +310,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
               );
             })}
           </div>
+          {options["sticky_streams_scroller"] && streamsWithProgress.length > 1 && (
           <div className="fixed top-29 right-6 z-51">
             <StreamScroller 
               streamsnames={Array.from(new Set(streamsWithProgress.map(s => s.name)))} 
@@ -319,6 +322,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
               config={configuration}
             />
           </div>
+          )} 
         </div>
         )}
         <ScrollToTopButton />

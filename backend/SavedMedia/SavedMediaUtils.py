@@ -64,3 +64,14 @@ def delete_saved_media_util(db_connection_string: str, ttid: str) -> bool:
         raise e
     finally:
         close_connection(conn)
+
+def delete_all_saved_media_util(db_connection_string: str) -> bool:
+    conn = get_connection(db_connection_string)
+    try:
+        result = smdb.delete_all_saved_media(conn)
+        return result
+    except Exception as e:
+        print(f"Failed to delete all saved media: {e}")
+        raise e
+    finally:
+        close_connection(conn)

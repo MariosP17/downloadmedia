@@ -37,7 +37,8 @@ export const OptionsNames : Record<string, string> =
     "MoviesFolder" : "Movies Folder",
     "TVShowsFolder" : "TV Shows Folder",
     "MediaFolder" : "Media Folder",
-    "DBConnectionString" : "Database Connection String"
+    "DBConnectionString" : "Database Connection String",
+    "sticky_streams_scroller" : "Show streams scroller"
 };
 
 export const isVideoExtension = (fileName: string) => {

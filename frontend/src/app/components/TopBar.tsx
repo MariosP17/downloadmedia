@@ -1,14 +1,69 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import SearchDropdown from "./SearchDropdown";
 
-export default function TopBar({ onToggleSidebar,onToggleSaved }: { onToggleSidebar?: () => void, onToggleSaved?: () => void }) {
+type SavedMedia = {
+  ttid: string;
+};
+
+export default function TopBar({
+  onToggleSidebar,
+  onToggleSaved,
+}: {
+  onToggleSidebar?: () => void;
+  onToggleSaved?: () => void;
+}) {
   const [query, setQuery] = useState("");
   const [showDropdown, setShowDropdown] = useState(false);
+  const [savedMedia, setSavedMedia] = useState<SavedMedia[]>([]);
   const router = useRouter();
+
+  useEffect(() => {
+    const fetchSavedMedia = async () => {
+      try {
+        const res = await fetch(`http://${window.location.hostname}:7000/getAllSavedMedia`);
+        const data = await res.json();
+        if (data.success === false) throw new Error(data.message || "Failed to fetch saved media");
+        setSavedMedia(data.data || []);
+      } catch (error) {
+        console.error("Error fetching saved media:", error);
+      }
+    };
+
+    const handleSavedMediaDeleted = (event: Event) => {
+      const { ttid } = (event as CustomEvent<{ ttid?: string }>).detail ?? {};
+      if (!ttid) return;
+      setSavedMedia((current) => current.filter((media) => media.ttid !== ttid));
+    };
+
+    const handleSavedMediaAdded = (event: Event) => {
+      const { ttid } = (event as CustomEvent<SavedMedia>).detail ?? {};
+      if (!ttid) return;
+      setSavedMedia((current) => (
+        current.some((media) => media.ttid === ttid)
+          ? current
+          : [...current, { ttid }]
+      ));
+    };
+
+    void fetchSavedMedia();
+    window.addEventListener("saved-media-deleted", handleSavedMediaDeleted);
+    window.addEventListener("saved-media-added", handleSavedMediaAdded);
+    window.addEventListener("saved-media-deleted-all", () => {
+      setSavedMedia([]);
+    });
+    return () => {
+      window.removeEventListener("saved-media-deleted", handleSavedMediaDeleted);
+      window.removeEventListener("saved-media-added", handleSavedMediaAdded);
+      window.removeEventListener("saved-media-deleted-all", () => {
+        setSavedMedia([]);
+      })
+    };
+  }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -71,7 +126,22 @@ export default function TopBar({ onToggleSidebar,onToggleSaved }: { onToggleSide
         onClick={() => onToggleSaved && onToggleSaved()}
         className="p-1 rounded-md hover:bg-zinc-800 hover:cursor-pointer text-zinc-200"
       >
-        <img src="/bookmarks.svg" alt="Bookmarks" className="h-7 w-7 object-contain" />
+        <span className="relative inline-flex">
+          <img src="/bookmarks.svg" alt="Bookmarks" className="h-7 w-7 object-contain" />
+          <AnimatePresence>
+            {savedMedia.length > 0 && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.3, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.3, y: -4 }}
+                transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                className="absolute -right-2 -top-2 min-w-5 rounded-full bg-purple-600 px-1 text-center text-xs leading-5 text-white"
+              >
+                <span className="font-bold">{savedMedia.length}</span>
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </span>
       </button>
 
   </div>

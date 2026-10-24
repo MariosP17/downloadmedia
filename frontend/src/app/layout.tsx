@@ -47,10 +47,16 @@ export default function RootLayout({
         <meta name="description" content="A media downloader built with Next.js and Stremio's Cinemeta API." />
       </head>
       <body className="min-h-full flex flex-col">
-        <TopBar onToggleSidebar={() => ToggleSidebar()} onToggleSaved={() => ToggleSavedBar()} />
+        <TopBar
+          onToggleSidebar={() => ToggleSidebar()}
+          onToggleSaved={() => ToggleSavedBar()}
+        />
           
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <SavedBar open={savedBarOpen} onClose={() => setSavedBar(false)} />
+        <SavedBar
+          open={savedBarOpen}
+          onClose={() => setSavedBar(false)}
+        />
         {children}
         <Toaster position="bottom-right" reverseOrder={false} />
       </body>

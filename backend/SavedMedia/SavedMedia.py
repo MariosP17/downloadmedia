@@ -7,7 +7,7 @@ class SavedMedia:
     type: int
     name: str
     poster_url: str
-    year: int
+    year: str
     series_name: str | None
     episode_info: str | None
 
