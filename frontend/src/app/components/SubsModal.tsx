@@ -265,7 +265,7 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 						) : (
 							<div className="space-y-2">
 								{embeddedSubs.map((subtitle) => (
-									<div key={subtitle} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2">
+									<div key={subtitle} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2">
 										<div className="min-w-0">
 											<p className="break-all text-sm text-zinc-200">{subtitle}</p>
 										</div>

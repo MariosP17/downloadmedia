@@ -1356,7 +1356,7 @@ def get_embedded_subtitles():
                     full_language_name = lang_code
             title = tags.get('title', 'unknown')
             subtitles.append(
-                title if title != 'unknown' else full_language_name + "-"+ str(stream.get('codec_name'))
+                title if title != 'unknown' else full_language_name + "."+ str(stream.get('codec_name'))
             )
     
         return jsonify({"subtitles": subtitles}), 200
