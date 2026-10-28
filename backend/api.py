@@ -793,10 +793,14 @@ def download_file_to_client():
     except Exception as e:
         return jsonify({"error": f"Failed to stream file payload: {str(e)}", "status": "Failed"}), 500
 
-def cleanup_archive_jobs():
+def cleanup_archive_jobs(force=False):
+    print(f"Running cleanup for archive jobs (force={force})")
     now = time()
     with archive_jobs_lock:
         expired = [
+            job_id for job_id, job in archive_jobs.items()
+            if job.get("status") in {"ready", "cancelled", "failed"}
+        ] if force else [
             job_id for job_id, job in archive_jobs.items()
             if job.get("status") in {"ready", "cancelled", "failed"}
             and now - job.get("updated_at", now) > ARCHIVE_JOB_TTL_SECONDS
@@ -1023,7 +1027,7 @@ def list_archive_jobs():
 
 @app.route('/cleanupArchiveJobs', methods=['POST'])
 def cleanup_archive_jobs_endpoint():
-    cleanup_archive_jobs()
+    cleanup_archive_jobs(True)  # Force cleanup of all completed, cancelled, or failed jobs
     return jsonify({"status": "Cleanup completed"}), 200
 
 @app.route('/cancel', methods=['POST'])
