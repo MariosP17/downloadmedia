@@ -100,13 +100,15 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
         return (
         <div >
         {isEditing && (
-            <div className="flex items-center justify-between bg-zinc-800 rounded px-2 py-1">
-            <div className="flex items-center bg-zinc-800 rounded px-2 py-1">
+            <div className="flex items-center justify-between bg-zinc-800 rounded px-2 py-1 overflow-x-auto">
+            <div className="flex shrink-0 items-center bg-zinc-800 rounded px-2 py-1">
                 <input
                     type="text"
                     placeholder="Language Name"
                     value={Language.name}
-                    className="bg-zinc-900 w-auto border border-zinc-700 rounded px-2 py-1 text-zinc-200 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]"
+                    maxLength={20}
+                    size={Language.name.length || "Language Name".length}
+                    className="bg-zinc-900 field-sizing-content min-w-0 shrink-0 border border-zinc-700 rounded px-3 py-1 text-zinc-200 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]"
                     onChange={(e) => {
                         setLanguage({ ...Language, name: e.target.value });
                     }}
@@ -115,18 +117,23 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
                     type="text"
                     placeholder="Language Code"
                     value={Language.code}
-                    className="bg-zinc-900 w-auto border border-zinc-700 rounded px-2 py-1 text-zinc-200 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]"
+                    maxLength={4}
+                    size={Language.code.length || "Language Code".length}
+                    className="bg-zinc-900 field-sizing-content min-w-0 shrink-0 border border-zinc-700 rounded px-3 py-1 text-zinc-200 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]"
                     onChange={(e) => {
                         setLanguage({ ...Language, code: e.target.value });
                     }}
                 />
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() =>handleChangeMode(add)} className="cursor-pointer text-red-500 hover:text-red-400">
-                        ✕
-                    </button>
-                    <button
-                        disabled={Language.name.trim() === "" || Language.code.trim() === "" || Language.name.trim().length >20 || Language.code.trim().length >4}
+                <div className="flex shrink-0 items-center gap-2">
+                <button
+                    onClick={() => handleChangeMode(add)}
+                    className="shrink-0 cursor-pointer text-red-500 hover:text-red-400"
+                >
+                    ✕
+                </button>
+                <button
+                     disabled={Language.name.trim() === "" || Language.code.trim() === "" || Language.name.trim().length >20 || Language.code.trim().length >4}
                         onClick={() => {
                             if (!add){
                                 handleSaveEditLanguage(Language);
@@ -135,11 +142,11 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
                                 handleSaveAddLanguage(Language);
                             }
                         }}
-                        className="disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-green-500 hover:opacity-80"
-                    >
-                        <img src="/save.svg" alt="Save" className="w-5 h-5" />
-                    </button>
-                </div>
+                    className="flex h-6 w-6 shrink-0 items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-green-500 hover:opacity-80"
+                >
+                    <img src="/save.svg" alt="Save" className="h-5 w-5" />
+                </button>
+            </div>
                 </div>
                 )
         }
@@ -254,7 +261,7 @@ const [isAdding, setIsAdding] = useState(false);
     </div>
     {openEditor && (
         <div onClick={closeEditor} className="fixed inset-0 bg-black/80 flex items-center justify-center z-60">
-            <div onClick={(e) =>{ e.preventDefault(); e.stopPropagation();}} className="bg-zinc-900  p-4 rounded-md w-126 max-h-[80vh] overflow-y-auto">
+            <div onClick={(e) =>{ e.preventDefault(); e.stopPropagation();}} className="bg-zinc-900 m-4 p-4 rounded-md w-126 max-h-[80vh] overflow-y-auto">
                 <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Languages Editor</h2>
                 <button onClick={closeEditor} className="cursor-pointer hover:text-red-400">

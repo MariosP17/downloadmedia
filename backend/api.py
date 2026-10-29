@@ -794,7 +794,6 @@ def download_file_to_client():
         return jsonify({"error": f"Failed to stream file payload: {str(e)}", "status": "Failed"}), 500
 
 def cleanup_archive_jobs(force=False):
-    print(f"Running cleanup for archive jobs (force={force})")
     now = time()
     with archive_jobs_lock:
         expired = [
