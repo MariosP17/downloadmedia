@@ -102,7 +102,6 @@ const normalizeSeasons = (data: any) => {
   return normalized.sort((a, b) => (a.number ?? 0) - (b.number ?? 0));
 };
 
-
 async function MediaInfo({ data, id }: { data: any; id: string }) {
   
   const OMDB_API_KEY = process.env.OMDB_API_KEY || "";
@@ -114,6 +113,11 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
     }
     return null;
   }
+
+  const headersList = await headers();
+  const host = headersList.get("host")?.split(":")[0] || "localhost";
+  const ret = await fetch(`http://${host}:7000/savedMediaExists?ttid=${encodeURIComponent(id)}`).then(res => res.json()).catch(() => false);
+  const isInSavedMedia = ret.data === true;
   if (!data) return null;
   const decodedId = decodeURIComponent(id);
   const type = data.type || data.mediaType || data.category;
@@ -149,7 +153,7 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
   return (
     <div className="rounded-lg border border-white/10 bg-zinc-900 p-4 shadow-md flex">
       <div>
-      <SaveMediaButton ttid={decodedId} name={episodeName || name} year={episodeData == null ?releaseYear : new Date(episodeData.released || episodeData.airDate).getFullYear()} type={type === "movie" ? MediaType.movie : MediaType.series} poster_url={posterUrl} series_name={episodeData == null ? undefined : name} episode_info={seasonAndEpisode || undefined} />
+      <SaveMediaButton ttid={decodedId} name={episodeName || name} year={episodeData == null ?releaseYear : new Date(episodeData.released || episodeData.airDate).getFullYear()} type={type === "movie" ? MediaType.movie : MediaType.series} poster_url={posterUrl} series_name={episodeData == null ? undefined : name} episode_info={seasonAndEpisode || undefined} initiallySaved={isInSavedMedia} />
     </div>
     <div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">

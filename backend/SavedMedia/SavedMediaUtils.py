@@ -54,6 +54,17 @@ def update_saved_media_util(db_connection_string: str, SavedMediaJSON: dict) -> 
     finally:
         close_connection(conn)
 
+def is_saved_media_util(db_connection_string: str, ttid: str) -> bool:
+    conn = get_connection(db_connection_string)
+    try:
+        result = smdb.is_saved_media(conn, ttid)
+        return result
+    except Exception as e:
+        print(f"Failed to check if saved media exists: {e}")
+        raise e
+    finally:
+        close_connection(conn)
+
 def delete_saved_media_util(db_connection_string: str, ttid: str) -> bool:
     conn = get_connection(db_connection_string)
     try:

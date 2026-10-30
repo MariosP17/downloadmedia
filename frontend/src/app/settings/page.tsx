@@ -159,7 +159,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-6 text-white sm:p-12">
+    <main className="min-h-screen bg-zinc-950 p-4 text-white sm:p-12">
       {isLoadingPage && <Loader />}
       {!isLoadingPage && !isLoading && 
         <div className="mx-auto max-w-5xl">
@@ -183,11 +183,11 @@ export default function SettingsPage() {
             <Options />
           </section>
 
-          <section className="mb-8 flex justify-between">
+          <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:justify-between">
             <h2 className="text-xl font-bold text-zinc-100">Stores</h2>
-            <div className="flex">
-              <div className="mr-5 justify-end flex flex-col">
-                <p className="mt-2 text-sm text-zinc-500 text-right">
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="flex flex-col justify-end sm:mr-5">
+                <p className="mt-2 text-sm text-zinc-500 sm:text-right">
                   Last refreshed: {refreshLibrariesLog?.lastRefreshed ? new Date(refreshLibrariesLog.lastRefreshed).toLocaleString("en-GB", {
                     timeZone: "Europe/Athens",
                     day: "2-digit",
@@ -199,7 +199,7 @@ export default function SettingsPage() {
                     hour12: true,
                   }).replace(",","").toUpperCase() : "N/A"}
                 </p>
-                <p className="mt-2 text-sm text-zinc-500 text-right">
+                <p className="mt-2 text-sm text-zinc-500 sm:text-right">
                   Initiated by: {refreshLibrariesLog?.lastRefreshedBy ? initiator[refreshLibrariesLog.lastRefreshedBy] ?? "N/A" : "N/A"}
                 </p>
               </div>
@@ -207,7 +207,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => void refreshLibraries()}
                 disabled={isRefreshingLibraries}
-                className="min-h-20 rounded-lg border border-blue-900/70 bg-blue-950/30 px-4 text-left text-sm font-medium text-blue-100 transition-colors hover:bg-blue-950/50 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
+                className="min-h-20 w-full rounded-lg border border-blue-900/70 bg-blue-950/30 px-4 text-left text-sm font-medium text-blue-100 transition-colors hover:bg-blue-950/50 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer sm:w-auto"
               >
                 {isRefreshingLibraries ? "Refreshing libraries..." : "Refresh Libraries"}
               </button>

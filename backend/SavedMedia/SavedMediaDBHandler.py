@@ -69,6 +69,16 @@ def update_saved_media(conn, saved_media: SavedMedia):
     finally:
         close_connection(conn)
 
+def is_saved_media(conn, ttid):
+    try:
+        result = fetch_query(conn, "SELECT * FROM saved_media WHERE ttid = %s", (ttid,))
+        return len(result) == 1
+    except Exception as e:
+        print(f"Failed to check if saved media exists: {e}")
+        raise e
+    finally:
+        close_connection(conn)
+
 def delete_saved_media(conn, ttid):
     try:
         result = execute_query(conn, "DELETE FROM saved_media WHERE ttid = %s", (ttid,))

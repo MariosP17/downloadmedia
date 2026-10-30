@@ -55,7 +55,7 @@ function SavedMediaCard({
   return (
     <motion.div
       layout
-      className="relative mb-2 overflow-hidden rounded bg-red-700"
+      className="relative mb-2 overflow-hidden rounded bg-red-700 cursor-pointer"
     >
 
       <motion.div

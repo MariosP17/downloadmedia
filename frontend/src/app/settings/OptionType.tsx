@@ -25,8 +25,8 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
   switch (type) {
     case "<boolean>":
     return (
-      <div className="mb-4 flex justify-between">
-        <p>{OptionsNames[typeKey]}</p>
+      <div className="mb-4 flex min-w-0 items-center justify-between gap-4">
+        <p className="min-w-0 flex-1">{OptionsNames[typeKey]}</p>
         <label className="switch">
           {/* Hidden checkbox that holds the actual state */}
           <input 
@@ -41,7 +41,7 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
     );
     case "<number>":
       return (
-        <div className="mb-4 flex justify-between">
+        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>{OptionsNames[typeKey]}</p>
           <input 
             type="number" 
@@ -55,19 +55,19 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
       );
     case "<dropdown>":
       return (
-      <div className="mb-4 flex justify-between ">
+        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <label 
           htmlFor={`${typeKey}_dropdown`} 
         >
           {OptionsNames[typeKey]}
         </label>
 
-        <div className="relative">
+        <div className="relative w-full min-w-0 sm:w-auto">
           <select 
             id={`${typeKey}_dropdown`}
             value={value}
             onChange={(event) => onChange && onChange(event.target.value)}
-            className="appearance-none bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 text-xs font-medium rounded-md pl-3 pr-8 py-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]"
+            className="block w-full sm:w-auto max-w-full appearance-none bg-zinc-900 border border-zinc-700 hover:border-zinc-600 text-zinc-200 text-xs font-medium rounded-md pl-3 pr-8 py-1.5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]"
           >
             {options && options.map((option) => (
               <option 
@@ -95,23 +95,23 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
     );
     case "<string>":
       return (
-        <div className="mb-4 flex justify-between">
+        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>{OptionsNames[typeKey]}</p>
           <input 
             type="text" 
             style={{
-              minWidth: minWidth ? `${minWidth}` : "calc(var(--spacing) * 1)", 
+              minWidth: minWidth ? `min(100%, ${minWidth})` : undefined,
               maxWidth: maxWidth ? `${maxWidth}` : "calc(var(--spacing) * 100)",
             }}
             value={value}
             onChange={(event) => onChange && onChange(event.target.value)}
-            className={`border border-zinc-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark]`}
+            className="w-full min-w-0 border border-zinc-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark] sm:w-auto"
           />
         </div>
       );
     case "<languages>":
       return (
-        <div className="mb-4 flex justify-between">
+        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>{OptionsNames[typeKey]}</p>
           <LanguagesEditor
             languages={value}

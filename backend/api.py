@@ -1948,6 +1948,13 @@ def update_saved_media():
         return jsonify(resp.error_response("SavedMedia data is required")), 400
     return performAction(smut.update_saved_media_util, SavedMediaJSON=saved_media)
 
+@app.route('/savedMediaExists', methods=['GET'])
+def saved_media_exists():
+    ttid = request.args.get("ttid")
+    if not ttid:
+        return jsonify(resp.error_response("ttid is required")), 400
+    return performAction(smut.is_saved_media_util, ttid=ttid)
+
 @app.route('/addSavedMedia', methods=['POST'])
 def add_saved_media():
     saved_media = request.get_json()
