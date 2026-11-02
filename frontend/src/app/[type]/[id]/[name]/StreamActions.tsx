@@ -298,7 +298,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     // Compute explicit absolute mounting location
-    const destinationFolder = `/media/${targetPath}`;
+    const destinationFolder = `${targetPath}`;
 
     try {
       const response = await fetch(`http://${window.location.hostname}:7000/download`, {
@@ -561,7 +561,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
                 <input
                   type="text"
                   readOnly
-                  value={`/${configuration["MediaFolder"]}/${targetPath}`}
+                  value={`${targetPath}`}
                   className="w-full bg-zinc-950/60 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-400 outline-none select-all"
                 />
               </div>
