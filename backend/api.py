@@ -39,6 +39,20 @@ CORS(app)
 # PLEX_API_KEY = os.getenv("PLEX_API_KEY")
 # OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 
+def is_path_within_configured_roots(path):
+    """Check if the given path is within the configured media roots."""
+    try:
+        absolute_path = Path(path).resolve()
+        movies_root = Path(get_configured_media_folder("MoviesFolder", "Movies")).resolve()
+        tvshows_root = Path(get_configured_media_folder("TVShowsFolder", "TV-Shows")).resolve()
+
+    except Exception as e:
+        print(f"Error occurred while checking path: {e}")
+        return False
+    print(f"Checking if path {absolute_path} is within configured roots: Movies: {movies_root}, TV Shows: {tvshows_root}")
+    print(f"Absolute path parents: {list(absolute_path.parents)}")
+    return absolute_path == movies_root or absolute_path == tvshows_root or movies_root in absolute_path.parents or tvshows_root in absolute_path.parents
+
 def refresh_all_environment_variables():
     global OPEN_SUBTITLES_API_KEY
     global OPEN_SUBTITLES_API_USERNAME
@@ -175,7 +189,9 @@ def download_subtitle():
     if not file_id or not filepath:
         return {"error": "Missing required parameters"}, 400
 
-    filepath = os.path.join(get_media_root(), filepath)
+    if not is_path_within_configured_roots(filepath):
+        return {"error": "Access to the specified file path is not allowed."}, 403
+    
     url = "https://api.opensubtitles.com/api/v1/download"
     headers = {
         "Content-Type": "application/json",
@@ -506,24 +522,26 @@ def refresh_plex_libraries():
         print(f"Exception occurred while refreshing Plex libraries: {e}")
         return False
 
-def get_media_root():
-    configuration = getConfigurationInternal()
-    media_folder = configuration.get("MediaFolder")
-    if not media_folder:
-        raise ValueError("Media folder is not configured in the settings.")
-    return os.path.join("/", str(media_folder).lstrip("/\\"))
+# def get_media_root():
+#     configuration = getConfigurationInternal()
+#     media_folder = configuration.get("MediaFolder")
+#     if not media_folder:
+#         raise ValueError("Media folder is not configured in the settings.")
+#     return os.path.join("/", str(media_folder).lstrip("/\\"))
 
 
 def get_configured_media_folder(configuration_key, default_name):
     configuration = getConfigurationInternal()
     folder_name = configuration.get(configuration_key, default_name)
-    return os.path.join(get_media_root(), str(folder_name).lstrip("/\\"))
+    return folder_name
 
 
 def download_stream_task(identifier: str, idx: str, path: str = None, name: str = "", ttid: str = "",add: bool = True):
     task_key = f"{identifier}_{idx}"
-    path = path or get_media_root()
-    
+    if path is None:
+        raise ValueError("The 'path' parameter cannot be None. Please provide a valid download path.")
+    if not is_path_within_configured_roots(path):
+        raise PermissionError(f"Access to the specified path '{path}' is not allowed. It must be within the configured media roots.")
     if add:
         with progress_lock:
             progress_store[task_key] = { "ttid": ttid, "progress": 0.0 }
@@ -676,13 +694,14 @@ def start_download():
     data = request.get_json() or {}
     identifier = data.get('identifier')
     idx = data.get('idx')
-    path = data.get('path', get_media_root())
+    path = data.get('path', None)
     name = data.get('name', "")
     ttid = data.get('ttid', "") 
 
-    if not identifier or not idx:
-        return jsonify({"error": "Both 'identifier' and 'idx' are required parameters."}), 400
-    
+    if not identifier or not idx or not path:
+        return jsonify({"error": "All of 'identifier', 'idx' and 'path' are required parameters."}), 400
+    if not is_path_within_configured_roots(path):
+        return jsonify({"error": "Access to the specified path is not allowed. It must be within the configured media roots."}), 403
     task_key = f"{identifier}_{idx}"
     
     # Check if download is already running or completed
@@ -705,21 +724,23 @@ def batch_download():
     """
     data = request.get_json() or {}
     items = data.get("items", [])
-    media_root = get_media_root()
-    path = data.get("path", media_root)
-    
+    # media_root = get_media_root()
+    path = data.get("path", None)
+    if not path:
+        return jsonify({"error": "A valid path is required."}), 400
     if not items or not isinstance(items, list):
         return jsonify({"error": "A list of items is required."}), 400
     if not path:
         return jsonify({"error": "A valid path is required."}), 400
         
-    path = os.path.join(media_root, path)
     
-    if os.path.abspath(path) == os.path.abspath(os.path.join(media_root, "stremio-server")) or os.path.abspath(path) == os.path.abspath(media_root):
+    if os.path.abspath(path) == get_configured_media_folder("StremioFolder", "stremio-server"):
         return jsonify({"error": "Cannot download to protected folder"}), 403
         
     if not os.path.exists(path):
         return jsonify({"error": "Specified path does not exist"}), 404
+    if not is_path_within_configured_roots(path):
+        return jsonify({"error": "Access to the specified path is not allowed. It must be within the configured media roots."}), 403
 
     task_ids = []
     local_task_ids = []
@@ -776,9 +797,11 @@ def download_file_to_client():
 
     if not file_path:
         return jsonify({"error": "The 'filePath' parameter is required.", "status": "Failed"}), 400
+    if not is_path_within_configured_roots(file_path):
+        return jsonify({"error": "Access to the specified file path is not allowed. It must be within the configured media roots."}), 403
 
     # Clean and resolve the absolute system path
-    absolute_path = os.path.join(get_media_root(), file_path)
+    absolute_path = file_path
     if not os.path.exists(absolute_path) or os.path.isdir(absolute_path):
         return jsonify({"error": "Target file path not found on server.", "status": "Failed"}), 404
 
@@ -813,13 +836,14 @@ def cleanup_archive_jobs(force=False):
 
 def resolve_archive_folder(folder_path):
     print(f"resolving folder path: {folder_path!r}")
-    media_root = Path(get_media_root()).resolve()
-    absolute_path = (media_root / str(folder_path).lstrip("/\\")).resolve()
-    if absolute_path != media_root and media_root not in absolute_path.parents:
-        print(f"rejected folder outside media root: {folder_path!r}")
-        return None
+    # media_root = Path(get_media_root()).resolve()
+    # absolute_path = (media_root / str(folder_path).lstrip("/\\")).resolve()
+    absolute_path = Path(folder_path).resolve()
     if not absolute_path.is_dir():
         print(f"rejected missing or non-directory path: {absolute_path}")
+        return None
+    if not is_path_within_configured_roots(str(absolute_path)):
+        print(f"rejected path outside configured roots: {absolute_path}")
         return None
     print(f"resolved folder: {absolute_path}")
     return absolute_path
@@ -1257,6 +1281,31 @@ def format_size(size_bytes):
     else:
         return f"{size_bytes} B"
     
+@app.route('/getSuperFolderInfo', methods=['POST'])
+def get_super_folder_info():
+    """
+    GET Endpoint: Retrieve information about a specific folder and its subfolders.
+    """
+    try:
+        folder_path = request.json.get('path', None)
+        if not folder_path:
+            return jsonify({"error": "Folder parameter is required"}), 400
+        
+
+        if not os.path.exists(folder_path):
+            return jsonify({"error": "Folder not found"}), 404
+
+        folders = [{ "key": os.path.join(folder_path, d), "title": d, "isLeaf": False } for d in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, d))]
+        number_of_folders = len(folders)
+        return jsonify({
+            "name": os.path.basename(folder_path),
+            "numberOfFolders": number_of_folders,
+            "path": folder_path,
+            "folders": folders
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/getItems', methods=['GET'])
 def get_items():
     """
@@ -1266,10 +1315,12 @@ def get_items():
         folder = request.args.get('folder', "")
         show_files = request.args.get('showFiles', 'true').lower() == 'true'
         only_subs = request.args.get('onlySubs', 'false').lower() == 'true'
-        folder_path = os.path.join(get_media_root(), folder)
-
+        # folder_path = os.path.join(get_media_root(), folder)
+        folder_path = folder
         if not os.path.exists(folder_path):
             return jsonify({"error": "Folder not found"}), 404
+        if not is_path_within_configured_roots(folder_path):
+            return jsonify({"error": "Access to the specified folder is not allowed. It must be within the configured media roots."}), 403
 
         folders = []
         files_matching = []
@@ -1318,7 +1369,33 @@ def get_items():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/getFolderInfo', methods=['GET'])
+def get_folder_info():
+    """
+    GET Endpoint: Retrieve information about a specific folder.
+    """
+    try:
+        folder = request.args.get('folder', "")
+        folder_path = folder
 
+        if not os.path.exists(folder_path):
+            return jsonify({"error": "Folder not found"}), 404
+        if not is_path_within_configured_roots(folder):
+            return jsonify({"error": "Access to the specified folder is not allowed. It must be within the configured media roots."}), 403
+
+        total_size = get_folder_size(folder_path)
+        number_of_items = len([f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))])
+        number_of_folders = len([d for d in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, d))])
+
+        return jsonify({
+            "name": os.path.basename(folder_path),
+            "size": format_size(total_size),
+            "numberOfItems": number_of_items,
+            "numberOfFolders": number_of_folders,
+            "path": folder_path
+        }), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/getEmbeddedSubtitles', methods=['POST'])
 def get_embedded_subtitles():
@@ -1329,7 +1406,9 @@ def get_embedded_subtitles():
         file = request.get_json().get('file', "")
         if not file or file.strip() == "":
             return jsonify({"error": "File parameter is required"}), 400
-        file_path = os.path.join(get_media_root(), file)
+        if not is_path_within_configured_roots(file):
+            return jsonify({"error": "Access to the specified file is not allowed. It must be within the configured media roots."}), 403
+        file_path =  file
         print(f"Fetching subtitles for file: {file_path}")
         if not os.path.exists(file_path):
             return jsonify({"error": "File not found"}), 404
@@ -1372,10 +1451,12 @@ def get_embedded_subtitles():
 def get_folder_size_endpoint():
         """Calculates total size of a specific directory in bytes."""
         folder = request.args.get('folder', "")
-        folder_path = os.path.join(get_media_root(), folder)
+        folder_path = folder
         total_size = 0
         if not os.path.exists(folder_path):
             return jsonify({"error": "Folder not found"}), 404
+        if not is_path_within_configured_roots(folder):
+            return jsonify({"error": "Access to the specified folder is not allowed."}), 403
         for root, dirs, files in os.walk(folder_path):
             for f in files:
                 fp = os.path.join(root, f)
@@ -1398,17 +1479,18 @@ def get_folder_size(folder_path):
 @app.route('/getUsageStats', methods=['GET'])
 def get_usage_stats():
     try:
-    # Drive-wide stats come from shutil (based on the root partition)
+        # Drive-wide stats come from shutil (based on the root partition)
         total, _, _ = shutil.disk_usage("/")
         
         # Specific folder sizes must be calculated manually
-        media_root = get_media_root()
-        used_media = get_folder_size(media_root)
-        used_stremio = get_folder_size(os.path.join(media_root, "stremio-server"))
+        movie_folder = get_configured_media_folder("MoviesFolder", "Movies")
+        tv_folder = get_configured_media_folder("TVShowsFolder", "TV-Shows")
+        used_media = get_folder_size(movie_folder) + get_folder_size(tv_folder)
+        used_stremio = get_folder_size(get_configured_media_folder("StremioFolder", "stremio-server"))
         
         return jsonify({
             "total": format_size(total),
-            "used": format_size(used_media-used_stremio),
+            "used": format_size(used_media),
             "usedStremio": format_size(used_stremio)
         }), 200
     except Exception as e:
@@ -1422,15 +1504,19 @@ def delete_folder():
     if not folder:
         return jsonify({"error": "Folder name is required"}), 400
 
+    if not is_path_within_configured_roots(folder):
+        return jsonify({"error": "Access to the specified folder is not allowed."}), 403
+
     try:
-        media_root = get_media_root()
+        # media_root = get_media_root()
         protected_folders = {
-            os.path.abspath(os.path.join(media_root, "stremio-server")),
-            os.path.abspath(media_root),
+            os.path.abspath(get_configured_media_folder("StremioFolder", "stremio-server")),
+            # os.path.abspath(media_root),
             os.path.abspath(get_configured_media_folder("MoviesFolder", "Movies")),
             os.path.abspath(get_configured_media_folder("TVShowsFolder", "TV-Shows")),
         }
-        folder_path = os.path.join(media_root, folder)
+        # folder_path = os.path.join(media_root, folder)
+        folder_path = folder
         if os.path.abspath(folder_path) in protected_folders:
             return jsonify({"error": "Cannot delete protected folder"}), 403
         if not os.path.exists(folder_path):
@@ -1461,7 +1547,11 @@ def delete_file():
     if not file_path:
         return jsonify({"error": "File path is required"}), 400
 
-    full_file_path = os.path.join(get_media_root(), file_path)
+    if not is_path_within_configured_roots(file_path):
+        return jsonify({"error": "Access to the specified file is not allowed."}), 403
+
+    # full_file_path = os.path.join(get_media_root(), file_path)
+    full_file_path = file_path
     if not os.path.exists(full_file_path):
         return jsonify({"error": "File not found"}), 404
 
@@ -1484,16 +1574,17 @@ def rename_folder():
 
     if not folder or not newName:
         return jsonify({"error": "Both 'folder' and 'newName' are required"}), 400
-    
+    if not is_path_within_configured_roots(folder):
+        return jsonify({"error": "Access to the specified folder is not allowed."}), 403
     try:
-        media_root = get_media_root()
+        # media_root = get_media_root()
         protected_folders = {
-            os.path.abspath(os.path.join(media_root, "stremio-server")),
-            os.path.abspath(media_root),
+            os.path.abspath(get_configured_media_folder("StremioFolder", "stremio-server")),
+            # os.path.abspath(media_root),
             os.path.abspath(get_configured_media_folder("MoviesFolder", "Movies")),
             os.path.abspath(get_configured_media_folder("TVShowsFolder", "TV-Shows")),
         }
-        folder_path = os.path.join(media_root, folder)
+        folder_path = folder
         if os.path.abspath(folder_path) in protected_folders:
             return jsonify({"error": "Cannot rename protected folder"}), 403
         parent_dir = os.path.dirname(folder_path)
@@ -1523,8 +1614,13 @@ def rename_file():
 
     if not filePath or not newName:
         return jsonify({"error": "Both 'filePath' and 'newName' are required"}), 400
+
+    if not is_path_within_configured_roots(filePath):
+        return jsonify({"error": "Access to the specified file is not allowed."}), 403
+
     
-    full_file_path = os.path.join(get_media_root(), filePath)
+    # full_file_path = os.path.join(get_media_root(), filePath)
+    full_file_path = filePath
     parent_dir = os.path.dirname(full_file_path)
     new_file_path = os.path.join(parent_dir, newName)
 
@@ -1553,7 +1649,11 @@ def create_folder():
     if not folder:
         return jsonify({"error": "Folder name is required"}), 400
 
-    folder_path = os.path.join(get_media_root(), folder)
+    if not is_path_within_configured_roots(folder):
+        return jsonify({"error": "Access to the specified folder is not allowed."}), 403
+
+    # folder_path = os.path.join(get_media_root(), folder)
+    folder_path = folder
     if os.path.exists(folder_path):
         return jsonify({"error": "Folder already exists"}), 400
 
@@ -1585,7 +1685,10 @@ def destination_exists():
         if not destination:
             return jsonify({"error": "Destination path is required"}), 400
 
-        destination_path = os.path.join(get_media_root(), destination)
+        if not is_path_within_configured_roots(destination):
+            return jsonify({"error": "Access to the specified destination is not allowed."}), 403
+        # destination_path = os.path.join(get_media_root(), destination)
+        destination_path = destination
         return jsonify({"exists": os.path.exists(destination_path)}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1702,7 +1805,9 @@ def get_subtitles_content():
     filename = request.args.get('filename')
     if not filename:
         return jsonify({"error": "Filename is required"}), 400
-    filename = os.path.join(get_media_root(), filename)
+    if not is_path_within_configured_roots(filename):
+        return jsonify({"error": "Access to the specified file is not allowed."}), 403
+    # filename = os.path.join(get_media_root(), filename)
     if not os.path.exists(filename):
         return jsonify({"error": "File not found"}), 404
     # Implement the logic to fetch subtitles content based on the filename
@@ -1721,8 +1826,10 @@ def save_subtitles_content():
 
     if not filename or content is None:
         return jsonify({"error": "Both 'filename' and 'content' are required"}), 400
+    if not is_path_within_configured_roots(filename):
+        return jsonify({"error": "Access to the specified file is not allowed."}), 403
 
-    filename = os.path.join(get_media_root(), filename)
+    # filename = os.path.join(get_media_root(), filename)
     if not os.path.exists(filename):
         return jsonify({"error": "File not found"}), 404
     try:

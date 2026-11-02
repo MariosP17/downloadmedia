@@ -51,7 +51,7 @@ export default function BatchDownloadPage() {
   const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
   const [targetPath, setTargetPath] = useState<string>(""); 
   const [temporarySelectedPath, setTemporarySelectedPath] = useState<string>(""); // For temporary selection before confirming
-  const [rootFolders, setRootFolders] = useState<{name: string, size: string, numberOfItems: number, numberOfFolders: number}[]>([]);
+  const [rootFolders, setRootFolders] = useState<{name: string, size: string, numberOfItems: number, numberOfFolders: number, path: string}[]>([]);
   const [newFolderName, setNewFolderName] = useState("");
   const [taskIds, setTaskIds] = useState<string[]>([]);
   const [isOn, setIsOn] = useState(false);
@@ -68,7 +68,7 @@ export default function BatchDownloadPage() {
         const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
         if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch configuration");
         const configData = await res.json();
-        if (!configData["MoviesFolder"] || !configData["TVShowsFolder"] || !configData["MediaFolder"]) throw new Error("Invalid configuration data");
+        if (!configData["MoviesFolder"] || !configData["TVShowsFolder"]) throw new Error("Invalid configuration data");
         setConfiguration(configData);
         setPattern(new RegExp(`^(${[configData["MoviesFolder"], configData["TVShowsFolder"]].map(folder => folder.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})/`));
       } catch (error) {
@@ -97,10 +97,14 @@ export default function BatchDownloadPage() {
 
   const loadRootFolders = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=&showFiles=false`);
-      if (!res.ok) throw new Error();
-      const data = await res.json();
-      setRootFolders(data.items || []);
+      const res1 = await fetch(`http://${window.location.hostname}:7000/getItems?folder=${configuration["MoviesFolder"]}&showFiles=false`);
+      if (!res1.ok) throw new Error();
+      const data1 = await res1.json();
+      const res2 = await fetch(`http://${window.location.hostname}:7000/getItems?folder=${configuration["TVShowsFolder"]}&showFiles=false`);
+      if (!res2.ok) throw new Error();
+      const data2 = await res2.json();
+      const data = [data1 , data2 ];
+      setRootFolders(data || []);
     } catch {
       toast.error("Failed to map target media folder pathways.");
     }
@@ -409,12 +413,18 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
   const openModal = async () => {
     setIsModalOpen(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=&showFiles=false`);
-      if (!res.ok) {
-        throw new Error((await res.json()).error || `Failed to get items from server`);
+      const res1 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${configuration["MoviesFolder"]}`);
+      if (!res1.ok) {
+        throw new Error((await res1.json()).error || `Failed to get items from server`);
       }
-      const data = await res.json();
-      setRootFolders(data.items || []);
+      const data1 = await res1.json();
+      const res2 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${configuration["TVShowsFolder"]}`);
+      if (!res2.ok) {
+        throw new Error((await res2.json()).error || `Failed to get items from server`);
+      }
+      const data2 = await res2.json();
+      const data = [data1, data2 ];
+      setRootFolders(data || []);
     } catch (err) {
       toast.error(`Failed to get items from server. ${err || ""}`);
     }
@@ -1017,18 +1027,19 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                 }`}
               >
                 <img src="/folder.png" alt="" className="w-4 h-4 object-contain" />
-                <span className="text-sm">{configuration["MediaFolder"]}/</span>
+                <span className="text-sm">Libraries</span>
               </div>
               
               <div className="pl-3 border-l border-zinc-800 ml-2 space-y-0.5">
-                {rootFolders.map(({ name, size, numberOfItems, numberOfFolders }) => (
+                {rootFolders.map(({ name, size, numberOfItems, numberOfFolders,path }) => (
                   <FolderTree
                     key={name}
                     name={name}
                     size={size}
                     numberOfItems={numberOfItems}
                     numberOfFolders={numberOfFolders}
-                    currentPath=""
+                    currentPath={path}
+                    isroot={true}
                     selectedPath={temporarySelectedPath}
                     onSelectPath={setTemporarySelectedPath}
                     onRefreshParent={loadRootFolders}
@@ -1059,7 +1070,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
               </button>
             </div>
             <label className="text-xs text-zinc-400 mb-2">
-              Selected Path: <span className="text-green-400 font-semibold">{`/${configuration["MediaFolder"]}/${temporarySelectedPath}`}</span>
+              Selected Path: <span className="text-green-400 font-semibold">{`${temporarySelectedPath}`}</span>
             </label>
             <div className="flex justify-end gap-2 border-t border-zinc-800 pt-3">
               <button

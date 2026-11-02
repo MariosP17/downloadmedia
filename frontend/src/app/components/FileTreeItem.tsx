@@ -14,6 +14,7 @@ type TreeItemProps = {
   numberOfItems: number; // Number of items inside the folder
   numberOfFolders: number; // Number of folders inside the folder
   currentPath: string; // Tracks the accumulated path relative to /media
+  isRoot?: boolean; // Flag to indicate if this is the root directory
   refreshStats:() => void; // Callback to refresh the size of the parent folder
   onRefreshParent?: () => void; // Callback to tell the parent directory to refresh its list
   activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>;
@@ -28,9 +29,9 @@ type ArchiveJob = {
   error?: string | null;
 };
 
-export default function FileTreeItem({ name, size, numberOfItems, numberOfFolders, currentPath, refreshStats, onRefreshParent, activeRefreshRef,opts,config }: TreeItemProps) {
-  const isFolder = name.endsWith("/");
-  const cleanName = isFolder ? name.slice(0, -1) : name;
+export default function FileTreeItem({ name, size, numberOfItems, numberOfFolders, currentPath,isRoot, refreshStats, onRefreshParent, activeRefreshRef,opts,config }: TreeItemProps) {
+  const isFolder = name.endsWith("/") || isRoot == true; // Root is treated as a folder for display purposes
+  const cleanName = isFolder ? isRoot != true ? name.slice(0, -1) : name : name;
   const cleanNameWithoutExtension = isFolder ? cleanName : cleanName.replace(/\.[^/.]+$/, "");
 
   const isVideoExtension = (fileName: string) => {
@@ -39,11 +40,15 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   return videoExtensions.includes(ext);
 };
   // Calculate this item's full path parameter for the backend API query
-  const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
-  const isMovieOrSeriesFolder = isFolder && (itemPath.split("/").length === 2 || itemPath.split("/").length === 3);
-  const isMovie = (itemPath.split("/").length === 2 && itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase()) || (itemPath.split("/").length === 3 && itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase() && itemPath.endsWith(".mp4") || itemPath.endsWith(".mkv") || itemPath.endsWith(".avi") || itemPath.endsWith(".mov") || itemPath.endsWith(".wmv") || itemPath.endsWith(".flv") || itemPath.endsWith(".webm"));
-  const isEpisode = !isFolder && itemPath.split("/").length === 4 && itemPath.split("/")[0].toLowerCase() === config["TVShowsFolder"].toLowerCase() && isVideoExtension(cleanName);
-  const type = isEpisode ? "series" : isMovieOrSeriesFolder ? itemPath.split("/")[0].toLowerCase() === config["MoviesFolder"].toLowerCase() ? "movie" : "series" : "";
+  const itemPath = isRoot ? currentPath : currentPath ? `${currentPath}/${cleanName}` : cleanName;
+  const isMovieOrSeriesFolder = isFolder && (
+  (itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) && itemPath.toLowerCase().length > config["MoviesFolder"].toLowerCase().length) || 
+  (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().length > config["TVShowsFolder"].toLowerCase().length)
+);
+  const isSeasonFolder =  itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 2;
+  const isMovie = (itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase())) && (itemPath.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 1 || (itemPath.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 2 && isVideoExtension(cleanName)));
+  const isEpisode = !isFolder && (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 3 && isVideoExtension(cleanName));
+  const type = isEpisode ? "series" : isMovieOrSeriesFolder ? itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) ? "movie" : "series" : "";
   const isSubtitleFile = !isFolder && (cleanName.endsWith(".srt") || cleanName.endsWith(".vtt") || cleanName.endsWith(".sub") || cleanName.endsWith(".ass") || cleanName.endsWith(".idx"));
 
   const [isOpen, setIsOpen] = useState(false);
@@ -480,8 +485,8 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
 
   async function getAndSetTtid(cleanName: string, path: string) {
     try {
-        let isSeasonFolder=  itemPath.split("/").length === 3;
-        const { title, year } = parseTitleAndYear(isSeasonFolder ? path.split("/")[1] : isEpisode ? path.split("/")[1] : cleanName);
+        const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
+        const { title, year } = parseTitleAndYear(isSeasonFolder ? replacedPath.split("/")[0] : isMovie ? replacedPath.split("/")[0] : isEpisode ? path.split("/")[1] : cleanName);
         if (!title) return;
         const omdbUrl = `http://${window.location.hostname}:7000/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}`;
         const OMDBResponse = await fetch(omdbUrl);
@@ -503,17 +508,19 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       }
   }
 
-  async function navigateToMedia(cleanName: string, path: string) {
+  async function navigateToMedia(cleanName: string,path: string) {
     if (!isMovieOrSeriesFolder || !type) return;
     setPageLoading(true);
-    let isSeasonFolder=  itemPath.split("/").length === 3;
-    let season = isSeasonFolder ? parseInt(path.split("/")[2].match(/\d+/)?.[0] || "-1", 10) : undefined;
+    const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
+    let season = isSeasonFolder ? parseInt(replacedPath.split("/")[1].match(/\d+/)?.[0] || "-1", 10) : undefined;
+    let cleanNameForTtid = isSeasonFolder ? replacedPath.split("/")[0] : isEpisode ? path.split("/")[1] : cleanName;
+    const {title, year} = parseTitleAndYear(cleanNameForTtid);
     let targetTtid = ttid;
     try {
       if (targetTtid == ""){
-        targetTtid = await getAndSetTtid(cleanName, path);
+        targetTtid = await getAndSetTtid(cleanNameForTtid, path);
       }
-      window.location.href = `/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(cleanName)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : "");
+      window.location.href = `/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : "");
     } finally {
       setPageLoading(false);
     }
@@ -537,7 +544,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           alt=""
           className="w-5 h-5 object-contain flex-shrink-0"
         />
-        <span onClick={async (e) => { isMovieOrSeriesFolder && (e.stopPropagation(), e.preventDefault(), await navigateToMedia(cleanName,itemPath)) }} className={`text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-none ${isMovieOrSeriesFolder ? "hover:text-blue-500 hover:underline" : ""}`}>
+        <span onClick={async (e) => { isMovieOrSeriesFolder && (e.stopPropagation(), e.preventDefault(), await navigateToMedia(cleanName, itemPath)) }} className={`text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-none ${isMovieOrSeriesFolder ? "hover:text-blue-500 hover:underline" : ""}`}>
           {cleanName}
         </span>
         {loading && <span className="text-xs text-zinc-500 animate-pulse">loading...</span>}
@@ -667,6 +674,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 numberOfFolders={numberOfFolders}
                 name={name}
                 currentPath={itemPath}
+                isRoot={false}
                 opts={options}
                 config={configuration}
                 // Recursively link the reload pipeline downwards 
@@ -810,6 +818,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       {isSubsModalOpen && (
         <SubsModal
           pathname={itemPath}
+          replacedPath={itemPath.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "")}
           ttid={ttid}
           onClose={() => setSubsModalOpen(false)}
           onChanged={() => {
@@ -823,6 +832,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           }}
           isEpisode={isEpisode}
           options={options}
+          config={configuration}
         />
       )}
       {isEditSubtitlesModalOpen && (

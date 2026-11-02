@@ -207,7 +207,7 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => void refreshLibraries()}
                 disabled={isRefreshingLibraries}
-                className="min-h-20 w-full rounded-lg border border-blue-900/70 bg-blue-950/30 px-4 text-left text-sm font-medium text-blue-100 transition-colors hover:bg-blue-950/50 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer sm:w-auto"
+                className="min-h-20 w-full flex items-center justify-center rounded-lg border border-blue-900/70 bg-blue-950/30 px-4 text-left text-sm font-medium text-blue-100 transition-colors hover:bg-blue-950/50 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer sm:w-auto"
               >
                 {isRefreshingLibraries ? "Refreshing libraries..." : "Refresh Libraries"}
               </button>

@@ -9,6 +9,7 @@ type FolderTreeItemProps = {
   size: string;
   numberOfItems: number;
   numberOfFolders: number;
+  isroot?: boolean;
   currentPath: string;
   selectedPath: string;
   onSelectPath: (path: string) => void;
@@ -39,9 +40,9 @@ const closeAnyOpenMenu = () => {
   globalActiveCloseMenuFn?.();
 };
 
-export default function FolderTree({ name, size, numberOfItems, numberOfFolders, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef, expandedFolders, exists, config, opts }: FolderTreeItemProps) {
+export default function FolderTree({ name, size, numberOfItems, numberOfFolders,isroot, currentPath, selectedPath, onSelectPath, onRefreshParent, activeRefreshRef, expandedFolders, exists, config, opts }: FolderTreeItemProps) {
   const cleanName = name.endsWith("/") ? name.slice(0, -1) : name;
-  const itemPath = currentPath ? `${currentPath}/${cleanName}` : cleanName;
+  const itemPath = isroot ? currentPath : currentPath ? `${currentPath}/${cleanName}` : cleanName;
   const menuAnchorRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(exists &&expandedFolders != null && expandedFolders.split("/").includes(cleanName));
   const [newName, setNewName] = useState(cleanName);

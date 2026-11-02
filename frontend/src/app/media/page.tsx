@@ -27,9 +27,10 @@ export type Config = {
   [key: string]: any;
 };
 export default function MediaExplorerPage() {
-  const [rootItems, setRootItems] = useState<{ name: string; size: string; numberOfItems: number, numberOfFolders: number }[]>([]);
+  const [rootItems, setRootItems] = useState<{ name: string; size: string; numberOfItems: number, numberOfFolders: number,path: string }[]>([]);
   const [isMediaOpen, setIsMediaOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
   const [hasInitialized, setHasInitialized] = useState(false);
   const [usageStats, setUsageStats] = useState<{ total: string; used: string; usedStremio: string }>({ total: "0 B", used: "0 B", usedStremio: "0 B" });
   const [config, setConfig] = useState<Config>({});
@@ -56,6 +57,7 @@ export default function MediaExplorerPage() {
 
   const fetchConfig = async () => {
     try {
+      setLoadingConfig(true);
       const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
       if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch config");
       const data = await res.json();
@@ -63,6 +65,9 @@ export default function MediaExplorerPage() {
     } catch (error) {
       console.error("Error fetching config:", error);
       toast.error(`Failed to fetch config. ${error}`);
+    }
+    finally {
+      setLoadingConfig(false);
     }
   };
 
@@ -79,17 +84,23 @@ export default function MediaExplorerPage() {
   };
 
   const toggleMediaFolder = async () => {
+    if (loading || loadingConfig) return; // Prevent toggling while loading
     const nextState = !isMediaOpen;
     setIsMediaOpen(nextState);
 
     if (nextState && !hasInitialized) {
       setLoading(true);
       try {
-        const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=`);
-        if (!res.ok) throw new Error((await res.json()).error || "Failed to load root media");
+        const res1 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["MoviesFolder"]}`);
+        if (!res1.ok) throw new Error((await res1.json()).error || "Failed to load root media");
         
-        const data = await res.json();
-        setRootItems(data.items || []);
+        const data1 = await res1.json();
+        const res2 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["TVShowsFolder"]}`);
+        if (!res2.ok) throw new Error((await res2.json()).error || "Failed to load root media");
+        
+        const data2 = await res2.json();
+        const data = [data1, data2];
+        setRootItems(data || []);
         setHasInitialized(true);
       } catch (error) {
         console.error("Error loading root media:", error);
@@ -158,14 +169,14 @@ export default function MediaExplorerPage() {
           {/* Main Collapsed Media Root Row */}
           <div
             onClick={toggleMediaFolder}
-            className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-zinc-800 cursor-pointer transition-colors text-zinc-100 font-semibold"
+            className={`flex items-center gap-3 py-2 px-3 rounded-lg ${loading || loadingConfig ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-800'} transition-colors text-zinc-100 font-semibold`}
           >
             <img
               src={isMediaOpen ? "/open-folder.png" : "/folder.png"}
               alt="Root Directory"
               className="w-6 h-6 object-contain flex-shrink-0"
             />
-            <span className={`text-base ${!config.MediaFolder ? 'text-zinc-500 animate-pulse' : ''}`}>{!config.MediaFolder? "Loading..." : config.MediaFolder}</span>
+            <span className={`text-base ${loadingConfig ? 'text-zinc-500 animate-pulse' : 'text-zinc-100'}`}>{loadingConfig ? 'Loading...' : 'Libraries'}</span>
             {loading && <span className="text-xs text-zinc-500 font-normal animate-pulse">loading root assets...</span>}
           </div>
 
@@ -175,7 +186,7 @@ export default function MediaExplorerPage() {
               {rootItems.length === 0 && !loading ? (
                 <div className="text-sm text-zinc-500 py-2 italic pl-2">No accessible files found in root</div>
               ) : (
-                rootItems.map(({ name, size, numberOfItems, numberOfFolders }) => (
+                rootItems.map(({ name, size, numberOfItems, numberOfFolders,path }) => (
                   <FileTreeItem
                     key={name}
                     name={name}
@@ -184,17 +195,23 @@ export default function MediaExplorerPage() {
                     numberOfFolders={numberOfFolders}
                     opts={options}
                     config={config}
-                    currentPath=""
+                    currentPath={path}
+                    isRoot={true}
                     refreshStats={fetchUsageStats}
                     activeRefreshRef={activeRefreshRef}
                     onRefreshParent={async () => {
                       setLoading(true);
                       try {
-                        const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=`);
-                        if (!res.ok) throw new Error("Failed to refresh root files");
+                        const res1 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["MoviesFolder"]}`);
+                        if (!res1.ok) throw new Error("Failed to refresh root files");
                         
-                        const data = await res.json();
-                        setRootItems(data.items || []);
+                        const data1 = await res1.json();
+                        const res2 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["TVShowsFolder"]}`);
+                        if (!res2.ok) throw new Error("Failed to refresh root files");
+                        
+                        const data2 = await res2.json();
+                        const data = [data1, data2];
+                        setRootItems(data);
                       } catch (error) {
                         console.error("Error refreshing root media:", error);
                         toast.error("Failed to refresh root media items.");

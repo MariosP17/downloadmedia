@@ -36,10 +36,11 @@ export const OptionsNames : Record<string, string> =
     "auto_download_subs" : "Automatically download subtitles if they're missing",
     "MoviesFolder" : "Movies Folder",
     "TVShowsFolder" : "TV Shows Folder",
-    "MediaFolder" : "Media Folder",
+    "StremioFolder" : "Stremio Data Folder",
     "DBConnectionString" : "Database Connection String",
     "sticky_streams_scroller" : "Show streams scroller",
-    "show_embedded" : "Show embedded subtitles in the subs modal"
+    "show_embedded" : "Show embedded subtitles in the subs modal",
+    "sort_streams_by_size" : "Sort streams by size"
 };
 
 export const isVideoExtension = (fileName: string) => {

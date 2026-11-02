@@ -4,7 +4,7 @@ import { LanguagesEditor } from "../components/LanguagesEditor";
 type OptionType = {
   typeKey: string;
   value: any;
-  type: "<boolean>" | "<string>" | "<number>" | "<dropdown>" | "<languages>";
+  type: "<boolean>" | "<string>" | "<number>" | "<dropdown>" | "<languages>"| "<Folder>";
   min?: number;
   max?: number;
   maxWidth?: string;
@@ -13,6 +13,7 @@ type OptionType = {
   options?: { [key: string]: any }[];
 }
 import { OptionsNames } from "../../../Props";
+import FolderPicker  from "../components/FolderPicker";
 
 export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth, onChange, options}: OptionType) {
 
@@ -116,6 +117,21 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
           <LanguagesEditor
             languages={value}
             // afterAdd={fetch}
+          />
+        </div>
+      );
+    case "<Folder>":
+      return (
+        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p>{OptionsNames[typeKey]}</p>
+          <FolderPicker 
+            style={{
+              minWidth: minWidth ? `min(100%, ${minWidth})` : undefined,
+              maxWidth: maxWidth ? `${maxWidth}` : "calc(var(--spacing) * 100)",
+            }}
+            initialFolder={value}
+            onSelectFolder={(newValue) => onChange && onChange(newValue)}
+            folderName={OptionsNames[typeKey]}
           />
         </div>
       );

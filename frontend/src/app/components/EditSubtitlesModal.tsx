@@ -70,6 +70,7 @@ export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: Edi
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Could not save subtitle info");
             toast.success("Subtitle saved successfully");
+            if (onClose) onClose();
         }
         catch (error) {
             toast.error(error instanceof Error ? error.message : "Could not save subtitle info");

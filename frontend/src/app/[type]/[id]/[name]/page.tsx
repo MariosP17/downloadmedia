@@ -139,9 +139,9 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
                 }).format(new Date(episodeData.released || episodeData.airDate)).replace(",", ""));
   let rating = episodeData == null ? (data.imdbRating || data.rating) : (parseFloat(episodeData.rating) === 0 ? omdbData?.imdbRating || omdbData?.Rating : episodeData.rating);
   const duration = type === "movie" ? data.runtime || data.duration || data.runtimeMinutes : !episodeData ? null : omdbData?.Runtime || null;
-  const description = episodeData == null ? (data.description || data.plot || data.overview || data.summary) : (episodeData.description || data.description || data.plot || data.overview || data.summary);
+  const description = episodeData == null ? (data.description || data.plot || data.overview || data.summary) : (episodeData.description);
   let link = episodeData == null ? data.links?.filter((l:any) => l.category === "imdb")[0]?.url ?? `https://www.imdb.com/title/${omdbData?.imdbId || omdbData?.imdbID || omdbData?.imdb}/` : `https://www.imdb.com/title/${omdbData?.imdbId || omdbData?.imdbID || omdbData?.imdb}/`;
-  if (!rating || rating === 0 || !rating) {
+  if ((!rating || rating === 0 || rating === null || rating === "N/A" || rating === undefined) && type === "movie" && OMDB_API_KEY) {
     const omdbData = await getMovieOmdbData();
     if (omdbData && omdbData.imdbRating && omdbData.imdbRating !== "N/A") {
       rating = omdbData.imdbRating;
@@ -229,7 +229,27 @@ export default async function ItemPage({ params, searchParams }: Props) {
     } catch (e) {
       data = { error: "Failed to fetch data" };
     }
+    
+    const convertFileSizeToBytes = (sizeMatch: RegExpMatchArray | null): number | null => {
+      if (!sizeMatch || sizeMatch.length < 2) return null;
+      const sizeStr = sizeMatch[1].replace(/,/g, '').trim();
+      const unit = sizeStr.match(/[a-zA-Z]+$/)?.[0] || '';
+      const value = parseFloat(sizeStr.replace(/[a-zA-Z]+$/, ''));
   
+      switch (unit.toUpperCase()) {
+        case 'GB':
+          return value * 1024 * 1024 * 1024;
+        case 'MB':
+          return value * 1024 * 1024;
+        case 'KB':
+          return value * 1024;
+        case 'B':
+          return value;
+        default:
+          return null; // Unknown unit
+      }
+    };
+
     const streams = Array.isArray(data?.streams) ? data.streams : [];
     const streamsWithProgress = await Promise.all(
       streams.sort((a: any, b: any) => {
@@ -240,8 +260,13 @@ export default async function ItemPage({ params, searchParams }: Props) {
       if (rankA !== rankB) {
         return rankA - rankB;
       }
-
-      // Secondary: alphabetical fallback for unranked labels
+      const sizeA = convertFileSizeToBytes(a.title.match(/💾\s*([\d.,]+\s*(?:GB|MB|KB|B))/i));
+      const sizeB = convertFileSizeToBytes(b.title.match(/💾\s*([\d.,]+\s*(?:GB|MB|KB|B))/i));
+      // Secondary: Size (descending)
+      if (sizeA && sizeB) {
+        return (sizeA - sizeB) * (!options["sort_streams_by_size"] ? 0 : options["sort_streams_by_size"] === "No" ? 0 : options["sort_streams_by_size"] === "Ascending" ? 1 : -1);
+      }
+      // Fallback: Alphabetical order
       return a.name.localeCompare(b.name);
     }).map(async (s: any) => {
       const infoHash = s.infoHash || "";

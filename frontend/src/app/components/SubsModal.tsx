@@ -21,16 +21,18 @@ type SubtitleResult = {
 
 type SubsModalProps = {
 	pathname: string;
+	replacedPath: string;
 	ttid: string;
 	onClose: () => void;
 	onChanged?: () => void;
     isEpisode?: boolean;
     options: Record<string, any>
+	config: Record<string, any>
 };
 
 const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
 
-export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisode =false,options }: SubsModalProps) {
+export default function SubsModal({ pathname, replacedPath, ttid, onClose, onChanged, isEpisode =false,options,config }: SubsModalProps) {
 	const [existingSubs, setExistingSubs] = useState<ExistingSubtitle[]>([]);
 	const [results, setResults] = useState<SubtitleResult[]>([]);
 	const [language, setLanguage] = useState("en");
@@ -69,13 +71,13 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 		setLoadingExisting(true);
 		try {
 			const response = await fetch(
-				apiUrl(`/getItems?folder=${encodeURIComponent(isEpisode ? pathname.split("/").slice(0, -1).join("/") : pathname.split("/").length == 3 ? pathname.split("/").slice(0, -1).join("/") : pathname)}&onlySubs=true`)
+				apiUrl(`/getItems?folder=${encodeURIComponent(isEpisode ? pathname.split("/").slice(0, -1).join("/") : replacedPath.split("/").length === 2 ? pathname.split("/").slice(0, -1).join("/") : pathname)}&onlySubs=true`)
 			);
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Could not load subtitles");
 			setLoadingSubtitlesError(false);
 			setExistingSubs(
-				(data.items || []).filter((item: ExistingSubtitle) => /\.(srt|sub|vtt|ass)$/i.test(item.name)).filter((item: ExistingSubtitle) => isEpisode ? item.name.includes(pathname.split(".")[0]?.split("/").pop() || "") : true)
+				(data.items || []).filter((item: ExistingSubtitle) => isEpisode ? item.name.includes(pathname.split(".")[0]?.split("/").pop() || "") : true)
 			);
 		} catch (error) {
 			setLoadingSubtitlesError(true);
@@ -103,7 +105,7 @@ export default function SubsModal({ pathname, ttid, onClose, onChanged, isEpisod
 		setLoadingEmbedded(true);
 		try {
 			let finalpathname = pathname;
-			if (pathname.split("/").length === 2) {
+			if (pathname.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) && pathname.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 1) {
 				try {
 				finalpathname = await getMovieFilePathFromFolder(pathname);
 				} catch (error) {

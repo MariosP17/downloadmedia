@@ -31,7 +31,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
   // Custom Selection Window / Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isModalCreateFolderOpen, setIsModalCreateFolderOpen] = useState(false);
-  const [rootFolders, setRootFolders] = useState<{ name: string; size: string; numberOfItems: number; numberOfFolders: number }[]>([]);
+  const [rootFolders, setRootFolders] = useState<{ name: string; size: string; numberOfItems: number; numberOfFolders: number, path: string }[]>([]);
   const [targetPath, setTargetPath] = useState(""); 
   const [targetName, setTargetName] = useState(filename || title || "");
   const [newFolderName, setNewFolderName] = useState("");
@@ -121,10 +121,15 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
 
   const loadRootFolders = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=&showFiles=false`);
-      if (!res.ok) throw new Error((await res.json()).error || `Failed to get items from server`);
-      const data = await res.json();
-      setRootFolders(data.items || []);
+      const res1 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["MoviesFolder"]}`);
+      if (!res1.ok) throw new Error((await res1.json()).error || `Failed to get items from server`);
+      const data1 = await res1.json();
+
+      const res2 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["TVShowsFolder"]}`);
+      if (!res2.ok) throw new Error((await res2.json()).error || `Failed to get items from server`);
+      const data2 = await res2.json();
+      const data = [data1,data2]
+      setRootFolders(data || []);
       scrollToSelectedPath();
     } catch (err : any) {
       toast.error(`Failed to map target media folder pathways. ${err.message || ""}`);
@@ -505,18 +510,19 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
                 }`}
               >
                 <img src="/folder.png" alt="" className="w-4 h-4 object-contain" />
-                <span className="text-sm">{configuration["MediaFolder"]}/</span>
+                <span className="text-sm">Libraries</span>
               </div>
               
               <div className="pl-3 border-l border-zinc-800 ml-2 space-y-0.5">
-                {rootFolders.map(({ name, size, numberOfItems, numberOfFolders }) => (
+                {rootFolders.map(({ name, size, numberOfItems, numberOfFolders,path }) => (
                   <FolderTree
                     key={name}
                     name={name}
                     size={size}
                     numberOfItems={numberOfItems}
                     numberOfFolders={numberOfFolders}
-                    currentPath=""
+                    currentPath={path}
+                    isroot={true}
                     selectedPath={targetPath}
                     onSelectPath={setTargetPath}
                     onRefreshParent={loadRootFolders}
@@ -551,7 +557,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
             {/* Form Configuration Inputs Footer Block */}
             <div className="space-y-2 border-t border-zinc-800 pt-3">
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Target Path (Read-Only)</label>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-1">Target Path</label>
                 <input
                   type="text"
                   readOnly

@@ -45,9 +45,9 @@ export default function Configuration() {
 
     return (
         <div className="mt-4 flex flex-col">
-            <OptionType typeKey="MoviesFolder" value={config["MoviesFolder"] || ""} type="<string>" onChange={(newValue) => setConfig((prev) => ({ ...prev, MoviesFolder: newValue }))} />
-            <OptionType typeKey="TVShowsFolder" value={config["TVShowsFolder"] || ""} type="<string>" onChange={(newValue) => setConfig((prev) => ({ ...prev, TVShowsFolder: newValue }))} />
-            <OptionType typeKey="MediaFolder" value={config["MediaFolder"] || ""} type="<string>" onChange={(newValue) => setConfig((prev) => ({ ...prev, MediaFolder: newValue }))} />
+            <OptionType typeKey="MoviesFolder" value={config["MoviesFolder"] || ""} type="<Folder>" onChange={(newValue) => setConfig((prev) => ({ ...prev, MoviesFolder: newValue }))} />
+            <OptionType typeKey="TVShowsFolder" value={config["TVShowsFolder"] || ""} type="<Folder>" onChange={(newValue) => setConfig((prev) => ({ ...prev, TVShowsFolder: newValue }))} />
+            <OptionType typeKey="StremioFolder" value={config["StremioFolder"] || ""} type="<Folder>" onChange={(newValue) => setConfig((prev) => ({ ...prev, StremioFolder: newValue }))} />
             <OptionType minWidth="40vw" typeKey="DBConnectionString" value={config["DBConnectionString"] || ""} type="<string>" onChange={(newValue) => setConfig((prev) => ({ ...prev, DBConnectionString: newValue }))} />
             
 
