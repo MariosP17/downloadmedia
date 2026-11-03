@@ -28,9 +28,17 @@ export default function TopBar({
     const fetchSavedMedia = async () => {
       const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
       try {
-        const healthResponse = await fetch(`${apiUrl}/health`);
-        if (!healthResponse.ok || (await healthResponse.text()) !== "OK") {
-          throw healthResponse.status;
+        const healthController = new AbortController();
+        const healthTimeout = window.setTimeout(() => healthController.abort(), 2000);
+        try {
+          const healthResponse = await fetch(`${apiUrl}/health`, {
+            signal: healthController.signal,
+          });
+          if (!healthResponse.ok || (await healthResponse.text()) !== "OK") {
+            throw healthResponse.status;
+          }
+        } finally {
+          window.clearTimeout(healthTimeout);
         }
       } catch (error) {
         if (window.location.pathname !== "/settings") {

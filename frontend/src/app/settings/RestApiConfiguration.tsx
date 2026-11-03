@@ -40,10 +40,21 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
         const apiUrl = restapioption === "remote" && restapiurl && restapiurl.trim() !== ""
             ? restapiurl.trim().replace(/\/+$/, "")
             : `${window.location.protocol.replace(":", "")}://${window.location.hostname}:${restapiurlport || 7000}`;
-        const healthResponse = await fetch(`${apiUrl}/health`);
-        const healthBody = await healthResponse.text();
-        if (!healthResponse.ok || healthBody !== "OK") {
-            throw new Error(`API health check failed with status ${healthResponse.status}`);
+        const healthController = new AbortController();
+        const healthTimeout = setTimeout(() => {
+            healthController.abort();
+        }, 2000);
+        try {
+            const healthResponse = await fetch(`${apiUrl}/health`, {
+                signal: healthController.signal,
+            });
+            const healthBody = await healthResponse.text();
+            if (!healthResponse.ok || healthBody !== "OK") {
+                throw new Error(`API health check failed with status ${healthResponse.status}`);
+            }
+        }
+        finally {
+            clearTimeout(healthTimeout);
         }
 
         if(restapioption === "remote" && restapiurl && restapiurl.trim() !== ""){
