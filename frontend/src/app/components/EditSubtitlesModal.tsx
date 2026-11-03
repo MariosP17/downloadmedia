@@ -13,8 +13,6 @@ type EditSubsProps = {
     onClose: () => void;
 };
 
-const  apiUrl =async (path: string) => `${await getApiUrl(window.location.hostname, window.location.protocol)}${path}`;
-
 export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: EditSubsProps) {
     const [content, setContent] = useState<string>("");
     const [loadedContent, setLoadedContent] = useState<string>("");

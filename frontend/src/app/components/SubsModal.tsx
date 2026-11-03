@@ -31,8 +31,6 @@ type SubsModalProps = {
 	config: Record<string, any>
 };
 
-const apiUrl = async (path: string) => `${await getApiUrl(window.location.hostname, window.location.protocol)}${path}`;
-
 export default function SubsModal({ pathname, replacedPath, ttid, onClose, onChanged, isEpisode =false,options,config }: SubsModalProps) {
 	const [existingSubs, setExistingSubs] = useState<ExistingSubtitle[]>([]);
 	const [results, setResults] = useState<SubtitleResult[]>([]);
@@ -72,7 +70,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 		setLoadingExisting(true);
 		try {
 			const response = await fetch(
-				await apiUrl(`/getItems?folder=${encodeURIComponent(isEpisode ? pathname.split("/").slice(0, -1).join("/") : replacedPath.split("/").length === 2 ? pathname.split("/").slice(0, -1).join("/") : pathname)}&onlySubs=true`)
+				await getApiUrl(window.location.hostname, window.location.protocol) + `/getItems?folder=${encodeURIComponent(isEpisode ? pathname.split("/").slice(0, -1).join("/") : replacedPath.split("/").length === 2 ? pathname.split("/").slice(0, -1).join("/") : pathname)}&onlySubs=true`
 			);
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Could not load subtitles");
@@ -90,7 +88,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 
 	const getMovieFilePathFromFolder = async (folderPath: string): Promise<string> => {
 		try {
-			const response = await fetch(await apiUrl(`/getItems?folder=${encodeURIComponent(folderPath)}`));
+			const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + `/getItems?folder=${encodeURIComponent(folderPath)}`);
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Could not fetch items from folder");
 			const movieFile = (data.items || []).find((item: ExistingSubtitle) => /\.(mp4|mkv|avi|mov|wmv)$/i.test(item.name));
@@ -114,7 +112,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 					return [];
 				}
 			}
-			const response = await fetch(await apiUrl(`/getEmbeddedSubtitles`),{
+			const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + `/getEmbeddedSubtitles`,{
 				body: JSON.stringify({ file: finalpathname }),
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
@@ -152,7 +150,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 
 	async function fetchSubtitleInfo() {
 		try {
-			const response = await fetch(await apiUrl(`/getOpenSubtitlesInfo`));
+			const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + `/getOpenSubtitlesInfo`);
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Could not fetch subtitle info");
 			setSubtitleInfo(data.data || {});
@@ -167,7 +165,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 	const deleteSubtitle = async () => {
 		if (!subtitleToDelete) return;
 		try {
-			const response = await fetch(await apiUrl("/deleteFile"), {
+			const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/deleteFile", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ filePath: isEpisode ? `${pathname.split("/").slice(0, -1).join("/")}/${subtitleToDelete}` : `${pathname}/${subtitleToDelete}` }),
@@ -195,7 +193,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 		setSearching(true);
 		try {
 			const response = await fetch(
-				await apiUrl(`/getSubtitles?ttid=${encodeURIComponent(ttid)}&language=${language}`)
+				await getApiUrl(window.location.hostname, window.location.protocol) + `/getSubtitles?ttid=${encodeURIComponent(ttid)}&language=${language}`
 			);
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Could not search subtitles");
@@ -215,7 +213,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
         }
         let videoItem = null;
         if (!isEpisode){
-            const items = await fetch(await apiUrl(`/getItems?folder=${encodeURIComponent(pathname)}`)).then(res => res.json());
+            const items = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + `/getItems?folder=${encodeURIComponent(pathname)}`).then(res => res.json());
             videoItem = (items.items ?? []).filter((item: any) => isVideoExtension(item.name))[0];
         }
         if (!videoItem && !isEpisode) {
@@ -226,7 +224,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
         const mediaName = isEpisode ? `${pathname.split("/").pop()}-${language}.srt` : `${cleanExtension(videoItem.name)}-${language}.srt`;
         const filePath = isEpisode ? `${pathname.split("/").slice(0, -1).join("/")}/${mediaName}` : `${pathname}/${mediaName}`;
         try {
-            const response = await fetch(await apiUrl("/downloadSubtitle"), {
+            const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/downloadSubtitle", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

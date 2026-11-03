@@ -36,21 +36,22 @@ const formatBytes = (bytes: number) => {
 const progressLabel = (progress: number) => progress === -2 ? "Failed" : progress === -1 ? "Cancelled" : progress >= 100 ? "Complete" : "Downloading";
 
 export default function SettingsPage() {
+  const apiUnavailable = typeof window !== "undefined"
+    && new URLSearchParams(window.location.search).get("apiUnavailable") === "true";
+  const [apiReady, setApiReady] = useState(!apiUnavailable);
   const [progressStore, setProgressStore] = useState<Record<string, ProgressEntry>>({});
   const [batchProgressStore, setBatchProgressStore] = useState<Record<string, ProgressEntry>>({});
   const [archiveJobs, setArchiveJobs] = useState<ArchiveJob[]>([]);
   const [subtitlesInfo, setSubtitlesInfo] = useState<any>({});
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!apiUnavailable);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [isRefreshingLibraries, setIsRefreshingLibraries] = useState(false);
   const [isCleaningArchives, setIsCleaningArchives] = useState(false);
   const [clearingStore, setClearingStore] = useState<"progress" | "batch" | null>(null);
   const [refreshLibrariesLog, setRefreshLibrariesLog] = useState<{ lastRefreshed: string; lastRefreshedBy: string } | null>(null);
 
-  const apiUrl = async (path: string) => `${await getApiUrl(window.location.hostname, window.location.protocol)}${path}`;
-
   const fetchSubtitlesInfo = async () => {
-            const res = await fetch(await apiUrl("/getOpenSubtitlesInfo"));
+            const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getOpenSubtitlesInfo");
             const data = (await res.json())?.data ?? {};
             setSubtitlesInfo(data);
   };
@@ -60,9 +61,9 @@ export default function SettingsPage() {
     setIsLoadingPage(true);
     try {
       const [progressResponse, batchProgressResponse, archiveJobsResponse] = await Promise.all([
-        fetch(await apiUrl("/getProgressStore")),
-        fetch(await apiUrl("/getBatchProgressStore")),
-        fetch(await apiUrl("/archiveJobs")),
+        fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getProgressStore"),
+        fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getBatchProgressStore"),
+        fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/archiveJobs"),
       ]);
 
       if (!progressResponse.ok || !batchProgressResponse.ok || !archiveJobsResponse.ok) {
@@ -87,22 +88,23 @@ export default function SettingsPage() {
     }
   };
 
-  useEffect(() => {
-
-    void loadAll();
-  }, []);
-
   const loadAll = async () => {
     void loadOperationalState();
     void loadRefreshLibrariesLog();
     void fetchSubtitlesInfo();
   };
 
+  useEffect(() => {
+    if (apiReady) {
+      void loadAll();
+    }
+  }, [apiReady]);
+
   const refreshLibraries = async () => {
     setIsRefreshingLibraries(true);
     setIsLoadingPage(true);
     try {
-      const response = await fetch(await apiUrl("/refreshLibraries"),{ 
+      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/refreshLibraries",{ 
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -123,7 +125,7 @@ export default function SettingsPage() {
 
   const loadRefreshLibrariesLog = async () => {
     try {
-      const response = await fetch(await apiUrl("/getRefreshLibrariesLog"));
+      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getRefreshLibrariesLog");
       if (!response.ok) throw new Error("Failed to load refresh libraries log");
       const data = await response.json();
       setRefreshLibrariesLog(data);
@@ -136,7 +138,7 @@ export default function SettingsPage() {
   const cleanupArchiveJobs = async () => {
     setIsCleaningArchives(true);
     try {
-      const response = await fetch(await apiUrl("/cleanupArchiveJobs"), { method: "POST" });
+      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/cleanupArchiveJobs", { method: "POST" });
       if (!response.ok) throw new Error("Failed to clean archive jobs");
       await loadOperationalState();
       toast.success("Expired archive jobs cleaned up.");
@@ -152,7 +154,7 @@ export default function SettingsPage() {
     setClearingStore(store);
     try {
       const endpoint = store === "progress" ? "/clearProgressStore" : "/clearBatchProgressStore";
-      const response = await fetch(await apiUrl(endpoint), { method: "POST" });
+      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + endpoint, { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to clear store");
       await loadOperationalState();
@@ -183,18 +185,20 @@ export default function SettingsPage() {
           </div>
           <section className="mb-8">
             <h2 className="text-xl font-bold text-zinc-100">Rest API</h2>
-            <RestApiConfiguration onRefreshParent={() => { loadAll(); }} />
+            <RestApiConfiguration
+              onApiReady={() => setApiReady(true)}
+            />
           </section>
-          <section className="mb-8">
+          {apiReady && <section className="mb-8">
             <h2 className="text-xl font-bold text-zinc-100">Configuration</h2>
             <Configuration />
-          </section>
-          <section className="mb-8">
+          </section>}
+          {apiReady && <section className="mb-8">
             <h2 className="text-xl font-bold text-zinc-100">Options</h2>
             <Options />
-          </section>
+          </section>}
 
-          <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:justify-between">
+          {apiReady && <section className="mb-8 flex flex-col gap-4 sm:flex-row sm:justify-between">
             <h2 className="text-xl font-bold text-zinc-100">Stores</h2>
             <div className="flex flex-col gap-3 sm:flex-row">
               <div className="flex flex-col justify-end sm:mr-5">
@@ -223,21 +227,20 @@ export default function SettingsPage() {
                 {isRefreshingLibraries ? "Refreshing libraries..." : "Refresh Libraries"}
               </button>
             </div>
-          </section>
-
-          <section className="mb-8 space-y-5">
+          </section>}
+          {apiReady && <section className="mb-8 space-y-5">
             <StorePanel title="Download Progress" entries={progressStore} emptyMessage="No download progress entries." isClearing={clearingStore === "progress"} hasActive={Object.values(progressStore).some(entry => 0 <= entry.progress && entry.progress < 100)} isIdle={Object.values(progressStore).every(entry => entry.progress === 100 || entry.progress < 0)} onClear={() => void clearStore("progress")} />
             <StorePanel title="Batch Progress" entries={batchProgressStore} emptyMessage="No batch progress entries." isClearing={clearingStore === "batch"} hasActive={Object.values(batchProgressStore).some(entry => 0 <= entry.progress && entry.progress < 100)} isIdle={Object.values(batchProgressStore).every(entry => entry.progress === 100 || entry.progress < 0)} onClear={() => void clearStore("batch")} />
             <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900/70">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3"><div className="flex items-center gap-2"><h2 className="text-sm font-semibold text-zinc-200">Archive Jobs</h2><span className="rounded bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400">{archiveJobs.length}</span></div><button type="button" data-tooltip-id="archive-tooltip" data-tooltip-place="right" data-tooltip-content={!archiveJobs.length ? "No entries to clear" : archiveJobs.some(job => 0 <= job.progress && job.progress < 100) ? "Can't clean up jobs with active progress" : ""} onClick={() => void cleanupArchiveJobs()} disabled={isCleaningArchives || !archiveJobs.length || archiveJobs.some(job => 0 <= job.progress && job.progress < 100)} className="h-8 rounded border border-amber-900/70 px-3 text-xs font-medium text-red-300 transition-colors enabled:hover:bg-amber-950/50 cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">{isCleaningArchives ? "Cleaning..." : "Clean Up Jobs"}</button>{(archiveJobs.some(job => 0 <= job.progress && job.progress < 100) || !archiveJobs.length) && <Tooltip id='archive-tooltip'/>}</div>
               {!archiveJobs.length ? <p className="px-4 py-6 text-sm text-zinc-500">No archive jobs.</p> : <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="border-b border-zinc-800 bg-zinc-950/50 text-xs uppercase text-zinc-500"><tr><th className="px-4 py-3 font-medium">Id</th><th className="px-4 py-3 font-medium">Folder</th><th className="px-4 py-3 font-medium">Progress</th><th className="px-4 py-3 font-medium">Bytes</th><th className="px-4 py-3 font-medium">State</th><th className="px-4 py-3 font-medium">Error</th></tr></thead><tbody className="divide-y divide-zinc-800/80">{archiveJobs.map((job) => <tr key={job.job_id}><td className="px-4 py-3 tabular-nums text-zinc-300">{job.job_id}</td><td className="max-w-48 truncate px-4 py-3 text-zinc-300" title={job.folder_name}>{job.folder_name || "Unnamed folder"}</td><td className="px-4 py-3 tabular-nums text-zinc-300">{job.progress.toFixed(0)}%</td><td className="px-4 py-3 text-xs text-zinc-400">{formatBytes(job.processed_bytes)} / {formatBytes(job.total_bytes)}</td><td className="px-4 py-3"><span className="rounded bg-zinc-800 px-2 py-1 text-xs font-medium capitalize text-zinc-300">{job.status}</span></td><td className="max-w-56 truncate px-4 py-3 text-xs text-red-300" title={job.error || undefined}>{job.error || "-"}</td></tr>)}</tbody></table></div>}
             </div>
-          </section>
-          <section>
+          </section>}
+          {apiReady && <section>
             <h2 className="text-xl font-bold text-zinc-100">Logs</h2>
             {subtitlesInfo && <div className="text-sm text-zinc-400 text-right">Remaining subtitle downloads {subtitlesInfo?.remaining_downloads}</div>}
             <LogComponent/>
-          </section>
+          </section>}
         </div>
       }
     </main>

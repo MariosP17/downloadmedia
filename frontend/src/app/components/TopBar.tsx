@@ -26,9 +26,28 @@ export default function TopBar({
 
   useEffect(() => {
     const fetchSavedMedia = async () => {
+      const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
       try {
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getAllSavedMedia`);
-        const data = await res.json();
+        const healthResponse = await fetch(`${apiUrl}/health`);
+        if (!healthResponse.ok || (await healthResponse.text()) !== "OK") {
+          throw healthResponse.status;
+        }
+      } catch (error) {
+        if (window.location.pathname !== "/settings") {
+          window.location.replace("/settings?apiUnavailable=true");
+          return;
+        }
+        const status = typeof error === "number" ? error : "Cannot connect";
+        toast.error(`(${status}) Could not connect to the API. Please check your REST API configuration in settings.`);
+        return;
+      }
+
+      try {
+        const savedMediaResponse = await fetch(`${apiUrl}/getAllSavedMedia`);
+        if (!savedMediaResponse.ok) {
+          throw new Error(`Saved media request failed with status ${savedMediaResponse.status}`);
+        }
+        const data = await savedMediaResponse.json();
         if (data.success === false) throw new Error(data.message || "Failed to fetch saved media");
         setSavedMedia(data.data || []);
       } catch (error) {
@@ -65,7 +84,7 @@ export default function TopBar({
         setSavedMedia([]);
       })
     };
-  }, []);
+  }, [router]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

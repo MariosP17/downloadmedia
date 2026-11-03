@@ -11,7 +11,6 @@ export type Configuration = {
 
 
 export default function Configuration() {
-    const apiUrl = async (path: string) => `${await getApiUrl(window.location.hostname, window.location.protocol)}${path}`;
 
     const saveConfiguration = async () => {
         if (disabledSave) return;
@@ -19,7 +18,7 @@ export default function Configuration() {
         
         try{
             setLoading(true);
-            const response = await fetch(await apiUrl("/updateConfiguration"), {
+            const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/updateConfiguration", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -52,7 +51,7 @@ export default function Configuration() {
         const fetchConfiguration = async () => {
             setLoading(true); 
             try{
-                const res = await fetch(await apiUrl("/getConfiguration"));
+                const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getConfiguration");
                 const data = await res.json();
                 setLoadedConfig(data);
                 setConfig(data);

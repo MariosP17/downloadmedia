@@ -14,13 +14,12 @@ export default function Options() {
     const [languages, setLanguages] = useState<string>();
     // const [loading, setLoading] = useState(false);
     
-    const apiUrl = async (path: string) => `${await getApiUrl(window.location.hostname, window.location.protocol)}${path}`;
 
     const saveOptions = async () => {
         if (disabledSave) return;
         if (!options || Object.keys(options).length === 0) return;
         setLoading(true);
-        await fetch(await apiUrl("/updateOptions"), {
+        await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/updateOptions", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -60,7 +59,7 @@ export default function Options() {
         const fetchOptions = async () => {
             try{
                 setLoading(true);
-                const res = await fetch(await apiUrl("/getOptions"));
+                const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getOptions");
                 const data = await res.json();
                 setLoadedOptions(data);
                 setOptions(data);
