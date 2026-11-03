@@ -4,6 +4,7 @@ import { useEffect, useState,useRef } from "react";
 import { toast } from "react-hot-toast";
 import FileTreeItem from "../components/FileTreeItem";
 import { AnimatedNumber } from "../components/AnimatedNumber";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 const parseSizeToBytes = (value: string) => {
   const match = value.trim().match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
@@ -45,7 +46,7 @@ export default function MediaExplorerPage() {
   
   const fetchUsageStats = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/getUsageStats`);
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getUsageStats`);
       if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch usage stats");
       const data = await res.json();
       setUsageStats(data);
@@ -58,7 +59,7 @@ export default function MediaExplorerPage() {
   const fetchConfig = async () => {
     try {
       setLoadingConfig(true);
-      const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getConfiguration`);
       if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch config");
       const data = await res.json();
       setConfig(data);
@@ -73,7 +74,7 @@ export default function MediaExplorerPage() {
 
   const fetchOptions = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/getOptions`);
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getOptions`);
       if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch options");
       const data = await res.json();
       setOptions(data || []);
@@ -91,11 +92,11 @@ export default function MediaExplorerPage() {
     if (nextState && !hasInitialized) {
       setLoading(true);
       try {
-        const res1 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["MoviesFolder"]}`);
+        const res1 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${config["MoviesFolder"]}`);
         if (!res1.ok) throw new Error((await res1.json()).error || "Failed to load root media");
         
         const data1 = await res1.json();
-        const res2 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["TVShowsFolder"]}`);
+        const res2 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${config["TVShowsFolder"]}`);
         if (!res2.ok) throw new Error((await res2.json()).error || "Failed to load root media");
         
         const data2 = await res2.json();
@@ -202,11 +203,11 @@ export default function MediaExplorerPage() {
                     onRefreshParent={async () => {
                       setLoading(true);
                       try {
-                        const res1 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["MoviesFolder"]}`);
+                        const res1 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${config["MoviesFolder"]}`);
                         if (!res1.ok) throw new Error("Failed to refresh root files");
                         
                         const data1 = await res1.json();
-                        const res2 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["TVShowsFolder"]}`);
+                        const res2 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${config["TVShowsFolder"]}`);
                         if (!res2.ok) throw new Error("Failed to refresh root files");
                         
                         const data2 = await res2.json();

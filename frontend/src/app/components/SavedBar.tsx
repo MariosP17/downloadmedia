@@ -6,6 +6,7 @@ import Loader from "../loader";
 import toast from "react-hot-toast";
 import FallbackImage from "./fallbackimg";
 import { MediaType } from "../../../Props";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 interface SavedMediaItem {
     ttid: string;
@@ -140,13 +141,13 @@ export default function SavedBar({
   const [savedMedia, setSavedMedia] = useState<SavedMediaItem[]>([]);
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
-  const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
+  const apiUrl = async(path: string) => `${await getApiUrl(window.location.hostname, window.location.protocol)}${path}`;
 
   useEffect(() => {
     const fetchSavedMedia = async () => {
       try {
         setLoading(true);
-        const response = await fetch(apiUrl("/getAllSavedMedia"));
+        const response = await fetch(await apiUrl("/getAllSavedMedia"));
         const data = await response.json();
         if (!data.success) {
           toast.error(data.message || "Failed to fetch saved media");
@@ -195,7 +196,7 @@ export default function SavedBar({
   const deleteSavedMedia = async (media: SavedMediaItem): Promise<boolean> => {
     try {
       setLoading(true);
-      const response = await fetch(apiUrl(`/deleteSavedMedia`), {
+      const response = await fetch(await apiUrl(`/deleteSavedMedia`), {
         method: "DELETE",
         body: new URLSearchParams({ ttid: media.ttid })
       });
@@ -221,7 +222,7 @@ export default function SavedBar({
   const deleteAllSavedMedia = async () => {
     try {
       setLoading(true);
-      const response = await fetch(apiUrl("/clearSavedMedia"), {
+      const response = await fetch(await apiUrl("/clearSavedMedia"), {
         method: "DELETE"
       });
       const data = await response.json();

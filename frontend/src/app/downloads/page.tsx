@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "react-hot-toast";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 // Define the shape of a single download item based on your API structure
 type DownloadItem = {
@@ -28,7 +29,7 @@ export default function DownloadsPage() {
     const fetchProgress = async (lastFetch: boolean = false) => {
       try {
         setInitialLoad(true);
-        const res = await fetch(`http://${window.location.hostname}:7000/getProgressStore`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getProgressStore`);
         if (!res.ok) throw new Error("Failed to fetch progress store");
         
         const data: ProgressStoreResponse = await res.json();
@@ -77,7 +78,7 @@ export default function DownloadsPage() {
       try {
         for (const key of keys) {
           const [hash, idx] = key.split("_");
-          const res = await fetch(`http://${window.location.hostname}:7000/progress/${hash}/${idx}`);
+          const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/progress/${hash}/${idx}`);
           if (!res.ok && res.status !== 500 && res.status !== 404) {
             console.error(`Failed to remove download ${key} from store`);
             return;
@@ -224,7 +225,7 @@ export default function DownloadsPage() {
       const [hash, idx] = storeKey.split("_");
       if (isDownloading) {
         try {
-          const res = await fetch(`http://${window.location.hostname}:7000/cancel`, {
+          const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancel`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -242,7 +243,7 @@ export default function DownloadsPage() {
       }
 
       try {
-        const res = await fetch(`http://${window.location.hostname}:7000/progress/${hash}/${idx}`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/progress/${hash}/${idx}`);
         if (!res.ok && res.status !== 500 && res.status !== 404) {
           console.error(`Failed to remove download ${storeKey} from store`);
           return;
@@ -256,7 +257,7 @@ export default function DownloadsPage() {
     const handleCancelBatch = async (storeKeys: string[]) => {
       for (const storekey of storeKeys){
         try {
-          const res = await fetch(`http://${window.location.hostname}:7000/cancel`, {
+          const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancel`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json"

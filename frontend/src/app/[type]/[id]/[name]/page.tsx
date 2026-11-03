@@ -8,6 +8,7 @@ import ScrollToTopButton from "./ScrollToTopButton";
 import StreamScroller from "./StreamScroller";
 import { MediaType, qualityPriority } from "../../../../../Props";
 import SaveMediaButton from "../../../components/SaveMediaButton";
+import{ getApiUrl } from "../../../Actions/RestApiConfig";
 
 type Props = {
   params: {
@@ -26,7 +27,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `Download ${name}`,
   };
 }
-
 const normalizeSeasons = (data: any) => {
   let normalized: any[] = [];
 
@@ -104,28 +104,39 @@ const normalizeSeasons = (data: any) => {
 
 async function MediaInfo({ data, id }: { data: any; id: string }) {
   
-  const OMDB_API_KEY = process.env.OMDB_API_KEY || "";
   async function getMovieOmdbData() {
-    if (OMDB_API_KEY){
-      const omdbUrl = `https://www.omdbapi.com/?i=${data.imdb_id}&apikey=${OMDB_API_KEY}`;
-      const omdbData = await fetch(omdbUrl).then(res => res.json());
-      return omdbData;
+    const headersList = await headers();
+    const host = headersList.get("host")?.split(":")[0] || "localhost";
+    const protocol = headersList.get("x-forwarded-proto") || "http";
+    const omdbUrl = `${await getApiUrl(host,protocol)}/getOmdbData?t=${encodeURIComponent(data.imdb_id)}`;
+    const omdbData = await fetch(omdbUrl)
+    if (!omdbData.ok) {
+      throw new Error((await omdbData.json()).error || "Failed to fetch OMDB data");
     }
-    return null;
+    return omdbData.json();
   }
 
   const headersList = await headers();
   const host = headersList.get("host")?.split(":")[0] || "localhost";
-  const ret = await fetch(`http://${host}:7000/savedMediaExists?ttid=${encodeURIComponent(id)}`).then(res => res.json()).catch(() => false);
+  const protocol = headersList.get("x-forwarded-proto") || "http";
+  const ret = await fetch(`${await getApiUrl(host,protocol)}/savedMediaExists?ttid=${encodeURIComponent(id)}`).then(res => res.json()).catch(() => false);
   const isInSavedMedia = ret.data === true;
   if (!data) return null;
   const decodedId = decodeURIComponent(id);
   const type = data.type || data.mediaType || data.category;
   const episodeData = type==="movie" ? null : data.videos.filter((v: any) => v.id == decodedId)[0];
   let omdbData = null;
-  if (episodeData && OMDB_API_KEY){
-    const omdbUrl = `https://www.omdbapi.com/?i=${data.imdb_id}&Season=${episodeData.season}&Episode=${episodeData.episode}&apikey=${OMDB_API_KEY}`;
-    omdbData = await fetch(omdbUrl).then(res => res.json());
+  if (episodeData){
+    try {
+      const omdbUrl = `${await getApiUrl(host,protocol)}/getOmdbData?t=${data.imdb_id}&season=${episodeData.season}&episode=${episodeData.episode}`;
+      const omdbret = await fetch(omdbUrl)
+      if (!omdbret.ok) {
+        throw new Error((await omdbret.json()).error || "Failed to fetch OMDB data");
+      }
+      omdbData = await omdbret.json();
+    } catch (error) {
+      console.error("Error fetching OMDB data:", error);
+    }
   }
   const posterUrl = episodeData ? episodeData.thumbnail || episodeData.poster || null : data.poster || data.posterUrl || null;
   const name = (data.name || data.title || data.originalTitle || data.originalName || "Unknown Title");
@@ -141,13 +152,18 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
   const duration = type === "movie" ? data.runtime || data.duration || data.runtimeMinutes : !episodeData ? null : omdbData?.Runtime || null;
   const description = episodeData == null ? (data.description || data.plot || data.overview || data.summary) : (episodeData.description);
   let link = episodeData == null ? data.links?.filter((l:any) => l.category === "imdb")[0]?.url ?? `https://www.imdb.com/title/${omdbData?.imdbId || omdbData?.imdbID || omdbData?.imdb}/` : `https://www.imdb.com/title/${omdbData?.imdbId || omdbData?.imdbID || omdbData?.imdb}/`;
-  if ((!rating || rating === 0 || rating === null || rating === "N/A" || rating === undefined) && type === "movie" && OMDB_API_KEY) {
+  if ((!rating || rating === 0 || rating === null || rating === "N/A" || rating === undefined) && type === "movie") {
+    try {
     const omdbData = await getMovieOmdbData();
     if (omdbData && omdbData.imdbRating && omdbData.imdbRating !== "N/A") {
       rating = omdbData.imdbRating;
     }
     if (!link || link === "N/A") {
       link = omdbData?.imdbID ? `https://www.imdb.com/title/${omdbData.imdbID}/` : null;
+    }
+    }
+    catch (error) {
+      console.error("Error fetching OMDB data:", error);
     }
   }
   return (
@@ -177,6 +193,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
   const { season } = await searchParams;
   const headersList = await headers();
   const host = headersList.get("host")?.split(":")[0] || "localhost";
+  const protocol = headersList.get("x-forwarded-proto") || "http";
   let mediaData: any = null;
   if ((type === "movie" || type === "series")) {
     const metadataUrl = `https://v3-cinemeta.strem.io/meta/${encodeURIComponent(type)}/${encodeURIComponent(decodeURIComponent(id).split(":")[0])}.json`;
@@ -190,8 +207,8 @@ export default async function ItemPage({ params, searchParams }: Props) {
         // ignore and try next
       }
   }
-  const options = await fetch(`http://${host}:7000/getOptions`).then(res => res.json());
-  const configuration = await fetch(`http://${host}:7000/getConfiguration`).then(res => res.json());
+  const options = await fetch(`${await getApiUrl(host,protocol)}/getOptions`).then(res => res.json());
+  const configuration = await fetch(`${await getApiUrl(host,protocol)}/getConfiguration`).then(res => res.json());
 
   if (type === "series" && !decodeURIComponent(id).includes(":")) {
     const seasons = normalizeSeasons(mediaData);
@@ -273,7 +290,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
       const filename = s.behaviorHints?.filename || "";
       const data = s.progressData;
       try {
-        const res = await fetch(`http://${host}:7000/progress/${infoHash}/${s.fileIdx}`);
+        const res = await fetch(`${ await getApiUrl(host,protocol)}/progress/${infoHash}/${s.fileIdx}`);
         const progressData = res.ok ? await res.json() : { progress: 0.0, status: "Not started or task not found" };
         return { ...s, progressData };
       } catch {

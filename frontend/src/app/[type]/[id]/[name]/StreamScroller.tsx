@@ -16,19 +16,6 @@ export default function StreamScroller({ streamsnames, counts, opts,config }: Pr
     const [highlightedStream, setHighlightedStream] = useState<HTMLElement | null>(null);
     const [options, setOptions] = useState<any>(opts);
 
-    const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
-    
-    // useEffect(() => {
-    //     async function fetchOptions() {
-    //         try{
-    //             const response = await fetch(apiUrl("/getOptions")).then(res => res.json());
-    //             setOptions(response);
-    //         } catch (error) {
-    //             console.error("Failed to fetch options:", error);
-    //         }
-    //     }
-    //     fetchOptions();
-    // }, []);
 
     useEffect(() => {
         if (highlightedStream) {

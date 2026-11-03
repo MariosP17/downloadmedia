@@ -2,8 +2,9 @@
 
 import React, { useState ,useEffect} from 'react';
 import Tree from 'rc-tree';
-import 'rc-tree/assets/index.css'; // Required for default expanding/collapsing styles
+import 'rc-tree/assets/index.css';
 import { toast } from 'react-hot-toast';
+import { getApiUrl } from '../Actions/RestApiConfig';
 
 // Define the shape of your folder data
 interface TreeNode {
@@ -20,6 +21,37 @@ interface FolderPickerProps {
   folderName?: string;
 }
 
+function SwitcherIcon({ expanded, loading, isLeaf }: { expanded?: boolean; loading?: boolean; isLeaf?: boolean }) {
+  if (isLeaf) {
+    return <span className="folder-tree-switcher-placeholder" aria-hidden="true" />;
+  }
+
+  if (loading) {
+    return (
+      <span className="folder-tree-switcher-loader" aria-label="Loading">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <defs>
+            <linearGradient id="folder-tree-loader-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#60a5fa" />
+              <stop offset="50%" stopColor="#a1a1aa" />
+              <stop offset="100%" stopColor="#3f3f46" />
+            </linearGradient>
+          </defs>
+          <circle cx="8" cy="8" r="5.5" stroke="url(#folder-tree-loader-gradient)" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="folder-tree-switcher-icon" aria-hidden="true">
+      <svg viewBox="0 0 16 16">
+        <path d={expanded ? "m4 6 4 4 4-4" : "m6 4 4 4-4 4"} />
+      </svg>
+    </span>
+  );
+}
+
 export default function FolderPicker({ style,initialFolder, onSelectFolder, folderName }: FolderPickerProps) {
   // 1. Initial state: Just the root folder. isLeaf: false tells rc-tree it has children to load.
   const [treeData, setTreeData] = useState<TreeNode[]>([{
@@ -28,13 +60,18 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
     isLeaf: false
   }]);
   
-  const [selectedFolder, setSelectedFolder] = useState<string | null>();
-  const [displayedFolder, setDisplayedFolder] = useState<string | null>(initialFolder);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(initialFolder);
+  // const [displayedFolder, setDisplayedFolder] = useState<string | null>(initialFolder);
   const [treeOpen, setTreeOpen] = useState(false);
+  const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+
+  const onExpand = (keys: React.Key[]) => {
+    setExpandedKeys(keys);
+  };
   // 2. The function to fetch subfolders from your remote API
   const fetchSubFolders = async (parentKey: string): Promise<TreeNode[]> => {
     try {
-      const response = await fetch(`http://${window.location.hostname}:7000/getSuperFolderInfo`,{
+      const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getSuperFolderInfo`,{
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -84,6 +121,7 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
       setTreeData((origin) => updateTreeData(origin, key, newFolders));
     } catch (error) {
       console.error("Failed to load folders", error);
+      toast.error("Failed to load folders: " + (error instanceof Error ? error.message : ""));
     }
   };
 
@@ -94,7 +132,9 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
         selectedKeys = [];
         toast.error("Please select a valid folder, not the root folder.");
       }
+
       const folderId = selectedKeys[0] as string;
+      // setDisplayedFolder(folderId);
       setSelectedFolder(folderId);
       // if (onSelectFolder) {
       //   onSelectFolder(selectedKeys[0] as string);
@@ -102,7 +142,7 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
       // setTreeOpen(false); // Close the modal after selection
     }
   };
-  
+
   const onOpenTreeModal = () => {
     setTreeOpen(true);
   };
@@ -113,17 +153,66 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
         onSelectFolder(selectedFolder);
       }
     }
+    else{
+      setSelectedFolder(initialFolder);
+    }
     setTreeOpen(false);
   };
-
+  
   useEffect(() => {
-    setDisplayedFolder(initialFolder);
-  }, [initialFolder]);
+    const loadInitialPath = async () => {
+      if (!initialFolder) return;
+      
+    // setDisplayedFolder(initialFolder);
+    setSelectedFolder(initialFolder);
+    // Convert "/media/Movies/Action" into parent keys: ["/media", "/media/Movies"]
+    const paths = initialFolder.split('/').slice(0, -1).filter(Boolean);
+    const keysToExpand = paths.map((_, index) => 
+        '/' + paths.slice(0, index + 1).join('/')
+    );
+    
+    const allKeysToExpand = ['/', ...keysToExpand];
+
+    // Start with a fresh root state
+    let currentTree : TreeNode[] = [{ key: '/', title: '/', isLeaf: false }];
+    // Sequentially fetch and build the tree data level-by-level
+    for (const key of allKeysToExpand) {
+      try {
+        // Use your existing fetch logic here
+        const newFolders = await fetchSubFolders(key); 
+        
+        // Use your existing updateTreeData helper to insert the new children
+        currentTree = updateTreeData(currentTree, key, newFolders);
+      } catch (error) {
+        console.error(`Failed to load folder: ${key}`, error);
+        break; // Stop trying to expand if a folder in the path is missing/fails
+      }
+    }
+
+    // 1. First, provide the fully populated tree data
+    setTreeData(currentTree);
+    
+    // 2. Now rc-tree can successfully expand all the way down
+    setExpandedKeys(allKeysToExpand);
+  };
+
+  
+  loadInitialPath();
+}, [initialFolder]);
+
+useEffect(() => {
+  if (!treeOpen) return; // Only scroll when the tree is open
+  const selectedSpan = document.querySelector(`.rc-tree-node-selected[title="${initialFolder.split('/').pop()}"]`);
+  console.log("Scrolling to:", selectedSpan, "for folder:", initialFolder);
+  if (selectedSpan) {
+    selectedSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+}, [treeOpen]);
 
   return (
     <div>
     <div style={style} className='cursor-pointer'>
-      <input type="text" value={displayedFolder || ''} readOnly placeholder="Select a folder" className="w-full mb-2 p-2 border rounded"
+      <input type="text" value={selectedFolder || ''} readOnly placeholder="Select a folder" className="w-full mb-2 p-2 border rounded"
         onClick={onOpenTreeModal} />
     </div>
     {treeOpen && (
@@ -140,10 +229,15 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
         </div>
         <div className="flex-grow overflow-auto p-4 search-scrollbar border-b border-zinc-800 p-3">
         <Tree
+          className="folder-picker-tree"
           treeData={treeData}
           loadData={onLoadData}
           onSelect={onSelect}
           selectedKeys={selectedFolder ? [selectedFolder] : []}
+          expandedKeys={expandedKeys}       // ADDED: Controls what is expanded
+          onExpand={onExpand}               // ADDED: Updates state when user clicks arrows
+          autoExpandParent={true}           // ADDED: Ensures parent folders open automatically
+          switcherIcon={SwitcherIcon}
         />
         </div>
         <div className="flex justify-end p-3">

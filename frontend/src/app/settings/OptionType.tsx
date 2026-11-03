@@ -9,13 +9,16 @@ type OptionType = {
   max?: number;
   maxWidth?: string;
   minWidth?: string;
+  disabled?: boolean;
+  hidden?: boolean;
+  allHidden?: boolean;
   onChange?: (newValue: any) => void;
   options?: { [key: string]: any }[];
 }
 import { OptionsNames } from "../../../Props";
 import FolderPicker  from "../components/FolderPicker";
 
-export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth, onChange, options}: OptionType) {
+export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden, onChange, options}: OptionType) {
 
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
@@ -42,11 +45,12 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
     );
     case "<number>":
       return (
-        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div hidden={allHidden} className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>{OptionsNames[typeKey]}</p>
           <input 
             type="number" 
             value={value}
+            hidden={hidden}
             onChange={(event) => onChange && onChange(Number(event.target.value))}
             min={min}
             max={max}
@@ -65,6 +69,7 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
 
         <div className="relative w-full min-w-0 sm:w-auto">
           <select 
+            disabled={disabled}
             id={`${typeKey}_dropdown`}
             value={value}
             onChange={(event) => onChange && onChange(event.target.value)}
@@ -100,13 +105,14 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
           <p>{OptionsNames[typeKey]}</p>
           <input 
             type="text" 
+            disabled={disabled}
             style={{
               minWidth: minWidth ? `min(100%, ${minWidth})` : undefined,
               maxWidth: maxWidth ? `${maxWidth}` : "calc(var(--spacing) * 100)",
             }}
             value={value}
             onChange={(event) => onChange && onChange(event.target.value)}
-            className="w-full min-w-0 border border-zinc-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark] sm:w-auto"
+            className="w-full min-w-0 border border-zinc-700 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-zinc-500 focus:border-zinc-500 transition-colors [color-scheme:dark] sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
           />
         </div>
       );

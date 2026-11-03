@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
-// import Loader from "../../../loader";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 // Inner Helper Component: Recursive Folder Selection Row
 type FolderTreeItemProps = {
@@ -57,13 +57,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
   const [options, setOptions] = useState<{ [key: string]: any }[]>(opts);
 
   const isSelected = selectedPath === itemPath;
-  // useEffect(() => {
-  //   const getConfiguration = async () => {
-  //     const config = await fetch(`http://${window.location.hostname}:7000/getConfiguration`).then(res => res.json());
-  //     setConfiguration(config);
-  //   };
-  //   getConfiguration();
-  // }, []);
+
   useEffect(() => {
     const fetchSubFoldersOnConditions = async () => {
         if (exists && expandedFolders != null && expandedFolders.split("/").includes(cleanName)) {
@@ -76,7 +70,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
   const fetchSubfolders = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`);
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setSubFolders(data.items || []);
@@ -104,7 +98,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
     e.stopPropagation();
 
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/deleteFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: itemPath })
@@ -123,7 +117,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
     e.stopPropagation();
     if (newName && newName.trim()) {
       try {
-      const res = await fetch(`http://${window.location.hostname}:7000/renameFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/renameFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: itemPath, newName: newName.trim() })

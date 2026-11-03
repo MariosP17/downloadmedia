@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Loader from "../loader";
 import toast from "react-hot-toast";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 type LanguagesEditorProps = {
   languages: { name: string; code: string,id: number }[];
@@ -26,7 +27,7 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
         
         try{
         setLoading(true);
-        const res = await fetch(`http://${window.location.hostname}:7000/updateLanguage`, {
+        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/updateLanguage`, {
             method: "PUT",
             headers: {
                 "Content-Type": "application/json",
@@ -49,7 +50,7 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
     const handleSaveAddLanguage = async (newLanguage: { name: string; code: string,id: number }) => {
         try{
         setLoading(true);
-        const res = await fetch(`http://${window.location.hostname}:7000/addLanguage`, {
+        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/addLanguage`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -73,7 +74,7 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
     const handleDeleteLanguage = async (languageToDelete: { name: string; code: string,id: number }) => {
         try{
         setLoading(true);
-        const res = await fetch(`http://${window.location.hostname}:7000/deleteLanguage`, {
+        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteLanguage`, {
             method: "DELETE",
              body: new URLSearchParams({ id: languageToDelete.id.toString() }),
         });
@@ -187,7 +188,7 @@ const [isAdding, setIsAdding] = useState(false);
 //   useEffect(() => {
 //     const fetchLanguages = async () => {
 //       try {
-//         const res = await fetch(`http://${window.location.hostname}:7000/getLanguages`);
+//         const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getLanguages`);
 //         const data = await res.json();
 //         if (data.success === false) throw new Error(data.message || "Failed to fetch languages");
 //         setLanguages(data.data || []);
@@ -223,7 +224,7 @@ const [isAdding, setIsAdding] = useState(false);
         // Refresh the languages list after adding a new language
         const fetchLanguages = async () => {
             try {
-                const res = await fetch(`http://${window.location.hostname}:7000/getLanguages`);
+                const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getLanguages`);
                 const data = await res.json();
                 if (data.success === false) throw new Error(data.message || "Failed to fetch languages");
                 setLanguages(data.data || []);
@@ -238,7 +239,7 @@ const [isAdding, setIsAdding] = useState(false);
         // Refresh the languages list after deleting a language
         const fetchLanguages = async () => {
             try {
-                const res = await fetch(`http://${window.location.hostname}:7000/getLanguages`);
+                const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getLanguages`);
                 const data = await res.json();
                 if (data.success === false) throw new Error(data.message || "Failed to fetch languages");
                 setLanguages(data.data || []);

@@ -5,7 +5,7 @@ import { toast } from "react-hot-toast";
 import Loading from "../loader";
 import SubsModal from "./SubsModal";
 import EditSubtitlesModal from "./EditSubtitlesModal";
-import { chown } from "fs";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 
 type TreeItemProps = {
@@ -72,21 +72,8 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   useEffect(() => {
     setFolderSize(size);
   }, [size]);
-  
-  // const loadOptions = async () => {
-  //   try {
-  //     const response = await fetch(`http://${window.location.hostname}:7000/getOptions`);
-  //     const data = await response.json();
-  //     if (!response.ok) throw new Error(data.error || "Could not load options");
-  //     setOptions(data || []);
-  //   } catch (error) {
-  //     console.error(error instanceof Error ? error.message : "Could not load options");
-  //   }
-  // };
 
-  // useEffect(() => {
-  //   void loadOptions(); 
-  // }, []);
+
   const archivePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Reference hook assigned to the dropdown container to check for outside clicks
@@ -142,13 +129,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     if (setLoadingInternal) setLoading(true);
     try {
       const res = await fetch(
-        `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(itemPath)}`
+        `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(itemPath)}`
       );
       if (!res.ok) throw new Error("Could not retrieve contents");
       
       const data = await res.json();
       const sizeres = await fetch(
-        `http://${window.location.hostname}:7000/getFolderSize?folder=${encodeURIComponent(itemPath)}`
+        `${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderSize?folder=${encodeURIComponent(itemPath)}`
       );
       if (!sizeres.ok) throw new Error("Could not retrieve folder size");
       const sizeData = await sizeres.json();
@@ -172,14 +159,14 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const RefreshAllChildren = async () => {
     try {
       // const childrenRes = await fetch(
-      //   `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(itemPath)}`
+      //   `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(itemPath)}`
       // );
       // if (!childrenRes.ok) throw new Error("Could not retrieve contents");
       // const childrenData = await childrenRes.json();
       // setChildren(childrenData.items || []);
       // 1. Fetch only subfolders for the current folder path
       const res = await fetch(
-        `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`
+        `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`
       );
       if (!res.ok) throw new Error("Could not retrieve contents");
       
@@ -205,7 +192,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           // B. Crucial: Force the backend API request cascade to dig deeper into this child's subfolders
           try {
             const childRes = await fetch(
-              `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(childPath)}&showFiles=false`
+              `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(childPath)}&showFiles=false`
             );
             if (childRes.ok) {
               const childData = await childRes.json();
@@ -231,7 +218,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const RefreshNestedSubTree = async (targetPath: string): Promise<void> => {
     try {
       const res = await fetch(
-        `http://${window.location.hostname}:7000/getItems?folder=${encodeURIComponent(targetPath)}&showFiles=false`
+        `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(targetPath)}&showFiles=false`
       );
       if (!res.ok) return;
       
@@ -274,13 +261,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     try {
       let res;
       if (!isFolderInternal) {
-        res = await fetch(`http://${window.location.hostname}:7000/deleteFile`, {
+        res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteFile`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filePath: itemPath })
         });
       } else {
-        res = await fetch(`http://${window.location.hostname}:7000/deleteFolder`, {
+        res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteFolder`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ folder: itemPath })
@@ -305,13 +292,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       try {
         let res;
         if (!isFolderInternal) {
-          res = await fetch(`http://${window.location.hostname}:7000/renameFile`, {
+          res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/renameFile`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ filePath: itemPath, newName: newItemName.trim() })
           });
         } else {
-          res = await fetch(`http://${window.location.hostname}:7000/renameFolder`, {
+          res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/renameFolder`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ folder: itemPath, newName: newItemName.trim() })
@@ -333,7 +320,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const pollArchiveJob = (jobId: string) => {
     const poll = async () => {
       try {
-        const response = await fetch(`http://${window.location.hostname}:7000/folderDownloadProgress/${jobId}`);
+        const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/folderDownloadProgress/${jobId}`);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Could not retrieve archive progress");
 
@@ -343,7 +330,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           archivePollRef.current = null;
           setArchiveJob(null);
           toast.success("Archive ready. Download starting...");
-          window.location.href = `http://${window.location.hostname}:7000/downloadFolderToClient/${jobId}`;
+          window.location.href = `${await getApiUrl(window.location.hostname, window.location.protocol)}/downloadFolderToClient/${jobId}`;
         } else if (["cancelled", "failed"].includes(data.status)) {
           if (archivePollRef.current) clearInterval(archivePollRef.current);
           archivePollRef.current = null;
@@ -364,7 +351,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     if (!archiveJob) return;
     setArchiveJob((current) => current ? { ...current, status: "cancelling" } : current);
     try {
-      await fetch(`http://${window.location.hostname}:7000/cancelFolderDownload/${archiveJob.job_id}`, { method: "POST" });
+      await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancelFolderDownload/${archiveJob.job_id}`, { method: "POST" });
     } catch {
       toast.error("Could not cancel archive creation.");
     }
@@ -375,7 +362,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     
     if (isFolderInternal) {
       try {
-        const response = await fetch(`http://${window.location.hostname}:7000/downloadFolderToClient`, {
+        const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/downloadFolderToClient`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filePath: itemPath })
@@ -395,7 +382,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         // 1. Create a hidden, throwaway HTML form element
         const form = document.createElement("form");
         form.method = "POST";
-        form.action = `http://${window.location.hostname}:7000/downloadFileToClient`;
+        form.action = `${await getApiUrl(window.location.hostname, window.location.protocol)}/downloadFileToClient`;
         form.style.display = "none";
 
         // 2. Add the filePath parameter to match application/x-www-form-urlencoded
@@ -488,7 +475,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
         const { title, year } = parseTitleAndYear(isSeasonFolder ? replacedPath.split("/")[0] : isMovie ? replacedPath.split("/")[0] : isEpisode ? path.split("/")[1] : cleanName);
         if (!title) return;
-        const omdbUrl = `http://${window.location.hostname}:7000/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}`;
+        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}`;
         const OMDBResponse = await fetch(omdbUrl);
         const OMDBData = await OMDBResponse.json();
         if (!OMDBData || OMDBData.Response === "False") {

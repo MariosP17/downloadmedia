@@ -1295,7 +1295,15 @@ def get_super_folder_info():
         if not os.path.exists(folder_path):
             return jsonify({"error": "Folder not found"}), 404
 
-        folders = [{ "key": os.path.join(folder_path, d), "title": d, "isLeaf": False } for d in os.listdir(folder_path) if os.path.isdir(os.path.join(folder_path, d))]
+        folders = [
+    {
+        "key": os.path.join(folder_path, entry.name),
+        "title": entry.name,
+        "isLeaf": not has_subfolders(entry.path),
+    }
+    for entry in os.scandir(folder_path)
+    if entry.is_dir(follow_symlinks=False)
+]
         number_of_folders = len(folders)
         return jsonify({
             "name": os.path.basename(folder_path),
@@ -1305,6 +1313,21 @@ def get_super_folder_info():
         }), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+def has_subfolders(path):
+    try:
+        with os.scandir(path) as entries:
+            for entry in entries:
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        return True
+                except OSError:
+                    continue
+    except OSError:
+        # Unknown accessibility should remain expandable rather than hidden.
+        return True
+
+    return False
 
 @app.route('/getItems', methods=['GET'])
 def get_items():
@@ -1788,13 +1811,15 @@ def update_configuration():
 def get_omdb_data():
     t = request.args.get('t')
     y = request.args.get('y')
+    season = request.args.get('season')
+    episode = request.args.get('episode')
     type = request.args.get('type')
 
     if not t:
         return jsonify({"error": "Title or TTID is required"}), 400
 
     try:
-        response = requests.get(f"http://www.omdbapi.com/?t={t}{f'&y={y}' if y else ''}{f'&type={type}' if type else ''}&apikey={OMDB_API_KEY}")
+        response = requests.get(f"http://www.omdbapi.com/?t={t}{f'&y={y}' if y else ''}{f'&type={type}' if type else ''}{f'&Season={season}' if season else ''}{f'&Episode={episode}' if episode else ''}&apikey={OMDB_API_KEY}")
         response.raise_for_status()
         return jsonify(response.json()), 200
     except requests.RequestException as e:

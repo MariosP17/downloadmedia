@@ -40,7 +40,11 @@ export const OptionsNames : Record<string, string> =
     "DBConnectionString" : "Database Connection String",
     "sticky_streams_scroller" : "Show streams scroller",
     "show_embedded" : "Show embedded subtitles in the subs modal",
-    "sort_streams_by_size" : "Sort streams by size"
+    "sort_streams_by_size" : "Sort streams by size",
+    "rest_api_selection" : "Rest API location",
+    "rest_api_url" : "Rest API URL",
+    "rest_api_url_port" : "Local Rest API Port"
+
 };
 
 export const isVideoExtension = (fileName: string) => {

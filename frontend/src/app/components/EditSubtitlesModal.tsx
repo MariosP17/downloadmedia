@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import Loader from "../loader";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 
 
@@ -12,7 +13,7 @@ type EditSubsProps = {
     onClose: () => void;
 };
 
-const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
+const  apiUrl =async (path: string) => `${await getApiUrl(window.location.hostname, window.location.protocol)}${path}`;
 
 export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: EditSubsProps) {
     const [content, setContent] = useState<string>("");
@@ -40,7 +41,8 @@ export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: Edi
     async function fetchSubtitleContent() {
         try {
             setLoading(true);
-            const response = await fetch(apiUrl(`/getSubtitlesContent?filename=${encodeURIComponent(fullPath)}`));
+            const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
+            const response = await fetch(`${apiUrl}/getSubtitlesContent?filename=${encodeURIComponent(fullPath)}`);
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Could not fetch subtitle info");
             setContent(data.content || "");
@@ -62,7 +64,8 @@ export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: Edi
     const saveSubtitleContent = async () => {
         try {
             setSaving(true);
-            const response = await fetch(apiUrl(`/saveSubtitlesContent`), {
+            const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
+            const response = await fetch(`${apiUrl}/saveSubtitlesContent`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ content, filename: fullPath }),

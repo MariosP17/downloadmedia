@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 type LanguagesDropdownProps = {
   value: string;
@@ -13,7 +14,7 @@ export function LanguagesDropdown({ value, onChange }: LanguagesDropdownProps) {
   useEffect(() => {
     const fetchLanguages = async () => {
       try {
-        const res = await fetch(`http://${window.location.hostname}:7000/getLanguages`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getLanguages`);
         const data = await res.json();
         if (data.success === false) throw new Error(data.message || "Failed to fetch languages");
         setLanguages(data.data || []);

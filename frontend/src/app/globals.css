@@ -222,7 +222,7 @@ input:checked + .slider-options:before {
   min-width: 30px;
 }
 
-.log-loader {
+.component-loader {
   width: 50px;
   aspect-ratio: 1;
   --_c:no-repeat radial-gradient(farthest-side,#1e7dbd 92%,#0000);
@@ -235,3 +235,59 @@ input:checked + .slider-options:before {
   animation: l7 1s infinite;
 }
 @keyframes l7 {to{transform: rotate(.5turn)}}
+
+.folder-tree-switcher-icon,
+.folder-tree-switcher-loader,
+.folder-tree-switcher-placeholder {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: #a1a1aa;
+}
+
+.folder-tree-switcher-placeholder {
+  visibility: hidden;
+}
+
+.rc-tree .rc-tree-switcher {
+  background: none !important;
+}
+
+.folder-picker-tree .rc-tree-icon__docu {
+  background-position: -110px 0;
+}
+
+.rc-tree-icon_loading {
+  display: none !important;
+}
+
+.folder-tree-switcher-icon svg,
+.folder-tree-switcher-loader svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.folder-tree-switcher-loader svg {
+  stroke: url("#folder-tree-loader-gradient");
+}
+
+.rc-tree-switcher:hover .folder-tree-switcher-icon {
+  color: #ffffff;
+}
+
+.folder-tree-switcher-loader {
+  animation: rc-tree-spin 700ms linear infinite;
+}
+
+@keyframes rc-tree-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

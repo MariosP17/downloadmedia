@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import SearchDropdown from "./SearchDropdown";
+import { getApiUrl } from "../Actions/RestApiConfig";
+import { toast } from "react-hot-toast";
 
 type SavedMedia = {
   ttid: string;
@@ -25,12 +27,12 @@ export default function TopBar({
   useEffect(() => {
     const fetchSavedMedia = async () => {
       try {
-        const res = await fetch(`http://${window.location.hostname}:7000/getAllSavedMedia`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getAllSavedMedia`);
         const data = await res.json();
         if (data.success === false) throw new Error(data.message || "Failed to fetch saved media");
         setSavedMedia(data.data || []);
       } catch (error) {
-        console.error("Error fetching saved media:", error);
+        toast.error("Error fetching saved media: " + (error instanceof Error ? error.message : ""));
       }
     };
 

@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { useState, useEffect } from "react";
 import { MediaType } from "../../../Props";
 import Loader from "../loader";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 type SaveMediaButtonProps = {
   ttid: string,
@@ -43,7 +44,7 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
     const handleSave = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`http://${window.location.hostname}:7000/addSavedMedia`, {
+            const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/addSavedMedia`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -65,7 +66,7 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
     const handleDelete = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`http://${window.location.hostname}:7000/deleteSavedMedia`, {
+            const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteSavedMedia`, {
                 method: "DELETE",
                 body: new URLSearchParams({ ttid })
             });

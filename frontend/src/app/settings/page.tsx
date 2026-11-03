@@ -1,6 +1,7 @@
 "use client";
 import Options from "./Options";
 import Configuration from "./Configuration";
+import RestApiConfiguration from "./RestApiConfiguration";
 
 import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
@@ -8,6 +9,7 @@ import { initiator } from "../../../Props";
 import { Tooltip } from 'react-tooltip'
 import  Loader  from "../loader";
 import LogComponent from "./LogComponent";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 type ArchiveJob = {
   job_id: string;
@@ -45,10 +47,10 @@ export default function SettingsPage() {
   const [clearingStore, setClearingStore] = useState<"progress" | "batch" | null>(null);
   const [refreshLibrariesLog, setRefreshLibrariesLog] = useState<{ lastRefreshed: string; lastRefreshedBy: string } | null>(null);
 
-  const apiUrl = (path: string) => `http://${window.location.hostname}:7000${path}`;
+  const apiUrl = async (path: string) => `${await getApiUrl(window.location.hostname, window.location.protocol)}${path}`;
 
   const fetchSubtitlesInfo = async () => {
-            const res = await fetch(apiUrl("/getOpenSubtitlesInfo"));
+            const res = await fetch(await apiUrl("/getOpenSubtitlesInfo"));
             const data = (await res.json())?.data ?? {};
             setSubtitlesInfo(data);
   };
@@ -58,9 +60,9 @@ export default function SettingsPage() {
     setIsLoadingPage(true);
     try {
       const [progressResponse, batchProgressResponse, archiveJobsResponse] = await Promise.all([
-        fetch(apiUrl("/getProgressStore")),
-        fetch(apiUrl("/getBatchProgressStore")),
-        fetch(apiUrl("/archiveJobs")),
+        fetch(await apiUrl("/getProgressStore")),
+        fetch(await apiUrl("/getBatchProgressStore")),
+        fetch(await apiUrl("/archiveJobs")),
       ]);
 
       if (!progressResponse.ok || !batchProgressResponse.ok || !archiveJobsResponse.ok) {
@@ -86,16 +88,21 @@ export default function SettingsPage() {
   };
 
   useEffect(() => {
+
+    void loadAll();
+  }, []);
+
+  const loadAll = async () => {
     void loadOperationalState();
     void loadRefreshLibrariesLog();
     void fetchSubtitlesInfo();
-  }, []);
+  };
 
   const refreshLibraries = async () => {
     setIsRefreshingLibraries(true);
     setIsLoadingPage(true);
     try {
-      const response = await fetch(apiUrl("/refreshLibraries"),{ 
+      const response = await fetch(await apiUrl("/refreshLibraries"),{ 
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -116,7 +123,7 @@ export default function SettingsPage() {
 
   const loadRefreshLibrariesLog = async () => {
     try {
-      const response = await fetch(apiUrl("/getRefreshLibrariesLog"));
+      const response = await fetch(await apiUrl("/getRefreshLibrariesLog"));
       if (!response.ok) throw new Error("Failed to load refresh libraries log");
       const data = await response.json();
       setRefreshLibrariesLog(data);
@@ -129,7 +136,7 @@ export default function SettingsPage() {
   const cleanupArchiveJobs = async () => {
     setIsCleaningArchives(true);
     try {
-      const response = await fetch(apiUrl("/cleanupArchiveJobs"), { method: "POST" });
+      const response = await fetch(await apiUrl("/cleanupArchiveJobs"), { method: "POST" });
       if (!response.ok) throw new Error("Failed to clean archive jobs");
       await loadOperationalState();
       toast.success("Expired archive jobs cleaned up.");
@@ -145,7 +152,7 @@ export default function SettingsPage() {
     setClearingStore(store);
     try {
       const endpoint = store === "progress" ? "/clearProgressStore" : "/clearBatchProgressStore";
-      const response = await fetch(apiUrl(endpoint), { method: "POST" });
+      const response = await fetch(await apiUrl(endpoint), { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to clear store");
       await loadOperationalState();
@@ -167,13 +174,17 @@ export default function SettingsPage() {
             <h1 className="text-2xl font-bold text-zinc-100">Settings</h1>
             <button
               type="button"
-              onClick={() => { loadOperationalState(); loadRefreshLibrariesLog(); fetchSubtitlesInfo(); }}
+              onClick={() => { loadAll(); }}
               disabled={isLoading}
               className="h-9 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 cursor-pointer"
             >
               {isLoading ? "Loading..." : "Refresh State"}
             </button>
           </div>
+          <section className="mb-8">
+            <h2 className="text-xl font-bold text-zinc-100">Rest API</h2>
+            <RestApiConfiguration onRefreshParent={() => { loadAll(); }} />
+          </section>
           <section className="mb-8">
             <h2 className="text-xl font-bold text-zinc-100">Configuration</h2>
             <Configuration />

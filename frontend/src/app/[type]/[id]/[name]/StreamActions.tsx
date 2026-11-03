@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
 import Loader from "../../../loader";
 import FolderTree from "../../../components/FoldersTree";
+import { getApiUrl } from "../../../Actions/RestApiConfig";
 
 type Props = {
   hash: string;
@@ -43,30 +44,6 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
   const folderRoot = targetPath.match(pattern)?.[0] ?? "";
   const editableFolderPath = targetPath.slice(folderRoot.length);
   
-  // useEffect(() => {
-  //   const fetchConfiguration = async () => {
-  //     try {
-  //       const res = await fetch(`http://${window.location.hostname}:7000/getConfiguration`);
-  //       if (!res.ok) throw new Error("Failed to fetch configuration");
-  //       const configData = await res.json();
-  //       setConfiguration(configData);
-  //     } catch (error) {
-  //       console.error("Error fetching configuration:", error);
-  //     }
-  //   };
-  //   const fetchOptions = async () => {
-  //     try {
-  //       const res = await fetch(`http://${window.location.hostname}:7000/getOptions`);
-  //       if (!res.ok) throw new Error("Failed to fetch options");
-  //       const optionsData = await res.json();
-  //       setOptions(optionsData);
-  //     } catch (error) {
-  //       console.error("Error fetching options:", error);
-  //     }
-  //   };
-  //   fetchConfiguration();
-  //   fetchOptions();
-  // }, []);
 
   const serverStateRef = useRef<ServerDownloadState>("idle");
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -121,11 +98,11 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
 
   const loadRootFolders = async () => {
     try {
-      const res1 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["MoviesFolder"]}`);
+      const res1 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${config["MoviesFolder"]}`);
       if (!res1.ok) throw new Error((await res1.json()).error || `Failed to get items from server`);
       const data1 = await res1.json();
 
-      const res2 = await fetch(`http://${window.location.hostname}:7000/getFolderInfo?folder=${config["TVShowsFolder"]}`);
+      const res2 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${config["TVShowsFolder"]}`);
       if (!res2.ok) throw new Error((await res2.json()).error || `Failed to get items from server`);
       const data2 = await res2.json();
       const data = [data1,data2]
@@ -139,7 +116,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
   const checkServerProgress = async () => {
     const currentLiveState = serverStateRef.current;
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/progress/${hash}/${id}`);
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/progress/${hash}/${id}`);
       if (!res.ok) throw new Error("Progress unavailable");
       const data = await res.json();
 
@@ -179,7 +156,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     setLoading(true);
     const initialPath = await getInitialPath();
     setTargetPath(initialPath); // Starts with base root directory path selected
-    const existsRes = await fetch(`http://${window.location.hostname}:7000/destinationExists`, {
+    const existsRes = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/destinationExists`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ destination: initialPath })
@@ -217,7 +194,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     const pathValue = targetPath ? `${targetPath}/${newFolderName.trim()}` : newFolderName.trim();
 
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/createFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/createFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: pathValue })
@@ -245,7 +222,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     if (!editableFolderPath.trim()) return;
 
     try {
-      const res = await fetch(`http://${window.location.hostname}:7000/createFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/createFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: targetPath })
@@ -273,7 +250,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
   const triggerCancellationTask = async () => {
     setServerState("cancelling");
     try {
-      const cancelResponse = await fetch(`http://${window.location.hostname}:7000/cancel`, {
+      const cancelResponse = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: hash, idx: String(id) }),
@@ -301,7 +278,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     const destinationFolder = `${targetPath}`;
 
     try {
-      const response = await fetch(`http://${window.location.hostname}:7000/download`, {
+      const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

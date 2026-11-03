@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import ComponentLoader from "../componentLoader";
+import { getApiUrl } from "../Actions/RestApiConfig";
 
 export default function LogComponent() {
   const [logs, setLogs] = useState<string[]>([]);
@@ -68,7 +70,7 @@ export default function LogComponent() {
       let newChunk: string[] = [];
 
       do {
-        const url = new URL(`http://${window.location.hostname}:7000/getLogs`);
+        const url = new URL(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getLogs`);
         if (nextCursor) url.searchParams.set("cursor", nextCursor);
         if (effectiveDate) url.searchParams.set("date", effectiveDate);
         if (searchParam) url.searchParams.set("search", searchParam);
@@ -214,7 +216,7 @@ export default function LogComponent() {
   };
 
   return (
-    <div className="flex h-[600px] w-full flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs text-zinc-300 mt-4">
+    <div className="relative flex h-[600px] w-full flex-col rounded-lg border border-zinc-800 bg-zinc-950 p-4 font-mono text-xs text-zinc-300 mt-4">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2">
           <label htmlFor="log-date" className="text-zinc-400">Date:</label>
@@ -291,9 +293,7 @@ export default function LogComponent() {
         className="flex-1 overflow-y-auto space-y-1 select-text search-scrollbar"
       >
         {isLoading && (
-          <div className="flex justify-center items-center h-full">
-            <div className="log-loader"></div>
-          </div>
+          <ComponentLoader name="Logs" />
         )}
 
         {!isLoading && visibleLogs.length === 0 && (
