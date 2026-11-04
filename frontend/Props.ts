@@ -44,7 +44,8 @@ export const OptionsNames : Record<string, string> =
     "rest_api_selection" : "Rest API location",
     "rest_api_url" : "Rest API URL",
     "rest_api_url_port" : "Local Rest API Port",
-    "batchSizeThreshold" : "Batch Size Threshold for batch bookmarking"
+    "batchSizeThreshold" : "Batch Size Threshold for batch bookmarking",
+    "BatchSize" : "Batch Size for batch bookmarking"
 
 };
 

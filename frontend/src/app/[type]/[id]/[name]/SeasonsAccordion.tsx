@@ -174,8 +174,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
     let completedCount = 0;
     console.log(`Starting to fetch streams for season ${seasonId}. Total episodes: ${totalEpisodes}.`);
     if (totalEpisodes >= (options["batchSizeThreshold"] || 50)) {
-      console.log(`Total episodes (${totalEpisodes}) exceed threshold (${options["batchSizeThreshold"] || 50}). Fetching in batches.`);
-      const BATCH_SIZE = 5; // (lower = safer)
+      const BATCH_SIZE = options["batchSize"] || 5; // (lower = safer)
 
       for (let i = 0; i < episodeIndices.length; i += BATCH_SIZE) {
         // Isolate a small chunk of episodes (e.g., episodes 1 to 5)
@@ -235,7 +234,6 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
       }
     }
     else {
-      console.log(`Total episodes (${totalEpisodes}) below threshold (${options["batchSizeThreshold"] || 50}). Fetching all at once.`);
       // 2. Dispatch all fetch execution threads concurrently
       await Promise.all(
         episodeIndices.map(async (i) => {
