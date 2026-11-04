@@ -102,7 +102,6 @@ export default function SettingsPage() {
 
   const refreshLibraries = async () => {
     setIsRefreshingLibraries(true);
-    setIsLoadingPage(true);
     try {
       const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/refreshLibraries",{ 
         method: "POST",
@@ -111,15 +110,14 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({ initiator: "settings" })
       });
-      if (!response.ok) throw new Error("Failed to refresh libraries");
+      if (!response.ok) throw new Error((await response.json()).error || "Failed to refresh libraries");
       loadRefreshLibrariesLog();
       toast.success("Libraries refreshed.");
     } catch (error) {
       console.error("Failed to refresh libraries:", error);
-      toast.error("Failed to refresh libraries.");
+      toast.error(`Failed to refresh libraries: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsRefreshingLibraries(false);
-      setIsLoadingPage(false);
     }
   };
 

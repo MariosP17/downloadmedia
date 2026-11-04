@@ -82,6 +82,10 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
     };
   }, [openAddAllModal]);
 
+  useEffect(() => {
+    console.log("data state updated:", data);
+  }, [data]);
+
   const addAllEpisodesToBatch = async (key: string) => {
   const toastId = toast.loading(<span>Adding all episodes to batch...</span>);
   const [seasonid,hash,ttid,episodesNum] = key.split(",");
@@ -150,10 +154,11 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
 
   const setDataForSeason = async (season : any) => {
     const seasonId = String(season.id);
-    if (data[seasonId]) {
+    if (data[seasonId] && Array.isArray(data[seasonId]) && data[seasonId].length > 0 && data[seasonId][0] !== false) {
       // Data for this season is already fetched and cached
       return;
     }
+    let hadErrors = false;
     const unifiedStreams : any[] = [];
 
     // 1. Keep a map to count how many episodes each infoHash appears in
@@ -241,7 +246,10 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
 
             seasontorrenturl = `https://torrentio.strem.fun/stream/series/${dummyVideoId}.json`;
             const res = await fetch(seasontorrenturl);
-            if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+            if (!res.ok) 
+            {
+              hadErrors = true;
+            }
             
             const json = await res.json();
             
@@ -268,6 +276,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
             }
           } catch (e) {
             console.error(`Failed to fetch series streams from ${seasontorrenturl}:`, e);
+            hadErrors = true;
           } finally {
             // 3. Thread-safe progress tracking updater 
             completedCount++;
@@ -284,9 +293,10 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
       }
     }
 
+
     setData((prevData) => ({
       ...prevData,
-      [seasonId]: unifiedStreams,
+      [seasonId]: hadErrors ? [false] : unifiedStreams,
     }));
   };
 
@@ -439,7 +449,12 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
                       No streams available for this season that contain all episodes.
                     </div>
                   )}
-                  {data[activeSeasonForModal]?.length > 0 && data[activeSeasonForModal]?.map((stream: any) => (ShowBasicData(stream, true))).map((item: any) => (
+                  {data[activeSeasonForModal]?.length ==1 && (data[activeSeasonForModal])[0] == false && (
+                    <div className="p-4 text-zinc-400 text-sm">
+                      An error occurred while fetching streams for this season.
+                    </div>
+                  )}
+                  {data[activeSeasonForModal]?.length > 0 && (data[activeSeasonForModal])[0] !== false && data[activeSeasonForModal]?.map((stream: any) => (ShowBasicData(stream, true))).map((item: any) => (
                     <MenuItem key={item.hash}>
                       <button
                         type="button"

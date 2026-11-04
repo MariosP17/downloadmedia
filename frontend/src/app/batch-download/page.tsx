@@ -39,6 +39,7 @@ type ServerStatus = "Downloading" | "Failed" | "Completed";
 export default function BatchDownloadPage() {
   const router = useRouter();
   const [items, setItems] = useState<HydratedItem[]>([]);
+  const [collapsedSeasonsOrTorrents, setCollapsedSeasonsOrTorrents] = useState<Set<string>>(new Set());
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [pageLoading, setPageLoading] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
@@ -46,6 +47,7 @@ export default function BatchDownloadPage() {
   const [seriesTabs, setSeriesTabs] = useState<SeriesItem[]>([]);
   const [serverStatus, setServerStatus] = useState<ServerStatus>("Completed");
   const [serverProgress, setServerProgress] = useState<number>(0);
+  const [loadedWidth, setLoadedWidth] = useState<number | null>(null);
 
   // Bottom action bar & target server tree variables configuration states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -241,6 +243,7 @@ export default function BatchDownloadPage() {
       } finally {
         setTimeout(() => {
           setPageLoading(false);
+          setLoadedWidth(document.getElementById("batch-download-container")?.offsetWidth || null);
         }, 200); // Delay to ensure UI updates smoothly
       }
     };
@@ -646,6 +649,32 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     setIsOn(!isOn);
   };
 
+  const expandOrCollapse = (seasonOrTorrent: any, ttid?: string) => { 
+    if (typeof seasonOrTorrent === "object" && seasonOrTorrent !== null) {
+      seasonOrTorrent = `${seasonOrTorrent.hash}`;
+    }
+    if (ttid) {
+      seasonOrTorrent = `${seasonOrTorrent}-${ttid}`;
+    }
+    const updatedSet = new Set(collapsedSeasonsOrTorrents);
+    if (updatedSet.has(seasonOrTorrent)) {
+      updatedSet.delete(seasonOrTorrent);
+    } else {
+      updatedSet.add(seasonOrTorrent);
+    }
+    setCollapsedSeasonsOrTorrents(updatedSet);
+  };
+
+  const isCollapsed = (seasonOrTorrent : any, ttid?: string) => {
+    if (typeof seasonOrTorrent === "object" && seasonOrTorrent !== null) {
+      seasonOrTorrent = `${seasonOrTorrent.hash}`;
+    }
+    if (ttid) {
+      seasonOrTorrent = `${seasonOrTorrent}-${ttid}`;
+    }
+    return collapsedSeasonsOrTorrents.has(seasonOrTorrent);
+  };
+
   return (
     <main className="pt-8 bg-zinc-950 max-w-screen max-h-screen text-white flex flex-col mx-auto relative p-3">
       <div className="mb-6">
@@ -665,7 +694,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
       ) : (
         <>
           {/* Scrollable Container Panel Area mapping list layout dimensions */}
-          <div className="overflow-y-auto bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 space-y-3 search-scrollbar" style={{ height: window.innerHeight - 390+"px" }}>
+          <div id="batch-download-container" className="overflow-y-auto bg-zinc-900/40 border border-zinc-800 rounded-xl p-4 space-y-3 search-scrollbar" style={{ height: window.innerHeight - 390+"px",width: loadedWidth || '100%' }}>
           {seriesTabs.length > 0 && (
           <div className="grid justify-end gap-4 mb-3">
             <div className="toggle-container">
@@ -698,39 +727,49 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
               );
           const seriesTorrents = Array.from(new Set(seriesEpisodes.map(ep => ep.infoHash)));
           const isAllEpisodesChecked = seriesEpisodes.every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}`));
+          
+          const applyBreak = (title: string) : string => {
+            if (title.split(" ").some(word => word.length >= 20)) {
+              return "break-all";
+            }
+            return "break-words";
+          };
+
           return (
             <div 
               key={`${seriesItem.displayName}-${seriesItem.posterUrl}-${seriesIdx}`}
-              className="bg-zinc-900 border border-zinc-800/60 rounded-xl p-4 space-y-4 hover:border-zinc-700 transition-colors"
+              className="bg-zinc-900 rounded-xl space-y-4 transition-colors"
             >
               {/* Show Title Header Block */}
-              <div className="flex items-center sm:gap-4 gap-2 border-b border-zinc-800">
-                <div className="min-w-0">
+              <div className={`flex items-center p-2 justify-between ${!isCollapsed(seriesItem.ttid) && 'rounded-b-none'} border-zinc-800 hover:bg-zinc-800/60 rounded-lg transition-colors cursor-pointer`}
+               onClick={() => expandOrCollapse(seriesItem.ttid)}>
+                <div className="flex items-center gap-2 min-w-0">
                 <FallbackImage 
                   src={seriesItem.posterUrl} 
                   alt="poster metadata" 
                   fallback="/no-poster-16-9.jpg"
                   className="object-cover w-12 h-18 rounded-lg border border-zinc-800 flex-shrink-0"
                 />
-                </div>
-                <div className="flex-1">
-                  <h3 
-                    className="text-base font-bold text-white text-ellipsis hover:cursor-pointer hover:text-blue-400" 
+                <div className="flex flex-col gap-1 min-w-0">
+                  <a 
+                    className={`${applyBreak(seriesItem.displayName)} text-base w-fit font-bold text-white text-ellipsis hover:cursor-pointer hover:text-blue-400`} 
                     title={seriesItem.displayName} 
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/series/${encodeURIComponent(seriesItem.ttid.split(':')[0])}/${encodeURIComponent(seriesItem.displayName)}`);
-                    }}>
+                    }}
+                    href={`/series/${encodeURIComponent(seriesItem.ttid.split(':')[0])}/${encodeURIComponent(seriesItem.displayName)}`}
+                    >
                       {seriesItem.displayName}
-                    </h3>
+                    </a>
                   <p className="text-xs text-zinc-500 font-medium mt-0.5">
                     {seriesEpisodes.length} {seriesEpisodes.length === 1 ? "Episode" : "Episodes"} queued
                   </p>
                 </div>
+                </div>
                 <div className="flex items-center gap-2 sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0">
                   <button
                     type="button"
-                    onClick={(e) => handleRemoveItems(e, seriesEpisodes)}
+                    onClick={(e) =>{e.stopPropagation(); handleRemoveItems(e, seriesEpisodes)}}
                     className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                   >
                     Remove
@@ -755,34 +794,40 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     }
                     setCheckedItems(updatedSet);
                   }}
+                  onClick={(e) => e.stopPropagation()}
                   // 2. CSS updates: Added 'indeterminate:bg-zinc-700' and 'indeterminate:after:content-["-"]'
                   className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
                 />
+                <img src={!isCollapsed(seriesItem.ttid) ? "/arrow-up.svg" : "/arrow-down.svg"} alt="Expand/Collapse" className="w-4 h-4" />
                   </div>
               </div>
 
               {/* Inner Nested Episodes Sub-List Tracking Area */}
-              <div className="space-y-3 pl-2">
+              {!isCollapsed(seriesItem.ttid) && (
+              <div className="space-y-3 pl-2 pb-3">
                 {seriesSeasonsorSeriesTorrents.map((seasonOrTorrent, seasonIdx) => (
-                  <div key={`${seriesItem.displayName}-season-${seasonOrTorrent}-${seasonIdx}`} className="space-y-2">
-                    <div className="flex items-center sm:gap-4 gap-2 border-b border-zinc-800">
-                    <div className="flex-1">
-                    <h4 className={`text-sm font-semibold text-zinc-300 mt-2 ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} onClick={!isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}`)} : () => {}} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
+                  <div key={`${seriesItem.displayName}-season-${seasonOrTorrent}-${seasonIdx}`} className="space-y-2 mx-3 border border-zinc-800 rounded-lg">
+                    <div className={`flex p-2 items-center justify-between sm:gap-4 gap-2 ${!isCollapsed(seasonOrTorrent, seriesItem.ttid) && 'rounded-b-none'} rounded-lg border-zinc-800 hover:bg-zinc-800/60 transition-colors cursor-pointer`}
+                    onClick={() => expandOrCollapse(seasonOrTorrent, seriesItem.ttid)}>
+                    <div className="flex flex-col mb-2 gap-1 min-w-0">
+                    <a className={`text-sm w-fit font-semibold text-zinc-300 mt-2  ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} 
+                    href={!isOn ? `/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}` : undefined}
+                    onClick={(e) => e.stopPropagation()} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
                         ? seasonOrTorrent.provider + ` (${seasonOrTorrent.hash.slice(0, 8)}...)`
-                        : 'Unknown Provider')}</h4>
+                        : 'Unknown Provider')}</a>
                      <p className="text-xs text-zinc-500 font-medium mt-0.5">
                     {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length} {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length === 1 ? "Episode" : "Episodes"} queued
                   </p>
-                </div>
+                  </div>
                 <div className="flex items-center gap-2 sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0 pr-2">
                   <button
                     type="button"
-                    onClick={(e) => handleRemoveItems(e, seriesEpisodes.filter( ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")))}
+                    onClick={(e) =>{e.stopPropagation();  handleRemoveItems(e, seriesEpisodes.filter( ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")))}}
                     className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
                   >
                     Remove
                   </button>
-                    <input 
+                  <input 
                   type="checkbox"
                   // 1. Compute state configurations dynamically
                   checked={seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).every(ep => checkedItems.has(`${ep.infoHash}-${ep.fileIdx}-${ep.ttid}`))}
@@ -802,86 +847,95 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     }
                     setCheckedItems(updatedSet);
                   }}
+                  onClick={(e) => e.stopPropagation()}
                   // 2. CSS updates: Added 'indeterminate:bg-zinc-700' and 'indeterminate:after:content-["-"]'
                   className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
                 />
+                <img src={!isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "/arrow-up.svg" : "/arrow-down.svg"} alt="Expand/Collapse" className="w-4 h-4" />
                 </div>
                 </div>
-                  <div className="space-y-3 pl-5 border-l-2 border-zinc-800" >
-                {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).sort((a,b) => a.number - b.number).map((episodeItem, epIdx) => (
-                  <div
-                    key={`${episodeItem.infoHash}-${episodeItem.fileIdx}-${epIdx}`}
-                    className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-zinc-950/60 border border-zinc-800/40 rounded-xl gap-4 transition-colors"
-                  >
-                    <div className="w-full flex items-center gap-4 flex-1 min-w-0">
-                      {/* Thumbnail Container (Using landscape layout for individual episode clips) */}
-                      <div className="w-18 h-12 rounded-lg overflow-hidden bg-zinc-900 flex-shrink-0 relative border border-zinc-800">
-                        <FallbackImage 
-                          src={episodeItem.posterUrl} 
-                          alt="episode metadata" 
-                          fallback="/no-poster-16-9.jpg"
-                          className="object-cover w-full h-full"
+                {!isCollapsed(seasonOrTorrent, seriesItem.ttid) && (
+                <div className="space-y-3 pl-2 pr-5" >
+                  {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).sort((a,b) => a.number - b.number).map((episodeItem, epIdx) => (
+                    <div
+                      key={`${episodeItem.infoHash}-${episodeItem.fileIdx}-${epIdx}`}
+                      className="flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between p-3 bg-zinc-950/60 border border-zinc-800/40 rounded-xl gap-4 transition-colors"
+                    >
+                      <div className="w-full flex items-center gap-4 min-w-0">
+                        {/* Thumbnail Container (Using landscape layout for individual episode clips) */}
+                        <div className="w-18 h-12 rounded-lg overflow-hidden bg-zinc-900 flex-shrink-0 relative border border-zinc-800">
+                          <FallbackImage 
+                            src={episodeItem.posterUrl} 
+                            alt="episode metadata" 
+                            fallback="/no-poster-16-9.jpg"
+                            className="object-cover w-full h-full"
+                          />
+                        </div>
+                          
+                        <div className="flex flex-col min-w-0">
+                          <a className={`text-xs text-zinc-400 truncate ${isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} title={episodeItem.filename || episodeItem.title} 
+                            href={isOn ? `/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}` : undefined}
+                            >
+                            { !isOn ? `⚙️ ${episodeItem.provider || "Unknown Provider"}` : parseInt(episodeItem.ttid.split(':')[1]) > 0 ? `Season ${episodeItem.ttid.split(':')[1]}` : `Specials`}
+                          </a>
+                          
+                          {episodeItem.episodeTitle && (
+                            <a 
+                              className={`${applyBreak(episodeItem.episodeTitle)} text-sm w-fit font-semibold text-zinc-200 mt-0.5 hover:cursor-pointer hover:text-blue-400`} 
+                              title={episodeItem.episodeTitle} 
+                              href={`/series/${encodeURIComponent(episodeItem.ttid)}/${encodeURIComponent(seriesItem.displayName)}`}
+                              // onClick={(e) => {
+                              //   e.stopPropagation();
+                              //   router.push(`/series/${encodeURIComponent(episodeItem.ttid)}/${encodeURIComponent(seriesItem.displayName)}`);
+                              // }}
+                            >
+                              {episodeItem.episodeTitle}
+                            </a>
+                          )}
+                          
+                          <p className="text-xs text-zinc-500 truncate mt-0.5" title={episodeItem.filename || episodeItem.title}>
+                            <span className="text-zinc-600 font-mono">File:</span> {episodeItem.filename || episodeItem.title || "Raw Stream Index Output"}
+                          </p>
+                          <p className="text-[10px] text-zinc-600 font-mono tracking-tight truncate mt-1">
+                            HASH: {episodeItem.infoHash} | IDX: {episodeItem.fileIdx}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Interaction Row Controls */}
+                      <div className="flex items-center gap-3 w-full sm:w-auto justify-end border-t border-zinc-800/60 sm:border-0 pt-2 sm:pt-0">
+                        <button
+                          type="button"
+                          onClick={(e) => handleRemoveItem(e, episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)}
+                          className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                        <input
+                          type="checkbox"
+                          checked={checkedItems.has(`${episodeItem.infoHash}-${episodeItem.fileIdx}-${episodeItem.ttid}`)}
+                          onChange={(e) => handleCheckboxChange(episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)(e)}
+                          className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
                         />
                       </div>
-                        
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-xs text-zinc-400 truncate ${isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} title={episodeItem.filename || episodeItem.title} onClick={isOn ? () => {router.push(`/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}`)} : () => {}}>
-                          { !isOn ? `⚙️ ${episodeItem.provider || "Unknown Provider"}` : parseInt(episodeItem.ttid.split(':')[1]) > 0 ? `Season ${episodeItem.ttid.split(':')[1]}` : `Specials`}
-                        </p>
-                        
-                        {episodeItem.episodeTitle && (
-                          <h4 
-                            className="text-sm font-semibold text-zinc-200 truncate mt-0.5 hover:cursor-pointer hover:text-blue-400" 
-                            title={episodeItem.episodeTitle} 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              router.push(`/series/${encodeURIComponent(episodeItem.ttid)}/${encodeURIComponent(seriesItem.displayName)}`);
-                            }}
-                          >
-                            {episodeItem.episodeTitle}
-                          </h4>
-                        )}
-                        
-                        <p className="text-xs text-zinc-500 truncate mt-0.5" title={episodeItem.filename || episodeItem.title}>
-                          <span className="text-zinc-600 font-mono">File:</span> {episodeItem.filename || episodeItem.title || "Raw Stream Index Output"}
-                        </p>
-                        <p className="text-[10px] text-zinc-600 font-mono tracking-tight truncate mt-1">
-                          HASH: {episodeItem.infoHash} | IDX: {episodeItem.fileIdx}
-                        </p>
-                      </div>
                     </div>
-
-                    {/* Interaction Row Controls */}
-                    <div className="flex items-center gap-3 w-full sm:w-auto justify-end border-t border-zinc-800/60 sm:border-0 pt-2 sm:pt-0">
-                      <button
-                        type="button"
-                        onClick={(e) => handleRemoveItem(e, episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)}
-                        className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
-                      >
-                        Remove
-                      </button>
-                      <input
-                        type="checkbox"
-                        checked={checkedItems.has(`${episodeItem.infoHash}-${episodeItem.fileIdx}-${episodeItem.ttid}`)}
-                        onChange={(e) => handleCheckboxChange(episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)(e)}
-                        className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))}
                 </div>
+                )}
               </div>
                 ))}
             </div>
+          )}
             </div>
           );
         })}
+          <div>
             {items.filter(item => item.itemType === "movie").map((item, index) => (
               <div
                 key={`${item.infoHash}-${item.fileIdx}-${index}`}
-                className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-zinc-900 border border-zinc-800/60 rounded-xl gap-4 hover:border-zinc-700 transition-colors"
+                className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-zinc-900 rounded-xl gap-4 hover:bg-zinc-800/60 transition-colors"
               >
-                <div className="w-full flex items-center gap-4 flex-1 min-w-0">
+                <div className="w-full flex items-center gap-2 flex-1 min-w-0">
                   <div className={`${item.itemType === "movie" ? "w-12 h-18" : "w-18 h-12"} rounded-lg overflow-hidden bg-zinc-950 flex-shrink-0 relative border border-zinc-800`}>
                     <FallbackImage 
                       src={item.posterUrl} 
@@ -892,22 +946,24 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm break-words text-white truncate hover:cursor-pointer hover:text-blue-400" title={item.displayName} onClick={(e) => {
+                    <a className="text-base font-bold break-words text-white truncate hover:cursor-pointer hover:text-blue-400" title={item.displayName} onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/${item.itemType}/${encodeURIComponent(item.ttid.split(':')[0])}/${encodeURIComponent(item.displayName)}`);
-                    }}>
+                      
+                    }}
+                    href={`/${item.itemType}/${encodeURIComponent(item.ttid.split(':')[0])}/${encodeURIComponent(item.displayName)}`}>
                       {item.displayName}
-                    </h3>
+                    </a>
                     <p className="text-xs text-zinc-400 truncate mt-0.5" title={item.filename || item.title}>
                       <span className="text-zinc-600 font-mono"></span>⚙️ {item.provider}
                     </p>
                     {item.itemType == "series" && (
-                      <p className="text-xs break-all text-zinc-400 truncate mt-0.5 hover:cursor-pointer hover:text-blue-400" title={item.episodeTitle} onClick={(e) => {
+                      <a className="text-xs break-all text-zinc-400 truncate mt-0.5 hover:cursor-pointer hover:text-blue-400" title={item.episodeTitle} onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/${item.itemType}/${encodeURIComponent(item.ttid)}/${encodeURIComponent(item.displayName)}`);
-                      }}>
+                      }}
+                      href={`/${item.itemType}/${encodeURIComponent(item.ttid.split(':')[0])}/${encodeURIComponent(item.episodeTitle)}`}
+                    >
                         <span className="text-zinc-600 font-mono"></span> {item.episodeTitle}
-                      </p>
+                      </a>
                     )}
                     <p className="text-xs text-zinc-400 truncate mt-0.5" title={item.filename || item.title}>
                       <span className="text-zinc-600 break-all font-mono">File:</span> {item.filename || item.title || "Raw Stream Index Output"}
@@ -936,6 +992,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   {/* </div> */}
               </div>
             ))}
+            </div>
           </div>
 
         </>

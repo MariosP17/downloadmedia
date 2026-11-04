@@ -24,6 +24,8 @@ from download_serial import SerialDownloadDispatcher
 import backend.SavedMedia.SavedMediaUtils as smut
 import backend.Languages.LanguagesUtils as lut
 import backend.Abstract.Responses as resp
+from Jellyfin.JellyfinActions import *
+from Plex.PlexActions import *
 
 load_dotenv()
 
@@ -33,15 +35,6 @@ CORS(app)
 @app.route("/health", methods=["GET"])
 def health_check():
     return Response("OK", status=200, mimetype="text/plain")
-
-# OPEN_SUBTITLES_API_KEY = os.getenv("OPEN_SUBTITLES_API_KEY")
-# OPEN_SUBTITLES_API_USERNAME = os.getenv("OPEN_SUBTITLES_API_USERNAME")
-# OPEN_SUBTITLES_API_PASSWORD = os.getenv("OPEN_SUBTITLES_API_PASSWORD")
-# OPEN_SUBTITLES_API_CURRENT_JWT = os.getenv("OPEN_SUBTITLES_API_CURRENT_JWT")
-# OPEN_SUBTITLES_CURRENT_USER_AGENT = os.getenv("OPEN_SUBTITLES_CURRENT_USER_AGENT")
-# JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
-# PLEX_API_KEY = os.getenv("PLEX_API_KEY")
-# OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 
 def is_path_within_configured_roots(path):
     """Check if the given path is within the configured media roots."""
@@ -56,6 +49,10 @@ def is_path_within_configured_roots(path):
     print(f"Checking if path {absolute_path} is within configured roots: Movies: {movies_root}, TV Shows: {tvshows_root}")
     print(f"Absolute path parents: {list(absolute_path.parents)}")
     return absolute_path == movies_root or absolute_path == tvshows_root or movies_root in absolute_path.parents or tvshows_root in absolute_path.parents
+
+def refresh_all_libraries():
+    refresh_jellyfin_libraries()
+    refresh_plex_libraries()
 
 def refresh_all_environment_variables():
     global OPEN_SUBTITLES_API_KEY
@@ -241,8 +238,7 @@ def download_subtitle():
         with open(filepath, "w", encoding="utf-8") as file:
             file.write(file_content_response.text)
             print(f"Success! Subtitle securely saved to disk as '{filepath}'")
-            refresh_jellyfin_libraries()
-            refresh_plex_libraries()
+            refresh_all_libraries()  # Refresh libraries after subtitle download
             write_refresh_libraries_log(initiator="file_download")
         return {"name": filename, "size": format_size(os.path.getsize(filepath))}, 200
     else:
@@ -470,69 +466,12 @@ def checkIfDoneAndRefreshLibraries():
     if not isDownloading:  
         print("All downloads completed (or cleared). Refreshing media libraries...")
         try:
-            refresh_jellyfin_libraries()
-            refresh_plex_libraries()
+            refresh_all_libraries()  # Refresh both Jellyfin and Plex libraries
             write_refresh_libraries_log(initiator='file_download')
         except Exception as e:
             print(f"Error occurred while refreshing libraries: {e}")
     else:
         print("Downloads still in progress...")
-
-def refresh_jellyfin_libraries():
-        url = "http://localhost:8096/Library/Refresh"
-        headers = {
-            "Authorization": f"MediaBrowser Token={JELLYFIN_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        while True:
-            try:
-                response = requests.post(url, headers=headers, json={})
-                
-                if response.status_code in (200, 204):
-                    print("Jellyfin libraries refreshed successfully.")
-                    return True  # Break the loop and exit the function successfully
-                    
-                elif response.status_code == 503:
-                    retry_after = int(response.headers.get('Retry-After', 5))
-                    message = response.json().get('message', 'Service Unavailable')
-                    print(f"{message}. Retrying after {retry_after} seconds...")
-                    time.sleep(retry_after)
-                    continue  # Loop goes back to the top and tries again cleanly
-                    
-                else:
-                    print(f"Failed to refresh. Status code: {response.status_code}, Response: {response.text}")
-                    return False # Exit on hard error (401, 404, etc.)
-                    
-            except Exception as e:
-                print(f"Exception occurred while refreshing Jellyfin libraries: {e}")
-                return False
-
-def refresh_plex_libraries():
-    url = "http://localhost:32400/library/sections/all/refresh"
-    headers = {
-        "X-Plex-Token": PLEX_API_KEY,
-        "Content-Type": "application/json"
-    }
-    try:
-        response = requests.get(url, headers=headers)
-        
-        if response.status_code in (200, 204):
-            print("Plex libraries refreshed successfully.")
-            return True
-        else:
-            print(f"Failed to refresh Plex libraries. Status code: {response.status_code}, Response: {response.text}")
-            return False
-    except Exception as e:
-        print(f"Exception occurred while refreshing Plex libraries: {e}")
-        return False
-
-# def get_media_root():
-#     configuration = getConfigurationInternal()
-#     media_folder = configuration.get("MediaFolder")
-#     if not media_folder:
-#         raise ValueError("Media folder is not configured in the settings.")
-#     return os.path.join("/", str(media_folder).lstrip("/\\"))
-
 
 def get_configured_media_folder(configuration_key, default_name):
     configuration = getConfigurationInternal()
@@ -1560,8 +1499,7 @@ def delete_folder():
     except OSError as e:
         return jsonify({"error": str(e)}), 500 
     finally:
-        refresh_jellyfin_libraries()
-        refresh_plex_libraries()
+        refresh_all_libraries()
         write_refresh_libraries_log(initiator='folder_delete')
 
 
@@ -1588,8 +1526,7 @@ def delete_file():
     except OSError as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        refresh_jellyfin_libraries()
-        refresh_plex_libraries()
+        refresh_all_libraries()
         write_refresh_libraries_log(initiator='file_delete')
 
 
@@ -1628,8 +1565,7 @@ def rename_folder():
     except OSError as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        refresh_jellyfin_libraries()
-        refresh_plex_libraries()
+        refresh_all_libraries()
         write_refresh_libraries_log(initiator='folder_rename')
 
 
@@ -1663,8 +1599,7 @@ def rename_file():
     except OSError as e:
         return jsonify({"error": str(e)}), 500
     finally:
-        refresh_jellyfin_libraries()
-        refresh_plex_libraries()
+        refresh_all_libraries()
         write_refresh_libraries_log(initiator='file_rename')
 
 
@@ -1695,14 +1630,75 @@ def refresh_libraries(initiator='settings'):
     initiator = request.json.get('initiator', initiator)
 
     try:
-        refresh_jellyfin_libraries()
-        refresh_plex_libraries()
+        refresh_all_libraries()
         write_refresh_libraries_log(initiator)
 
         return jsonify({"message": "Libraries refreshed successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/getJellyfinUsers', methods=['GET'])
+def get_jellyfin_users_endpoint():
+    try:
+        users = get_jellyfin_users()
+        return jsonify(users), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/getPlexUsers', methods=['GET'])
+def get_plex_users_endpoint():
+    try:
+        users = get_plex_users()
+        return jsonify(users), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/getJellyfinUser/<user_id>', methods=['GET'])
+def get_jellyfin_user_endpoint(user_id):
+    try:
+        user = get_jellyfin_user_by_id(user_id)
+        return jsonify(user), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/addJellyfinUser', methods=['POST'])
+def add_jellyfin_user_endpoint():
+    data = request.get_json() or {}
+    username = data.get('Name')
+    password = data.get('password')
+
+    if not username or not password:
+        return jsonify({"error": "Both 'Name' and 'password' are required"}), 400
+
+    try:
+        user_id = add_jellyfin_user(data)
+        return jsonify({"message": "User added successfully", "user_id": user_id}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/updateJellyfinUser/<user_id>', methods=['PUT'])
+def update_jellyfin_user_endpoint(user_id):
+    data = request.get_json() or {}
+    username = data.get('username')
+    password = data.get('password')
+
+    if not username and not password:
+        return jsonify({"error": "At least one of 'username' or 'password' is required"}), 400
+
+    try:
+        update_jellyfin_user(user_id, {"username": username, "password": password})
+        return jsonify({"message": "User updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/deleteJellyfinUser/<user_id>', methods=['DELETE'])
+def delete_jellyfin_user_endpoint(user_id):
+    try:
+        delete_jellyfin_user(user_id)
+        return jsonify({"message": "User deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 @app.route('/destinationExists', methods=['POST'])
 def destination_exists():
     try:
