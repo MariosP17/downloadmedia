@@ -174,7 +174,7 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
     <div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <div>
-        <h2 className="text-2xl font-bold text-white">{name} <span className="ml-2 text-sm text-zinc-400">{releaseYear}</span></h2>
+        <span className={`text-2xl font-bold text-white`}><a href={(type === "series" && episodeData) ? `/series/${encodeURIComponent(decodedId.split(":")[0])}/${encodeURIComponent(name)}` : undefined} className={` ${(type === "series" && episodeData) && "hover:text-blue-400 transition-colors cursor-pointer"}`}>{name}</a> <span className="ml-2 text-sm text-zinc-400">{releaseYear}</span></span>
         <h3 className="text-xl font-semibold text-white"><span className="text-zinc-300 italic text-lg">{seasonAndEpisode}</span> {episodeName}</h3>
         </div>
       </div>

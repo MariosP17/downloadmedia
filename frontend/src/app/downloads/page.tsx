@@ -185,9 +185,9 @@ export default function DownloadsPage() {
     }, [downloads]);
   
     // Helper to construct your internal navigation route based on media type
-    const handleNavigation = (name: string, ttid: string, type: string, season: string = "") => {
+    const handleNavigation = (name: string, ttid: string, type: string, season: string = "") : string => {
       const itemName = name ?? "Media";
-        router.push(`/${type}/${encodeURIComponent(ttid)}/${encodeURIComponent(itemName)}${season !=""  ? `?season=${season}` : ""}`);
+        return `/${type}/${encodeURIComponent(ttid)}/${encodeURIComponent(itemName)}${season !=""  ? `?season=${season}` : ""}`;
     };
     useEffect(() => {
     if (itemsWithMetaMap && Object.keys(itemsWithMetaMap).length > 0) {
@@ -400,22 +400,26 @@ export default function DownloadsPage() {
 
                   {/* Content & Progress Bar Section */}
                   <div className="flex-1 min-w-0 w-full">
-                    <p
-                      onClick={() => handleNavigation(seriesOrMovieName, ttid.split(":")[0],type, type === "series" ? ttid.split(":")[1] : "")}
+                    <a
+                      href={handleNavigation(seriesOrMovieName, ttid.split(":")[0], type, type === "series" ? ttid.split(":")[1] : "")}
+                      onClick={(e) => {
+                        e.preventDefault();
+                      }}
                       // --- FIXED: Removed 'truncate', added 'break-words' and 'whitespace-normal' so long titles wrap nicely ---
                       className="text-left cursor-pointer text-zinc-100 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
                     >
                       {seriesOrMovieName}
-                    </p>
+                    </a>
                     <span className="text-zinc-400 text-xs">⚙️{torrentTitle}</span>
                     {(type === "series") && 
-                      <p
-                        onClick={() => handleNavigation(displayName, ttid, type)}
+                      <a
+                        href={handleNavigation(displayName, ttid, type)}
+                        onClick={(e) => e.preventDefault()}
                         // --- FIXED: Removed 'truncate', added 'break-words' and 'whitespace-normal' so long titles wrap nicely ---
                         className="text-left cursor-pointer text-xs text-zinc-400 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
                       >
                       <span className="text-sm font-semibold">S{ttid.split(":")[1].padStart(2, '0')}E{ttid.split(":")[2].padStart(2, '0')} </span>{displayName} 
-                      </p>
+                      </a>
                       
                     }
                     <div className="mt-2 flex items-center gap-3 w-full">

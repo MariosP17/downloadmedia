@@ -26,7 +26,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
   const [loading, setLoading] = useState(false);
   const [openAddAllModal, setOpenAddAllModal] = useState(false);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
-  const [activeSeasonForModal, setActiveSeasonForModal] = useState(null);
+  const [activeSeasonForModal, setActiveSeasonForModal] = useState<any | null>(null);
   const [bookmarks, setBookmarks] = useSyncedLocalStorage(`stream_bookmarks`, "[]");
   const [data, setData] = useState<{ [seasonId: string]: any[] }>({});
   const [loadingPercentage, setLoadingPercentage] = useState(0);
@@ -121,7 +121,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
       }
     }
     if (episodesadded == parseInt(episodesNum)) {
-      toast.success(<div>{episodesadded} episodes added to batch!<br/><span className="text-blue-500 hover:underline cursor-pointer" onClick={() => {router.push("/batch-download");toast.dismiss(toastId)}}>View Bookmarks</span></div>, { id: toastId });
+      toast.success(<div>{episodesadded} episodes added to batch!<br/><a className="text-blue-500 hover:underline cursor-pointer" href="/batch-download" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</a></div>, { id: toastId });
       setSvgPaths((prev) => ({
         ...prev,
         [seasonid]: SvgAddAllIcon.checked
@@ -129,7 +129,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
     }
     else 
     {
-        toast(<div>{episodesadded} episodes added to batch.{infoMessage}<br/><span className="text-blue-500 hover:underline cursor-pointer" onClick={() => {router.push("/batch-download");toast.dismiss(toastId)}}>View Bookmarks</span></div>, {
+        toast(<div>{episodesadded} episodes added to batch.{infoMessage}<br/><a className="text-blue-500 hover:underline cursor-pointer" href="/batch-download" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</a></div>, {
           id: toastId,
           icon: (<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5a96ce"><path d="M444-288h72v-240h-72v240Zm61.5-322.29q10.5-10.29 10.5-25.5t-10.29-25.71q-10.29-10.5-25.5-10.5t-25.71 10.29q-10.5 10.29-10.5 25.5t10.29 25.71q10.29 10.5 25.5 10.5t25.71-10.29ZM480.28-96Q401-96 331-126t-122.5-82.5Q156-261 126-330.96t-30-149.5Q96-560 126-629.5q30-69.5 82.5-122T330.96-834q69.96-30 149.5-30t149.04 30q69.5 30 122 82.5T834-629.28q30 69.73 30 149Q864-401 834-331t-82.5 122.5Q699-156 629.28-126q-69.73 30-149 30Z"/></svg>),
         });
@@ -166,13 +166,12 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
 
     // 2. Keep a dictionary to store the stream objects so we can retrieve them later
     const streamObjects = new Map<string, any>();
-
+    console.log(season);
     const totalEpisodes = season.episodes.length;
     let notFoundEpisodes = 0;
     setLoadingPercentage(0); // Reset loading percentage at the start
     const episodeIndices = Array.from({ length: totalEpisodes }, (_, idx) => idx + 1);
     let completedCount = 0;
-    console.log(`Starting to fetch streams for season ${seasonId}. Total episodes: ${totalEpisodes}.`);
     if (totalEpisodes >= (options["batchSizeThreshold"] || 50)) {
       const BATCH_SIZE = options["batchSize"] || 5; // (lower = safer)
 
@@ -347,7 +346,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
                 e.stopPropagation();
                 setDataForSeason(season); // Fetch and set data for the selected season
                 // Pass the whole season object (or just season.id) to your state
-                setActiveSeasonForModal(season.id); 
+                setActiveSeasonForModal(season); 
                 setOpenAddAllModal(true);
               }}
               title="Add all episodes of this season to batch"
@@ -370,16 +369,18 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
                   const ename = ep.name ?? ep.title ?? `Episode ${ep.episode ?? ep.number ?? ""}`;
                   return (
                     <div key={eid}>
+                      <a href={`/series/${encodeURIComponent(ep.id)}/${encodeURIComponent(ename)}`}>
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLoading(true);
-                          router.push(`/series/${encodeURIComponent(ep.id)}/${encodeURIComponent(ename)}`);
+                          // setLoading(true);
+                          // router.push(`/series/${encodeURIComponent(ep.id)}/${encodeURIComponent(ename)}`);
                         }}
                         className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
                       >
                         <FallbackImage src={ep.thumbnail || ep.poster || ep.cover || "/no-poster-16-9.jpg"} fallback="/no-poster-16-9.jpg" alt={ename} />
                       </div>
+                      </a>
                       <p className="mt-2 text-sm font-medium"><span className="text-zinc-500">S{season.number.toString().padStart(2, '0')}E{ep.episode?.toString().padStart(2, '0') ?? ep.number?.toString().padStart(2, '0') ?? ""}</span> {ename}</p>
                       {(ep.description || ep.overview) && <p className="mt-1 text-xs text-zinc-400">{ep.description || ep.overview}</p>}
                     </div>
@@ -399,13 +400,13 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
     })}
 
     {/* 2. THE MODAL (Moved completely outside the loop) */}
-    {openAddAllModal && activeSeasonForModal && (
+    {openAddAllModal && activeSeasonForModal && activeSeasonForModal.id && (
       <div onClick={(e) => {setOpenAddAllModal(false); setActiveSeasonForModal(null); }} className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-md [backdrop-filter:blur(8px)]">
         <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-xl rounded-xl p-5 flex flex-col shadow-2xl max-h-[85vh] search-scrollbar">
           
           {/* Header */}
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
-            <h3 className="text-base font-bold text-white">Select Stream Target ({seasons.find((s) => s.id === activeSeasonForModal)?.name})</h3>
+            <h3 className="text-base font-bold text-white">Select Stream Target ({seasons.find((s) => s.id === activeSeasonForModal.id)?.name})</h3>
             <button 
               onClick={() => { setOpenAddAllModal(false); setActiveSeasonForModal(null); }} 
               className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
@@ -423,8 +424,17 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
 
               <Menu as={"div" as React.ElementType} className="relative inline-block text-left w-full">
                 {/* Trigger Button */}
-                <MenuButton className="w-full inline-flex justify-between items-center gap-x-1.5 rounded-lg bg-zinc-900 border border-zinc-800 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800/80 transition-colors focus:outline-none focus:border-green-600 cursor-pointer">
-                  <span>{selectedHash?.split(",")[0] === activeSeasonForModal ? ShowBasicData(data[activeSeasonForModal]?.find((s: any) => s.infoHash === selectedHash?.split(",")[1])).toString() : "Select an option"}</span>
+                <MenuButton onClick={() => {
+                    if (data[activeSeasonForModal.id]?.length === 1 && data[activeSeasonForModal.id][0] === false) {
+                      setData(prevData => ({
+                        ...prevData,
+                        [activeSeasonForModal.id]: undefined
+                      }));
+                      setDataForSeason(activeSeasonForModal)}}
+                    } 
+                      className="w-full inline-flex justify-between items-center gap-x-1.5 rounded-lg bg-zinc-900 border border-zinc-800 px-3.5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-zinc-800/80 transition-colors focus:outline-none focus:border-green-600 cursor-pointer">
+                    
+                  <span>{selectedHash?.split(",")[0] === activeSeasonForModal.id ? ShowBasicData(data[activeSeasonForModal.id]?.find((s: any) => s.infoHash === selectedHash?.split(",")[1])).toString() : "Select an option"}</span>
                   <svg className="h-4 w-4 text-zinc-400" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.168l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clipRule="evenodd" />
                   </svg>
@@ -435,7 +445,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
                   transition
                   className="absolute left-0 z-50 mt-1 w-full origin-top-left rounded-lg bg-zinc-900 border border-zinc-800 shadow-xl focus:outline-none py-1 max-h-48 overflow-y-auto search-scrollbar transition ease-out duration-100 data-[closed]:scale-95 data-[closed]:opacity-0"
                 >
-                  {data[activeSeasonForModal] == undefined && (
+                  {data[activeSeasonForModal.id] == undefined && (
                     <div className="p-4">
                       <div className="animate-pulse">
                         <div className="h-4 bg-zinc-800 rounded mb-2 w-3/4" />
@@ -445,23 +455,23 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
                       </div>
                     </div>
                   )}
-                  {data[activeSeasonForModal]?.length === 0 && (
+                  {data[activeSeasonForModal.id]?.length === 0 && (
                     <div className="p-4 text-zinc-400 text-sm">
                       No streams available for this season that contain all episodes.
                     </div>
                   )}
-                  {data[activeSeasonForModal]?.length ==1 && (data[activeSeasonForModal])[0] == false && (
+                  {data[activeSeasonForModal.id]?.length ==1 && (data[activeSeasonForModal.id])[0] == false && (
                     <div className="p-4 text-zinc-400 text-sm">
                       An error occurred while fetching streams for this season. Please try again after a while.
                     </div>
                   )}
-                  {data[activeSeasonForModal]?.length > 0 && (data[activeSeasonForModal])[0] !== false && data[activeSeasonForModal]?.map((stream: any) => (ShowBasicData(stream, true))).map((item: any) => (
+                  {data[activeSeasonForModal.id]?.length > 0 && (data[activeSeasonForModal.id])[0] !== false && data[activeSeasonForModal.id]?.map((stream: any) => (ShowBasicData(stream, true))).map((item: any) => (
                     <MenuItem key={item.hash}>
                       <button
                         type="button"
-                        onClick={() => setSelectedHash(`${activeSeasonForModal},${item.hash}`)}
+                        onClick={() => setSelectedHash(`${activeSeasonForModal.id},${item.hash}`)}
                         className={`w-full text-left px-4 py-2 text-sm transition-colors cursor-pointer block
-                          ${selectedHash?.split(",")[0] === activeSeasonForModal && selectedHash?.split(",")[1] === item.hash 
+                          ${selectedHash?.split(",")[0] === activeSeasonForModal.id && selectedHash?.split(",")[1] === item.hash 
                             ? "bg-green-600 text-white font-semibold" 
                             : "text-zinc-300 data-[focus]:bg-zinc-800 data-[focus]:text-white"
                           }`}
@@ -485,8 +495,8 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
               Cancel
             </button>
             <button
-              onClick={() =>addAllEpisodesToBatch((selectedHash || "")+","+ttid+","+seasons.find((s) => s.id === activeSeasonForModal)?.episodes.length)}
-              disabled={selectedHash === "" || selectedHash === null || selectedHash.split(",")[0] != activeSeasonForModal || selectedHash.split(",")[1] === undefined}
+              onClick={() =>addAllEpisodesToBatch((selectedHash || "")+","+ttid+","+seasons.find((s) => s.id === activeSeasonForModal.id)?.episodes.length)}
+              disabled={selectedHash === "" || selectedHash === null || selectedHash.split(",")[0] != activeSeasonForModal.id || selectedHash.split(",")[1] === undefined}
               className="px-4 py-2 bg-green-600 hover:bg-green-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
             >
               Add All Episodes to Batch

@@ -495,7 +495,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       }
   }
 
-  async function navigateToMedia(cleanName: string,path: string) {
+  async function navigateToMedia(cleanName: string,path: string, blank: boolean = false) {
     if (!isMovieOrSeriesFolder || !type) return;
     setPageLoading(true);
     const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
@@ -507,7 +507,12 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       if (targetTtid == ""){
         targetTtid = await getAndSetTtid(cleanNameForTtid, path);
       }
+      if (blank) {
+        window.open(`/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : ""), "_blank");
+      }
+      else {
       window.location.href = `/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : "");
+      }
     } finally {
       setPageLoading(false);
     }
@@ -531,7 +536,14 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           alt=""
           className="w-5 h-5 object-contain flex-shrink-0"
         />
-        <span onClick={async (e) => { isMovieOrSeriesFolder && (e.stopPropagation(), e.preventDefault(), await navigateToMedia(cleanName, itemPath)) }} className={`text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-none ${isMovieOrSeriesFolder ? "hover:text-blue-500 hover:underline" : ""}`}>
+        <span onMouseDown={async (e) =>{
+          if (isMovieOrSeriesFolder && e.button === 1) {
+            e.preventDefault();
+            e.stopPropagation();
+            await navigateToMedia(cleanName, itemPath, true);
+          }
+        }} 
+          onClick={async (e) => { isMovieOrSeriesFolder && (e.stopPropagation(), e.preventDefault(), await navigateToMedia(cleanName, itemPath)) }} className={`text-sm font-medium overflow-x-auto whitespace-nowrap scrollbar-none ${isMovieOrSeriesFolder ? "hover:text-blue-500 hover:underline" : ""}`}>
           {cleanName}
         </span>
         {loading && <span className="text-xs text-zinc-500 animate-pulse">loading...</span>}

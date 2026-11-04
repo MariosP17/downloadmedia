@@ -85,11 +85,12 @@ export default function SearchPage() {
               ) : (
                 movies.length > 0 ? movies.map((movie: any) => (
                   <div key={movie.id}>
+                    <a href={`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`}>
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
-                        setPageLoading(true);
-                        router.push(`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`);
+                        // setPageLoading(true);
+                        // router.push(`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`);
                       }}
                       className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
                     >
@@ -101,6 +102,7 @@ export default function SearchPage() {
                         className="poster"
                       />
                     </div>
+                    </a>
                     <p className="mt-2">{movie.name}</p>
                   </div>
                 )) : (
@@ -137,16 +139,18 @@ export default function SearchPage() {
               ) : (
                 series.length > 0 ? series.map((show: any) => (
                   <div key={show.id}>
+                    <a href={`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`}>
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
-                        setPageLoading(true);
-                        router.push(`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`);
+                        // setPageLoading(true);
+                        // router.push(`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`);
                       }}
                       className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
                     >
                       <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
                     </div>
+                    </a>
                     <p className="mt-2">{show.name}</p>
                   </div>
                 )) : (

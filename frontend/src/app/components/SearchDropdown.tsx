@@ -148,11 +148,12 @@ export default function SearchDropdown({
           >
             <div className={`${active === "movies" ? "block" : "hidden"}`}>
               {movies.length >0 ? movies.map((item: any) => (
+                <a href={`/movie/${encodeURIComponent(item.id)}/${encodeURIComponent(item.name)}`} key={item.id}>
                 <div
                   key={item.id}
                   onClick={() => {
                     if (onClose) onClose();
-                    router.push(`/movie/${encodeURIComponent(item.id)}/${encodeURIComponent(item.name)}`);
+                    // router.push(`/movie/${encodeURIComponent(item.id)}/${encodeURIComponent(item.name)}`);
                   }}
                   className="flex items-center gap-3 p-3 hover:bg-zinc-800 cursor-pointer"
                 >
@@ -163,6 +164,7 @@ export default function SearchDropdown({
                   />
                   <div className="text-white">{item.name}</div>
                 </div>
+                </a>
               )) : (
                 <div className="p-4 text-zinc-400">No movies found for "{query}"</div>
               )}
@@ -170,11 +172,12 @@ export default function SearchDropdown({
 
             <div className={`${active === "series" ? "block" : "hidden"}`}>
               {series.length > 0 ? series.map((item: any) => (
+                <a href={`/series/${encodeURIComponent(item.id)}/${encodeURIComponent(item.name)}`} key={item.id}>
                 <div
                   key={item.id}
                   onClick={() => {
                     if (onClose) onClose();
-                    router.push(`/series/${encodeURIComponent(item.id)}/${encodeURIComponent(item.name)}`);
+                    // router.push(`/series/${encodeURIComponent(item.id)}/${encodeURIComponent(item.name)}`);
                   }}
                   className="flex items-center gap-3 p-3 hover:bg-zinc-800 cursor-pointer"
                 >
@@ -185,6 +188,7 @@ export default function SearchDropdown({
                   />
                   <div className="text-white">{item.name}</div>
                 </div>
+                </a>
               )) : (
                 <div className="p-4 text-zinc-400">No series found for "{query}"</div>
               )}

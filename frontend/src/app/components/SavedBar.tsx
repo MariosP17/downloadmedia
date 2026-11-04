@@ -26,7 +26,7 @@ function SavedMediaCard({
   onDelete,
 }: {
   media: SavedMediaItem;
-  onNavigate: (media: SavedMediaItem) => void;
+  onNavigate: (media: SavedMediaItem, newTab?: boolean) => void;
   onDelete: (media: SavedMediaItem) => Promise<boolean>;
 }) {
   const x = useMotionValue(0);
@@ -91,6 +91,12 @@ function SavedMediaCard({
             return;
           }
           onNavigate(media);
+        }}
+        onMouseDown={(event) => {
+          if (event.button === 1) {
+            event.preventDefault();
+            onNavigate(media, true);
+          }
         }}
         >
         <p className="mb-1 text-zinc-200">
@@ -179,10 +185,16 @@ export default function SavedBar({
   // Use the render state instead of the open prop to control structural mount
   if (!render) return null;
 
-  const navigateToMedia = async (media: SavedMediaItem) => {
+  const navigateToMedia = async (media: SavedMediaItem, newTab: boolean = false) => {
     try {
       setLoading(true);
-      window.location.href = `/${MediaType[media.type]}/${encodeURIComponent(media.ttid)}/${encodeURIComponent(media.name)}`;
+      if (newTab) {
+        const url = `/${MediaType[media.type]}/${encodeURIComponent(media.ttid)}/${encodeURIComponent(media.name)}`;
+        window.open(url, "_blank");
+      }
+      else{
+        window.location.href = `/${MediaType[media.type]}/${encodeURIComponent(media.ttid)}/${encodeURIComponent(media.name)}`;
+      }
     } catch (error) {
       console.error("Failed to navigate to media:", error);
       toast.error("Failed to navigate to media");
@@ -284,7 +296,7 @@ export default function SavedBar({
           <SavedMediaCard
             key={media.ttid}
             media={media}
-            onNavigate={(item) => void navigateToMedia(item)}
+            onNavigate={(item, newTab) => void navigateToMedia(item, newTab)}
             onDelete={deleteSavedMedia}
           />
         ))}
