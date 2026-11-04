@@ -43,7 +43,8 @@ export const OptionsNames : Record<string, string> =
     "sort_streams_by_size" : "Sort streams by size",
     "rest_api_selection" : "Rest API location",
     "rest_api_url" : "Rest API URL",
-    "rest_api_url_port" : "Local Rest API Port"
+    "rest_api_url_port" : "Local Rest API Port",
+    "batchSizeThreshold" : "Batch Size Threshold for batch bookmarking"
 
 };
 

@@ -738,7 +738,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
           return (
             <div 
               key={`${seriesItem.displayName}-${seriesItem.posterUrl}-${seriesIdx}`}
-              className="bg-zinc-900 rounded-xl space-y-4 transition-colors"
+              className="bg-zinc-900 rounded-xl transition-colors"
             >
               {/* Show Title Header Block */}
               <div className={`flex items-center p-2 justify-between ${!isCollapsed(seriesItem.ttid) && 'rounded-b-none'} border-zinc-800 hover:bg-zinc-800/60 rounded-lg transition-colors cursor-pointer`}
@@ -796,23 +796,24 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   }}
                   onClick={(e) => e.stopPropagation()}
                   // 2. CSS updates: Added 'indeterminate:bg-zinc-700' and 'indeterminate:after:content-["-"]'
-                  className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
+                  className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
                 />
-                <img src={!isCollapsed(seriesItem.ttid) ? "/arrow-up.svg" : "/arrow-down.svg"} alt="Expand/Collapse" className="w-4 h-4" />
+                <img src="/arrow-down.svg" alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seriesItem.ttid) ? "rotate-180" : ""}`} />
                   </div>
               </div>
 
               {/* Inner Nested Episodes Sub-List Tracking Area */}
-              {!isCollapsed(seriesItem.ttid) && (
+              <div className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isCollapsed(seriesItem.ttid) ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
+              <div className="min-h-0 overflow-hidden">
               <div className="space-y-3 pl-2 pb-3">
                 {seriesSeasonsorSeriesTorrents.map((seasonOrTorrent, seasonIdx) => (
-                  <div key={`${seriesItem.displayName}-season-${seasonOrTorrent}-${seasonIdx}`} className="space-y-2 mx-3 border border-zinc-800 rounded-lg">
+                  <div key={`${seriesItem.displayName}-season-${seasonOrTorrent}-${seasonIdx}`} className=" mt-3 mx-3 border border-zinc-800 rounded-lg">
                     <div className={`flex p-2 items-center justify-between sm:gap-4 gap-2 ${!isCollapsed(seasonOrTorrent, seriesItem.ttid) && 'rounded-b-none'} rounded-lg border-zinc-800 hover:bg-zinc-800/60 transition-colors cursor-pointer`}
                     onClick={() => expandOrCollapse(seasonOrTorrent, seriesItem.ttid)}>
                     <div className="flex flex-col mb-2 gap-1 min-w-0">
                     <a className={`text-sm w-fit font-semibold text-zinc-300 mt-2  ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} 
                     href={!isOn ? `/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}` : undefined}
-                    onClick={(e) => e.stopPropagation()} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
+                    onClick={(e) => !isOn && e.stopPropagation()} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
                         ? seasonOrTorrent.provider + ` (${seasonOrTorrent.hash.slice(0, 8)}...)`
                         : 'Unknown Provider')}</a>
                      <p className="text-xs text-zinc-500 font-medium mt-0.5">
@@ -849,19 +850,20 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   }}
                   onClick={(e) => e.stopPropagation()}
                   // 2. CSS updates: Added 'indeterminate:bg-zinc-700' and 'indeterminate:after:content-["-"]'
-                  className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
+                  className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
                 />
-                <img src={!isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "/arrow-up.svg" : "/arrow-down.svg"} alt="Expand/Collapse" className="w-4 h-4" />
+                <img src="/arrow-down.svg" alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "rotate-180" : ""}`} />
                 </div>
                 </div>
-                {!isCollapsed(seasonOrTorrent, seriesItem.ttid) && (
+                <div className={` grid transition-[grid-template-rows] duration-300 ease-in-out ${isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
+                <div className="min-h-0 overflow-hidden">
                 <div className="space-y-3 pl-2 pr-5" >
                   {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).sort((a,b) => a.number - b.number).map((episodeItem, epIdx) => (
                     <div
                       key={`${episodeItem.infoHash}-${episodeItem.fileIdx}-${epIdx}`}
-                      className="flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between p-3 bg-zinc-950/60 border border-zinc-800/40 rounded-xl gap-4 transition-colors"
+                      className={`${epIdx == 0 ? 'mt-3' : 'mt-0'} ${epIdx == seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length - 1 ? 'mb-3' : 'mb-0'} flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between p-3 bg-zinc-950/60 border border-zinc-800/40 rounded-xl gap-4 transition-colors`}
                     >
-                      <div className="w-full flex items-center gap-4 min-w-0">
+                      <div className={`w-full flex items-center gap-4 min-w-0`}>
                         {/* Thumbnail Container (Using landscape layout for individual episode clips) */}
                         <div className="w-18 h-12 rounded-lg overflow-hidden bg-zinc-900 flex-shrink-0 relative border border-zinc-800">
                           <FallbackImage 
@@ -915,17 +917,19 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                           type="checkbox"
                           checked={checkedItems.has(`${episodeItem.infoHash}-${episodeItem.fileIdx}-${episodeItem.ttid}`)}
                           onChange={(e) => handleCheckboxChange(episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)(e)}
-                          className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
+                          className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
                         />
                       </div>
                     </div>
                   ))}
                 </div>
-                )}
               </div>
-                ))}
+              </div>
+              </div>
+            ))}
             </div>
-          )}
+            </div>
+            </div>
             </div>
           );
         })}
@@ -985,7 +989,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     type="checkbox"
                     defaultChecked={true}
                     onChange={handleCheckboxChange(item.infoHash, item.fileIdx, item.ttid)}
-                    className="appearance-none w-5 h-5 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
+                    className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
                   />
                 </div>
                   {/* <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t border-zinc-800 sm:border-0 pt-3 sm:pt-0"> */}

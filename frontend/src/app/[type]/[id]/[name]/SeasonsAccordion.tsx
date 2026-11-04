@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { toast } from "react-hot-toast";
 import { useSyncedLocalStorage } from "../../../Utils/useSyncedLocalStorage";
+import { option } from "framer-motion/client";
 
 type Props = {
   seasons: any[];
   type: string;
   ttid: string; // Optional ttid for future use, currently unused in this component
+  options: { [key: string]: any }; // Optional prop for additional options
+  config: { [key: string]: any }; // Optional prop for additional configuration
   paramsOpenSeason?: string; // Optional prop to open a specific season initially
 };
 
@@ -18,7 +21,7 @@ const SvgAddAllIcon = {
  "checked": "M120-320v-80h320v80H120Zm0-160v-80h480v80H120Zm0-160v-80h480v80H120Zm534 440L512-342l56-56 86 84 170-170 56 58-226 226Z"
 };
 
-export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason }: Props) {
+export default function SeasonsAccordion({ seasons, type, ttid, options, config, paramsOpenSeason }: Props) {
   const [openSeasonId, setOpenSeasonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [openAddAllModal, setOpenAddAllModal] = useState(false);
@@ -82,9 +85,6 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
     };
   }, [openAddAllModal]);
 
-  useEffect(() => {
-    console.log("data state updated:", data);
-  }, [data]);
 
   const addAllEpisodesToBatch = async (key: string) => {
   const toastId = toast.loading(<span>Adding all episodes to batch...</span>);
@@ -172,7 +172,9 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
     setLoadingPercentage(0); // Reset loading percentage at the start
     const episodeIndices = Array.from({ length: totalEpisodes }, (_, idx) => idx + 1);
     let completedCount = 0;
-    if (totalEpisodes >= 50) {
+    console.log(`Starting to fetch streams for season ${seasonId}. Total episodes: ${totalEpisodes}.`);
+    if (totalEpisodes >= (options["batchSizeThreshold"] || 50)) {
+      console.log(`Total episodes (${totalEpisodes}) exceed threshold (${options["batchSizeThreshold"] || 50}). Fetching in batches.`);
       const BATCH_SIZE = 5; // (lower = safer)
 
       for (let i = 0; i < episodeIndices.length; i += BATCH_SIZE) {
@@ -233,6 +235,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
       }
     }
     else {
+      console.log(`Total episodes (${totalEpisodes}) below threshold (${options["batchSizeThreshold"] || 50}). Fetching all at once.`);
       // 2. Dispatch all fetch execution threads concurrently
       await Promise.all(
         episodeIndices.map(async (i) => {
@@ -451,7 +454,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, paramsOpenSeason
                   )}
                   {data[activeSeasonForModal]?.length ==1 && (data[activeSeasonForModal])[0] == false && (
                     <div className="p-4 text-zinc-400 text-sm">
-                      An error occurred while fetching streams for this season.
+                      An error occurred while fetching streams for this season. Please try again after a while.
                     </div>
                   )}
                   {data[activeSeasonForModal]?.length > 0 && (data[activeSeasonForModal])[0] !== false && data[activeSeasonForModal]?.map((stream: any) => (ShowBasicData(stream, true))).map((item: any) => (

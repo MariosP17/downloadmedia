@@ -221,7 +221,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
           </div>
           <h1 className="text-2xl font-bold mb-6">Season results for {decodeURIComponent(name)}</h1>
   
-          <SeasonsAccordion seasons={seasons} type={type} ttid={id} paramsOpenSeason={season} />
+          <SeasonsAccordion seasons={seasons} type={type} ttid={id} paramsOpenSeason={season} options={options} config={configuration} />
         </main>
       );
     }
