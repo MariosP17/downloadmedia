@@ -166,7 +166,6 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
 
     // 2. Keep a dictionary to store the stream objects so we can retrieve them later
     const streamObjects = new Map<string, any>();
-    console.log(season);
     const totalEpisodes = season.episodes.length;
     let notFoundEpisodes = 0;
     setLoadingPercentage(0); // Reset loading percentage at the start

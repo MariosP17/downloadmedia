@@ -119,7 +119,7 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
   const headersList = await headers();
   const host = headersList.get("host")?.split(":")[0] || "localhost";
   const protocol = headersList.get("x-forwarded-proto") || "http";
-  const ret = await fetch(`${await getApiUrl(host,protocol)}/savedMediaExists?ttid=${encodeURIComponent(id)}`).then(res => res.json()).catch(() => false);
+  const ret = await fetch(`${await getApiUrl(host,protocol)}/savedMediaExists?ttid=${(id)}`).then(res => res.json()).catch(() => false);
   const isInSavedMedia = ret.data === true;
   if (!data) return null;
   const decodedId = decodeURIComponent(id);

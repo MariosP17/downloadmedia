@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState ,useEffect} from 'react';
+import React, { useRef, useState ,useEffect} from 'react';
 import Tree from 'rc-tree';
 import 'rc-tree/assets/index.css';
 import { toast } from 'react-hot-toast';
@@ -61,9 +61,10 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
   }]);
   
   const [selectedFolder, setSelectedFolder] = useState<string | null>(initialFolder);
-  // const [displayedFolder, setDisplayedFolder] = useState<string | null>(initialFolder);
+  const [displayedFolder, setDisplayedFolder] = useState<string | null>(initialFolder);
   const [treeOpen, setTreeOpen] = useState(false);
   const [expandedKeys, setExpandedKeys] = useState<React.Key[]>([]);
+  const historyEntryActive = useRef(false);
 
   const onExpand = (keys: React.Key[]) => {
     setExpandedKeys(keys);
@@ -134,7 +135,6 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
       }
 
       const folderId = selectedKeys[0] as string;
-      // setDisplayedFolder(folderId);
       setSelectedFolder(folderId);
       // if (onSelectFolder) {
       //   onSelectFolder(selectedKeys[0] as string);
@@ -144,6 +144,12 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
   };
 
   const onOpenTreeModal = () => {
+    window.history.pushState(
+      { ...window.history.state, folderPickerOpen: true },
+      "",
+      window.location.href
+    );
+    historyEntryActive.current = true;
     setTreeOpen(true);
   };
 
@@ -151,10 +157,15 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
     if (save){
       if (onSelectFolder && selectedFolder && selectedFolder !== initialFolder) {
         onSelectFolder(selectedFolder);
+        // setDisplayedFolder(selectedFolder);
       }
     }
     else{
       setSelectedFolder(initialFolder);
+    }
+    if (historyEntryActive.current) {
+      historyEntryActive.current = false;
+      window.history.back();
     }
     setTreeOpen(false);
   };
@@ -163,7 +174,7 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
     const loadInitialPath = async () => {
       if (!initialFolder) return;
       
-    // setDisplayedFolder(initialFolder);
+    setDisplayedFolder(initialFolder);
     setSelectedFolder(initialFolder);
     // Convert "/media/Movies/Action" into parent keys: ["/media", "/media/Movies"]
     const paths = initialFolder.split('/').slice(0, -1).filter(Boolean);
@@ -201,18 +212,41 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
 }, [initialFolder]);
 
 useEffect(() => {
-  if (!treeOpen) return; // Only scroll when the tree is open
-  const selectedSpan = document.querySelector(`.rc-tree-node-selected[title="${initialFolder.split('/').pop()}"]`);
-  console.log("Scrolling to:", selectedSpan, "for folder:", initialFolder);
-  if (selectedSpan) {
-    selectedSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (!treeOpen) return;
+
+  const handlePopState = () => {
+    historyEntryActive.current = false;
+    setSelectedFolder(initialFolder);
+    setTreeOpen(false);
+  };
+
+  window.addEventListener("popstate", handlePopState);
+  return () => window.removeEventListener("popstate", handlePopState);
+}, [treeOpen, initialFolder]);
+
+useEffect(() => {
+  const topbar = document.getElementById("top-bar");
+  const documentoverflow = document.body.style.overflow;
+  const tobbarVisibility = topbar?.style.visibility;
+  if (treeOpen) {
+    document.body.style.overflow = 'hidden';
+    if (topbar) topbar.style.setProperty('visibility', 'hidden');
+
+    const selectedSpan = document.querySelector(`.rc-tree-node-selected[title="${initialFolder.split('/').pop()}"]`);
+    if (selectedSpan) {
+      selectedSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+  return () => {
+    document.body.style.overflow = documentoverflow;
+    if (topbar) topbar.style.setProperty('visibility', tobbarVisibility || 'visible');
   }
 }, [treeOpen]);
 
   return (
     <div>
     <div style={style} className='cursor-pointer'>
-      <input type="text" value={selectedFolder || ''} readOnly placeholder="Select a folder" className="w-full mb-2 p-2 border rounded"
+      <input type="text" value={displayedFolder || ''} readOnly placeholder="Select a folder" className="w-full mb-2 p-2 border rounded"
         onClick={onOpenTreeModal} />
     </div>
     {treeOpen && (

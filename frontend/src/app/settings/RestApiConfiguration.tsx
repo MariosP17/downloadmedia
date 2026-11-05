@@ -81,7 +81,6 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
     };
 
     const onUpdateRestApiConfig = async (newValue : string) => {
-        console.log("Updating REST API configuration selection to:", restApiConfig);
             try{
                 setLoading(true);
                 const respone = await getRestApiConfig();

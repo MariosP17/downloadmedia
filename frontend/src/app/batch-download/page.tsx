@@ -762,7 +762,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                       {seriesItem.displayName}
                     </a>
                   <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                    {seriesEpisodes.length} {seriesEpisodes.length === 1 ? "Episode" : "Episodes"} queued
+                    <span className="text-white "> {Array.from(checkedItems).filter((item) => item.split("-")[2].split(":")[0] === seriesItem.ttid).length} </span> /{seriesEpisodes.length} {seriesEpisodes.length === 1 ? "Episode" : "Episodes"} queued
                   </p>
                 </div>
                 </div>
@@ -817,7 +817,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                         ? seasonOrTorrent.provider + ` (${seasonOrTorrent.hash.slice(0, 8)}...)`
                         : 'Unknown Provider')}</a>
                      <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                    {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length} {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length === 1 ? "Episode" : "Episodes"} queued
+                    <span className="text-white">{Array.from(checkedItems).filter((item) => !isOn ?  item.split("-")[2].split(":").slice(0,-1).join("/") === seriesItem.ttid+"/"+seasonOrTorrent   : item.split("-")[0] === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length}</span> / {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length} {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length === 1 ? "Episode" : "Episodes"} queued
                   </p>
                   </div>
                 <div className="flex items-center gap-2 sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0 pr-2">

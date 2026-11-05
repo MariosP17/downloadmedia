@@ -22,36 +22,44 @@ const SWIPE_DELETE_THRESHOLD = -140;
 
 function SavedMediaCard({
   media,
-  onNavigate,
   onDelete,
 }: {
   media: SavedMediaItem;
-  onNavigate: (media: SavedMediaItem, newTab?: boolean) => void;
   onDelete: (media: SavedMediaItem) => Promise<boolean>;
 }) {
   const x = useMotionValue(0);
   const deleteOpacity = useTransform(x, [-100, -20, 0], [1, 1, 0]);
   const [deleting, setDeleting] = useState(false);
-  const dragged = useRef(false);
-  const resetDragged = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelClick = useRef(false);
+
+  const getMediaUrl = (media: SavedMediaItem) => {
+    // try {
+      // setLoading(true);
+      // if (newTab) {
+        return`/${MediaType[media.type]}/${encodeURIComponent(media.ttid)}/${encodeURIComponent(media.name)}`;
+        // window.open(url, "_blank");
+    // } catch (error) {
+    //   console.error("Failed to navigate to media:", error);
+    //   toast.error("Failed to navigate to media");
+    // } finally {
+        // setLoading(false);
+    // }
+  };
 
   const handleDragEnd = async (
     _event: MouseEvent | TouchEvent | PointerEvent,
     info: PanInfo,
   ) => {
-    if (resetDragged.current) clearTimeout(resetDragged.current);
-    resetDragged.current = setTimeout(() => {
-      dragged.current = false;
-    }, 200);
-
     if (info.offset.x < SWIPE_DELETE_THRESHOLD) {
       setDeleting(true);
       const deleted = await onDelete(media);
       if (!deleted) {
         setDeleting(false);
       }
+      return;
     }
   };
+
 
   return (
     <motion.div
@@ -69,49 +77,47 @@ function SavedMediaCard({
           Remove
         </span>
       </motion.div>
-      <motion.div
-        drag={deleting ? false : "x"}
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={{ left: 0.9, right: 0.05 }}
-        animate={deleting ? { x: "-100%" } : { x: 0 }}
-        style={{ x }}
-        transition={{ type: "spring", stiffness: 500, damping: 35 }}
-        className="relative rounded bg-zinc-800 p-2"
-        onDragStart={() => {
-          dragged.current = true;
-        }}
-        onDragEnd={handleDragEnd}
-        onTap={(event) => {
-          if (event.target instanceof HTMLElement && event.target.closest("button")) {
-            return;
-          }
-          if (dragged.current) {
-            if (resetDragged.current) clearTimeout(resetDragged.current);
-            dragged.current = false;
-            return;
-          }
-          onNavigate(media);
-        }}
-        onMouseDown={(event) => {
-          if (event.button === 1) {
-            event.preventDefault();
-            onNavigate(media, true);
-          }
-        }}
+        <motion.div
+          drag={deleting ? false : "x"}
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={{ left: 0.9, right: 0.05 }}
+          animate={deleting ? { x: "-100%" } : { x: 0 }}
+          style={{ x }}
+          transition={{ type: "spring", stiffness: 500, damping: 35 }}
+          className="relative rounded bg-zinc-800 p-2"
+          onDragStart={() => {
+            cancelClick.current = true;
+          }}
+          onDragEnd={handleDragEnd}
         >
-        <p className="mb-1 text-zinc-200">
-          {media.series_name || media.name}{" "}
-          <span className="text-sm text-zinc-400">({media.year})</span>
-        </p>
-        {media.episode_info && (
-          <p className="mb-2 text-sm text-zinc-400">
-            {media.episode_info}{" "}
-            <span className="text-sm text-white">{media.name}</span>
+        <a
+          href={getMediaUrl(media)}
+          onPointerDown={() => {
+            cancelClick.current = false;
+          }}
+          onDragStart={(e) => e.preventDefault()}
+          onClick={(e) => {
+            if (cancelClick.current) {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelClick.current = false;
+            }
+          }}
+        >
+          <p className="mb-1 text-zinc-200">
+            {media.series_name || media.name}{" "}
+            <span className="text-sm text-zinc-400">({media.year})</span>
           </p>
-        )}
-        <div className="flex flex-col items-center">
-          <FallbackImage className="max-h-62 w-auto" src={media.poster_url} alt={media.name} />
-        </div>
+          {media.episode_info && (
+            <p className="mb-2 text-sm text-zinc-400">
+              {media.episode_info}{" "}
+              <span className="text-sm text-white">{media.name}</span>
+            </p>
+          )}
+          <div className="flex flex-col items-center">
+            <FallbackImage className="max-h-62 w-auto" src={media.poster_url} alt={media.name} />
+          </div>
+        </a>
         <div className="mt-2 flex justify-end">
           <button
             type="button"
@@ -119,6 +125,7 @@ function SavedMediaCard({
             className="rounded p-1 hover:cursor-pointer hover:bg-zinc-700 hover:opacity-80"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
+              event.preventDefault();
               event.stopPropagation();
               setDeleting(true);
               void onDelete(media).then((deleted) => {
@@ -184,24 +191,6 @@ export default function SavedBar({
 
   // Use the render state instead of the open prop to control structural mount
   if (!render) return null;
-
-  const navigateToMedia = async (media: SavedMediaItem, newTab: boolean = false) => {
-    try {
-      setLoading(true);
-      if (newTab) {
-        const url = `/${MediaType[media.type]}/${encodeURIComponent(media.ttid)}/${encodeURIComponent(media.name)}`;
-        window.open(url, "_blank");
-      }
-      else{
-        window.location.href = `/${MediaType[media.type]}/${encodeURIComponent(media.ttid)}/${encodeURIComponent(media.name)}`;
-      }
-    } catch (error) {
-      console.error("Failed to navigate to media:", error);
-      toast.error("Failed to navigate to media");
-    } finally {
-        setLoading(false);
-    }
-  };
 
   const deleteSavedMedia = async (media: SavedMediaItem): Promise<boolean> => {
     try {
@@ -296,7 +285,6 @@ export default function SavedBar({
           <SavedMediaCard
             key={media.ttid}
             media={media}
-            onNavigate={(item, newTab) => void navigateToMedia(item, newTab)}
             onDelete={deleteSavedMedia}
           />
         ))}

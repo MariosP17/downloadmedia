@@ -79,7 +79,13 @@ export default function TopBar({
       ));
     };
 
+    const handleSavedMediaAllFetched = async (event: Event) => {
+      await fetchSavedMedia();
+      
+    };
+
     void fetchSavedMedia();
+    window.addEventListener("saved-media-all-fetched", handleSavedMediaAllFetched);
     window.addEventListener("saved-media-deleted", handleSavedMediaDeleted);
     window.addEventListener("saved-media-added", handleSavedMediaAdded);
     window.addEventListener("saved-media-deleted-all", () => {
@@ -100,6 +106,21 @@ export default function TopBar({
     setShowDropdown(false);
     router.push(`/search?q=${encodeURIComponent(query)}`);
   }
+
+  const fetchSavedMedia = async () => {
+    const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
+    try {
+      const savedMediaResponse = await fetch(`${apiUrl}/getAllSavedMedia`);
+      if (!savedMediaResponse.ok) {
+        throw new Error(`Saved media request failed with status ${savedMediaResponse.status}`);
+      }
+      const data = await savedMediaResponse.json();
+      if (data.success === false) throw new Error(data.message || "Failed to fetch saved media");
+      setSavedMedia(data.data || []);
+    } catch (error) {
+      toast.error("Error fetching saved media: " + (error instanceof Error ? error.message : ""));
+    }
+  };
 
   return (
     <header id="top-bar" className="sticky top-0 w-full bg-zinc-900 border-b border-zinc-800 z-55">
@@ -152,7 +173,10 @@ export default function TopBar({
     <div className="hidden md:block w-8 flex-shrink-0" aria-hidden="true" />
      <button
         aria-label="Open saved"
-        onClick={() => onToggleSaved && onToggleSaved()}
+        onClick={async () => {
+          if (onToggleSaved) onToggleSaved();
+          await fetchSavedMedia()
+        }}
         className="p-1 rounded-md hover:bg-zinc-800 hover:cursor-pointer text-zinc-200"
       >
         <span className="relative inline-flex">
