@@ -16,7 +16,7 @@ type TreeItemProps = {
   currentPath: string; // Tracks the accumulated path relative to /media
   isRoot?: boolean; // Flag to indicate if this is the root directory
   refreshStats:() => void; // Callback to refresh the size of the parent folder
-  onRefreshParent?: () => void; // Callback to tell the parent directory to refresh its list
+  onRefreshParent?: () => void | Promise<void>; // Callback to tell the parent directory to refresh its list
   activeRefreshRef: React.MutableRefObject<{ [path: string]: () => Promise<void> }>;
   opts: { [key: string]: any }[];
   config: { [key: string]: any };
@@ -68,6 +68,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const [configuration, setConfiguration] = useState(config);
   const [folderSize, setFolderSize] = useState<string>(size);
   const [isEditSubtitlesModalOpen, setIsEditSubtitlesModalOpen] = useState(false);
+  const [isVideoPlayerOpen, setVideoPlayerOpen] = useState(false);
 
   useEffect(() => {
     setFolderSize(size);
@@ -154,6 +155,11 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     } finally {
       if (setLoadingInternal) setLoading(false);
     }
+  };
+
+  const refreshDirectoryAndAncestors = async () => {
+    await fetchDirectoryContents(false);
+    await onRefreshParent?.();
   };
 
   const RefreshAllChildren = async () => {
@@ -279,7 +285,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       toast.success(`${isFolderInternal ? "Folder" : "File"} deleted successfully!`);
       
       // Execute parent structural array sync
-      if (onRefreshParent) onRefreshParent();
+      await onRefreshParent?.();
       if (refreshStats) refreshStats();
     } catch (err: any) {
       toast.error(`Could not delete ${isFolderInternal ? "folder" : "file"}: ${err.message || "Is it empty?"}`);
@@ -310,7 +316,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         toast.success(`${isFolderInternal ? "Folder" : "File"} renamed successfully!`);
         
         // Execute parent structural array sync
-        if (onRefreshParent) onRefreshParent();
+        await onRefreshParent?.();
       } catch (err: any) {
         toast.error(`Could not rename ${isFolderInternal ? "folder" : "file"}: ${err.message || "Name conflict?"}`);
       }
@@ -413,6 +419,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     try{
       await fetchDirectoryContents(false);
       await RefreshAllChildren();
+      await onRefreshParent?.();
       if (refreshStats) refreshStats();
     }
     catch (err) {
@@ -642,6 +649,18 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                   Edit
                 </button>
               )}
+              {!isFolder && isVideoExtension(cleanName) && (
+                <button
+                  onClick={(e) => {
+                    setIsMenuOpen(false);
+                    setVideoPlayerOpen(true);
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <img src="/text.svg" alt="Edit Subtitles" className="w-4 h-4" />
+                  Play Video
+                </button>
+              )}
               <button
                 onClick={(e) => {
                   setIsMenuOpen(false);
@@ -677,7 +696,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 opts={options}
                 config={configuration}
                 // Recursively link the reload pipeline downwards 
-                onRefreshParent={fetchDirectoryContents}
+                onRefreshParent={refreshDirectoryAndAncestors}
                 refreshStats={refreshStats}
                 activeRefreshRef={activeRefreshRef}              />
             ))
