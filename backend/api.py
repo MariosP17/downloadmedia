@@ -2136,6 +2136,49 @@ def delete_language():
 def clear_languages():
     return performAction(lut.delete_all_languages_util)
 
+@app.route('/stream', methods=['GET'])
+def stream():
+    file_path = request.args.get('filePath', None)
+    if not file_path:
+        return jsonify(resp.error_response("filePath is required")), 400
+    if not is_path_within_configured_roots(file_path):
+        return jsonify(resp.error_response("Access to the specified file is not allowed.")), 403
+    file_size = os.path.getsize(file_path)
+    
+    # Get the range header provided by the React video player
+    range_header = request.headers.get('Range', None)
+    
+    if not range_header:
+        return jsonify(resp.error_response("Range header is required")), 400
+            
+    # Parse the Range header (e.g., "bytes=0-1000")
+    byte1, byte2 = 0, None
+    match = re.search(r'(\d+)-(?:\d*)', range_header)
+    if match:
+        byte1 = int(match.group(1))
+        
+    # Send chunks of 1MB at a time
+    chunk_size = 1024 * 1024 
+    byte2 = byte1 + chunk_size
+    
+    # Ensure we don't read past the file size
+    if byte2 >= file_size:
+        byte2 = file_size - 1
+        
+    length = byte2 - byte1 + 1
+
+    # Read the specific byte range from the file
+    with open(file_path, 'rb') as f:
+        f.seek(byte1)
+        data = f.read(length)
+
+    # Return the 206 Partial Content response
+    response = Response(data, 206, mimetype='video/mp4', direct_passthrough=True)
+    response.headers.add('Content-Range', f'bytes {byte1}-{byte2}/{file_size}')
+    response.headers.add('Accept-Ranges', 'bytes')
+    
+    return response
+
 def performAction(action, *args, **kwargs):
     db_connection_string = getConfigurationInternal().get("DBConnectionString", "")
     if not db_connection_string:

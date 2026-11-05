@@ -6,6 +6,7 @@ import Loading from "../loader";
 import SubsModal from "./SubsModal";
 import EditSubtitlesModal from "./EditSubtitlesModal";
 import { getApiUrl } from "../Actions/RestApiConfig";
+import VideoPlayer from "./VideoPlayer";
 
 
 type TreeItemProps = {
@@ -525,6 +526,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     }
   }
 
+  const applyBreak = (name: string) => {
+      if (name.split(" ").some(word => word.length > 20)) {
+            return "break-all";
+      }
+      return "break-words";
+    };
+
   return (
     <div className="select-none">
       {/* Row Item Layout Wrapper */}
@@ -576,7 +584,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           {isMenuOpen && (
             <div 
               onClick={(e) => e.stopPropagation()}
-              className={`absolute right-0 mt-1 w-28 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl py-1 z-30 transform-gpu transition-all duration-150 ease-out origin-top-right ${isMenuReady ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-1"}`}
+              className={`absolute right-0 w-28 bg-zinc-950 border border-zinc-800 rounded-lg shadow-xl z-30 transform-gpu transition-all duration-150 ease-out origin-top-right ${isMenuReady ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-1"}`}
             >
                 <button
                   onClick={(e) => {
@@ -657,7 +665,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                   }}
                   className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <img src="/text.svg" alt="Edit Subtitles" className="w-4 h-4" />
+                  <img src="/play.svg" alt="Edit Subtitles" className="w-4 h-4" />
                   Play Video
                 </button>
               )}
@@ -768,7 +776,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
             </div>
             <div className="mb-4">
               <span className="block text-sm font-bold text-zinc-400 tracking-wider mb-1">Are you sure you want to delete this {isFolder ? "folder and all its contents" : "file"}?</span>
-              <span className={`block text-center text-sm font-bold bg-black text-red-400 tracking-wider p-1 mb-1 w-full ${itemPath.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{itemPath}</span>
+              <span className={`block text-sm font-bold bg-black text-red-400 tracking-wider p-1 mb-1 w-full ${itemPath.split(" ").some((word: string) => word.length >= 20) ? "break-all" : "break-words"}`}>{itemPath}</span>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <button 
@@ -857,8 +865,25 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         <EditSubtitlesModal
           cleanName={cleanName}
           fullPath={itemPath}
-          onClose={async () => { await onRefreshParent?.();setIsEditSubtitlesModalOpen(false);}}
+          onClose={async () => { setIsEditSubtitlesModalOpen(false);await onRefreshParent?.();}}
         />
+      )}
+      {isVideoPlayerOpen && ( 
+        <div onClick={() => setVideoPlayerOpen(false)} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
+              <label className={`${applyBreak(cleanName)} block text-sm font-bold text-zinc-400 tracking-wider`}>{cleanName}</label>
+              <button 
+                onClick={() => {setVideoPlayerOpen(false);}}
+                className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mb-4"></div>
+              <VideoPlayer videopath={itemPath} />
+            </div>
+          </div>
       )}
     </div>
   );

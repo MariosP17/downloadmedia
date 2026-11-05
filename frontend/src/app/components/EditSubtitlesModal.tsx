@@ -82,12 +82,19 @@ export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: Edi
         }
     };
 
+    const applyBreak = (name: string) => {
+        if (name.split(" ").some(word => word.length > 20)) {
+            return "break-all";
+        }
+        return "break-words";
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-            <div className="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex  w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
                 
                 <div className="flex-shrink-0 border-b border-zinc-800 p-4 justify-between flex items-center">
-                    <h2 className="text-lg font-semibold text-zinc-100">Edit Subtitles: <span className="text-blue-400">{cleanName}</span></h2>
+                    <h2 className="text-lg font-semibold text-zinc-100">Edit Subtitles: <span className={`text-blue-400 ${applyBreak(cleanName)}`}>{cleanName}</span></h2>
                     <div className="flex gap-2"><button 
                         onClick={() => {onClose();}}
                         className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
