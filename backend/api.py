@@ -19,6 +19,7 @@ import uuid
 import json
 from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
+from langcodes import Language
 from download_parallel import enqueue_download as enqueue_parallel_download
 from download_serial import SerialDownloadDispatcher
 import backend.SavedMedia.SavedMediaUtils as smut
@@ -73,6 +74,7 @@ def refresh_all_environment_variables():
     PLEX_API_KEY = os.getenv("PLEX_API_KEY")
     OMDB_API_KEY = os.getenv("OMDB_API_KEY")
 
+SUBTITLE_EXTENSIONS = tuple(['.srt', '.vtt', '.ass', '.ssa', '.sub', '.idx'])
 # Initialize environment variables at startup
 refresh_all_environment_variables()
 
@@ -2179,6 +2181,76 @@ def stream():
     
     return response
 
+@app.route('/subtitles', methods=['GET'])
+def subtitles():
+    file_path = request.args.get('filePath', None)
+    if not file_path:
+        return jsonify(resp.error_response("filePath is required")), 400
+    if not is_path_within_configured_roots(file_path):
+        return jsonify(resp.error_response("Access to the specified file is not allowed.")), 403
+    if not os.path.exists(file_path):
+        return jsonify(resp.error_response("File not found")), 404
+    try:
+        mediatype = get_mediatype(file_path) 
+        subtitles = []
+        if mediatype == "series":
+            # For series, we might want to look for subtitles in the same folder as the video file
+            for sub in os.listdir(Path(file_path).parent):
+                if os.path.basename(sub).startswith(os.path.splitext(os.path.basename(file_path))[0]):
+                    if sub.lower().endswith(SUBTITLE_EXTENSIONS):
+                        subtitles.append({"filepath": os.path.join(Path(file_path).parent, sub), "lang": findLangByName(sub), "label": generateLabelFromFilename(sub, False)})
+        else:
+            # For movies, we might also look for subtitles in the same folder as the video file
+            for sub in os.listdir(Path(file_path).parent):
+                    if sub.lower().endswith(SUBTITLE_EXTENSIONS):
+                        subtitles.append({"filepath": os.path.join(Path(file_path).parent, sub), "lang": findLangByName(sub), "label": generateLabelFromFilename(sub, False)})
+        
+        
+        # Return the subtitle file content
+        return subtitles, 200
+    except Exception as e:
+        return jsonify(resp.error_response(f"Error fetching subtitles: {str(e)}")), 500
+
+def get_mediatype(file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File not found: {file_path}")
+    if file_path.lower().startswith(get_configured_media_folder("MoviesFolder", "Movies").lower()):
+        return "movie"
+    elif file_path.lower().startswith(get_configured_media_folder("TVShowsFolder", "TV-Shows").lower()):
+        return "series"
+    else:
+        raise ValueError(f"File path does not match any configured media folders: {file_path}")
+
+def findLangByName(filename):
+    # Extract the language code from the filename (assuming it's in the format "filename.lang.vtt")
+    parts = os.path.splitext(filename)[0].split('-')
+    if len(parts) >= 2:
+        lang_code = parts[-1].split(' ')[0]
+        return lang_code
+    return "en"
+
+def generateLabelFromFilename(filename, isEmbed=False):
+    lang_code = findLangByName(filename)
+    languagename = Language.get(lang_code).display_name()
+    subtype = "Embedded" if isEmbed else "External"
+    return f"{languagename} ({subtype})"
+
+@app.route('/subtitle', methods=['GET'])
+def serve_subtitle():
+    subtitle_path = request.args.get('filePath', None)
+    if not subtitle_path:   
+        return jsonify(resp.error_response("Subtitle path is required")), 400
+    if not os.path.exists(subtitle_path):
+        return jsonify(resp.error_response("Subtitle file not found")), 404
+    if not is_path_within_configured_roots(subtitle_path):
+        return jsonify(resp.error_response("Access to the specified subtitle file is not allowed.")), 403
+
+    if not subtitle_path.lower().endswith('.vtt'):
+        # Convert anything else to VTT
+        vtt_content = convert_subtitle_to_vtt(subtitle_path)
+        return Response(vtt_content, mimetype='text/vtt')
+    return send_file(subtitle_path, mimetype='text/vtt')
+
 def performAction(action, *args, **kwargs):
     db_connection_string = getConfigurationInternal().get("DBConnectionString", "")
     if not db_connection_string:
@@ -2188,6 +2260,20 @@ def performAction(action, *args, **kwargs):
         return jsonify(resp.success_response(result)), 200
     except Exception as e:
         return jsonify(resp.error_response(f"{str(e)}")), 500
+    
+def convert_subtitle_to_vtt(sub_path):
+    command = ['ffmpeg', '-i', sub_path, '-f', 'webvtt', '-']
+    try:
+        # Run FFmpeg and capture the converted WebVTT data
+        process = subprocess.run(command, capture_output=True, check=True)
+        
+        # Just return the raw WebVTT content directly
+        return process.stdout
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Subtitle conversion failed: {e.stderr}")
+        return {"error": "Failed to convert subtitle"}, 500
+
 if __name__ == '__main__':
     # Start the Flask app explicitly on Port 7000
     app.run(host='0.0.0.0', port=7000, debug=True)
