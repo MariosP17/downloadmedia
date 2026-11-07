@@ -17,6 +17,7 @@ import zipfile
 import tempfile
 import uuid
 import json
+from collections import defaultdict
 from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
 import chardet
@@ -32,6 +33,8 @@ load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
+embedded_subtitle_cache = {}
+embedded_subtitle_locks = defaultdict(Lock)
 
 @app.route("/health", methods=["GET"])
 def health_check():
@@ -2143,13 +2146,88 @@ def stream():
         return jsonify(resp.error_response("filePath is required")), 400
     if not is_path_within_configured_roots(file_path):
         return jsonify(resp.error_response("Access to the specified file is not allowed.")), 403
+    if not os.path.isfile(file_path):
+        return jsonify(resp.error_response("File not found")), 404
+
+    mobile_requested = request.args.get("mobile") == "true"
+    can_stream_directly = True
+    if mobile_requested:
+        try:
+            media_info = subprocess.run(
+                [
+                    'ffprobe', '-v', 'error',
+                    '-show_entries', 'format=format_name:stream=codec_type,codec_name',
+                    '-of', 'json', file_path
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            media_info = json.loads(media_info.stdout)
+        except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
+            print(f"Failed to inspect media file {file_path}: {error}")
+            return jsonify(resp.error_response("Unable to inspect the media file.")), 500
+
+        streams = media_info.get("streams", [])
+        if not any(stream.get("codec_type") == "video" for stream in streams):
+            return jsonify(resp.error_response("The selected file does not contain a video stream.")), 415
+
+        format_names = set(media_info.get("format", {}).get("format_name", "").split(","))
+        video_stream = next(stream for stream in streams if stream.get("codec_type") == "video")
+        audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
+        can_stream_directly = bool(
+            format_names.intersection({"mp4", "mov", "isom", "iso2", "avc1", "m4v"})
+            and video_stream.get("codec_name") == "h264"
+            and (audio_stream is None or audio_stream.get("codec_name") == "aac")
+        )
+
+    if not can_stream_directly:
+        ffmpeg_process = subprocess.Popen(
+            [
+                'ffmpeg', '-nostdin', '-v', 'error', '-i', file_path,
+                '-map', '0:v:0', '-map', '0:a:0?',
+                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+                '-c:a', 'aac', '-b:a', '128k',
+                '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
+                '-f', 'mp4', 'pipe:1'
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        def transcoded_stream():
+            try:
+                while True:
+                    chunk = ffmpeg_process.stdout.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+                return_code = ffmpeg_process.wait()
+                if return_code:
+                    error_output = ffmpeg_process.stderr.read().decode(errors="replace").strip()
+                    print(f"FFmpeg failed to transcode {file_path}: {error_output}")
+            finally:
+                if ffmpeg_process.poll() is None:
+                    ffmpeg_process.kill()
+                ffmpeg_process.stdout.close()
+                ffmpeg_process.stderr.close()
+
+        response = Response(
+            transcoded_stream(),
+            status=200,
+            mimetype='video/mp4',
+            direct_passthrough=True,
+        )
+        response.headers.add('Accept-Ranges', 'none')
+        return response
+
     file_size = os.path.getsize(file_path)
     
     # Get the range header provided by the React video player
     range_header = request.headers.get('Range', None)
     
     if not range_header:
-        return jsonify(resp.error_response("Range header is required")), 400
+        return send_file(file_path, mimetype='video/mp4', conditional=True, etag=True)
             
     # Parse the Range header (e.g., "bytes=0-1000")
     byte1, byte2 = 0, None
@@ -2314,54 +2392,62 @@ def serve_embedded_subtitle():
     if not os.path.exists(video_path):
         return {"error": "Video not found"}, 404
 
-    # -i: Input video file
-    # -map 0:s:{track_index}: Select the specific embedded subtitle track
-    # -f webvtt: Force output to WebVTT format
-    # -: Output to stdout
-    command = [
-        'ffmpeg', 
-        '-i', video_path, 
-        '-map', f'0:s:{track_index}', 
-        '-f', 'webvtt', 
-        '-'
-    ]
-    
     try:
-        process = subprocess.run(command, capture_output=True, check=True)
-        
-        # 1. FFmpeg always outputs UTF-8. Read it.
-        text = process.stdout.decode('utf-8', errors='replace')
-        
-        # 2. The Mojibake Reversal
-        try:
-            # If FFmpeg corrupted Greek/Bulgarian bytes by reading them as Western European, 
-            # we can reverse that process by encoding back to 'latin-1'.
-            # (If the text is actual perfect Greek/UTF-8, this line will throw an error 
-            # and drop to the except block below, leaving the perfect text alone!)
-            original_mkv_bytes = text.encode('latin-1')
-            
-            # Now we have the raw bytes. Let chardet figure out what they actually are.
-            detected = chardet.detect(original_mkv_bytes)
-            encoding = detected.get('encoding') or 'utf-8'
-            
-            # If it's a legacy regional encoding, decode it properly!
-            if encoding.lower() not in ['ascii', 'utf-8', 'iso-8859-1', 'windows-1252']:
-                text = original_mkv_bytes.decode(encoding, errors='replace')
-                
-        except UnicodeEncodeError:
-            # The text contained real Unicode characters that can't be pushed 
-            # back into Latin-1. This means it was already perfect UTF-8. Do nothing!
-            pass
-            
-        # 3. Serve the clean text
-        response = subtitle_response(text.encode('utf-8'))
-        response.content_type = 'text/vtt; charset=utf-8'
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        return response
-        
-    except subprocess.CalledProcessError as e:
-        print(f"Extraction failed: {e.stderr}")
-        return {"error": "Failed to extract embedded subtitle"}, 500
+        track_number = int(track_index)
+        if track_number < 0:
+            raise ValueError
+    except ValueError:
+        return {"error": "trackIndex must be a non-negative integer"}, 400
+
+    source_stat = os.stat(video_path)
+    cache_key = (os.path.realpath(video_path), source_stat.st_size, source_stat.st_mtime_ns)
+
+    with embedded_subtitle_locks[cache_key]:
+        tracks = embedded_subtitle_cache.get(cache_key)
+        if tracks is None:
+            try:
+                probe = subprocess.run(
+                    [
+                        'ffprobe', '-v', 'error', '-select_streams', 's',
+                        '-show_entries', 'stream=index', '-of', 'json', video_path
+                    ],
+                    capture_output=True, text=True, check=True,
+                )
+                track_count = len(json.loads(probe.stdout).get('streams', []))
+                if track_number >= track_count:
+                    return {"error": "Embedded subtitle track not found"}, 404
+
+                with tempfile.TemporaryDirectory(prefix='downloadmedia-subs-') as temp_dir:
+                    output_paths = [os.path.join(temp_dir, f'track-{index}.vtt') for index in range(track_count)]
+                    command = ['ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', video_path]
+                    for index, output_path in enumerate(output_paths):
+                        command.extend(['-map', f'0:s:{index}', '-f', 'webvtt', output_path])
+                    subprocess.run(command, capture_output=True, check=True)
+
+                    tracks = {}
+                    for index, output_path in enumerate(output_paths):
+                        with open(output_path, 'rb') as subtitle_file:
+                            text = subtitle_file.read().decode('utf-8', errors='replace')
+                        try:
+                            original_bytes = text.encode('latin-1')
+                            encoding = chardet.detect(original_bytes).get('encoding') or 'utf-8'
+                            if encoding.lower() not in ['ascii', 'utf-8', 'iso-8859-1', 'windows-1252']:
+                                text = original_bytes.decode(encoding, errors='replace')
+                        except UnicodeEncodeError:
+                            pass
+                        tracks[index] = text.encode('utf-8')
+                    embedded_subtitle_cache[cache_key] = tracks
+            except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
+                print(f"Extraction failed for {video_path}: {error}")
+                return {"error": "Failed to extract embedded subtitles"}, 500
+
+    content = tracks.get(track_number)
+    if content is None:
+        return {"error": "Embedded subtitle track not found"}, 404
+    response = subtitle_response(content)
+    response.content_type = 'text/vtt; charset=utf-8'
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return response
 
 def performAction(action, *args, **kwargs):
     db_connection_string = getConfigurationInternal().get("DBConnectionString", "")

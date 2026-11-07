@@ -22,8 +22,8 @@ type SubtitleResponse = {
     index?: number;
 };
 
-const PLAYER_CONTROLS_HIDE_DELAY = 2500;
-const INITIAL_CONTROLS_HIDE_DELAY = 5000;
+const PLAYER_CONTROLS_HIDE_DELAY = 3000;
+const TOUCH_TRANSITION_DELAY = 300;
 
 export default function VideoPlayer({ videopath }: VideoPlayerProps) {
     const [loading, setLoading] = useState(true);
@@ -34,12 +34,14 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
     const [activeSubtitleKey, setActiveSubtitleKey] = useState<string | null>(null);
     const [subtitleDelays, setSubtitleDelays] = useState<Record<string, number>>({});
     const [playerControlsVisible, setPlayerControlsVisible] = useState(false);
+    const [isPlaying, setIsPlaying] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const delaySettingsRef = useRef<HTMLDivElement | null>(null);
     const playerRef = useRef<HTMLDivElement | null>(null);
     const controlsFadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const initialFadeScheduledRef = useRef(false);
+    const touchTransitionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasStartedPlaybackRef = useRef(false);
     
     
     useEffect(() => {
@@ -49,15 +51,16 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
 
         const fetchVideoUrl = async () => {
             try {
-                const videoUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/stream?filePath=${encodeURIComponent(videopath)}`;
+                const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+                const mobileQuery = isMobile ? "&mobile=true" : "";
+                const videoUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/stream?filePath=${encodeURIComponent(videopath)}${mobileQuery}`;
                 if (cancelled) return;
                 setVideourl(videoUrl);
             } catch (error) {
                 if (cancelled) return;
                 console.error("Error fetching video URL:", error);
                 toast.error("Failed to fetch video URL. Please try again later.");
-            }
-            finally {
+            } finally {
                 if (!cancelled) setLoading(false);
             }
         };
@@ -77,14 +80,11 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
                     label: sub.label
                 })));
                 if (cancelled) return;
-                setVideoSubs(subsData);
+                setVideoSubs(subsData || []);
             } catch (error) {
                 if (cancelled || (error instanceof DOMException && error.name === "AbortError")) return;
                 console.error("Error fetching video subtitles:", error);
                 toast.error(`Failed to fetch video subtitles. ${error instanceof Error ? error.message : 'Unknown error'}`);
-            }
-            finally {
-                if (!cancelled) setLoading(false);
             }
         };
         fetchVideoSubs();
@@ -151,36 +151,66 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
     const resetSubtitleDelay = () => applyActiveSubtitleDelay(0);
 
     const revealPlayerControls = () => {
+        if (!isPlaying) return;
+
         setPlayerControlsVisible(true);
         if (controlsFadeTimeoutRef.current) {
             clearTimeout(controlsFadeTimeoutRef.current);
         }
+        if (!isPlaying) return;
         controlsFadeTimeoutRef.current = setTimeout(() => {
             setPlayerControlsVisible(false);
         }, PLAYER_CONTROLS_HIDE_DELAY);
+    };
+
+    const handlePlay = () => {
+        setIsPlaying(true);
+        if (controlsFadeTimeoutRef.current) {
+            clearTimeout(controlsFadeTimeoutRef.current);
+        }
+        setPlayerControlsVisible(false);
+        hasStartedPlaybackRef.current = true;
+    };
+
+    const handlePause = () => {
+        setIsPlaying(false);
+        if (controlsFadeTimeoutRef.current) {
+            clearTimeout(controlsFadeTimeoutRef.current);
+        }
+        setPlayerControlsVisible(true);
     };
 
     const toggleTouchControls = (event: TouchEvent<HTMLDivElement>) => {
         if (delaySettingsRef.current?.contains(event.target as Node)) return;
 
         setShowDelaySettings(false);
-        setPlayerControlsVisible((visible) => {
-            if (controlsFadeTimeoutRef.current) {
-                clearTimeout(controlsFadeTimeoutRef.current);
-            }
+        if (!isPlaying) {
+            setPlayerControlsVisible(true);
+            return;
+        }
 
-            if (!visible) {
-                controlsFadeTimeoutRef.current = setTimeout(() => {
-                    setPlayerControlsVisible(false);
-                }, PLAYER_CONTROLS_HIDE_DELAY);
-            }
+        if (touchTransitionTimeoutRef.current) {
+            clearTimeout(touchTransitionTimeoutRef.current);
+        }
+        touchTransitionTimeoutRef.current = setTimeout(() => {
+            setPlayerControlsVisible((visible) => {
+                if (controlsFadeTimeoutRef.current) {
+                    clearTimeout(controlsFadeTimeoutRef.current);
+                }
 
-            return !visible;
-        });
+                if (!visible) {
+                    controlsFadeTimeoutRef.current = setTimeout(() => {
+                        setPlayerControlsVisible(false);
+                    }, PLAYER_CONTROLS_HIDE_DELAY);
+                }
+
+                return !visible;
+            });
+        }, TOUCH_TRANSITION_DELAY);
     };
 
     const hideControlsOnMouseLeave = () => {
-        if (!showDelaySettings) {
+        if (isPlaying && !showDelaySettings) {
             if (controlsFadeTimeoutRef.current) {
                 clearTimeout(controlsFadeTimeoutRef.current);
             }
@@ -202,7 +232,18 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
     };
 
     useEffect(() => {
-        const updateFullscreenState = () => setIsFullscreen(document.fullscreenElement === playerRef.current);
+        const updateFullscreenState = () => {
+            setIsFullscreen(document.fullscreenElement === playerRef.current);
+            if (videoRef.current && !videoRef.current.paused) {
+                setPlayerControlsVisible(true);
+                if (controlsFadeTimeoutRef.current) {
+                    clearTimeout(controlsFadeTimeoutRef.current);
+                }
+                controlsFadeTimeoutRef.current = setTimeout(() => {
+                    setPlayerControlsVisible(false);
+                }, PLAYER_CONTROLS_HIDE_DELAY);
+            }
+        };
         document.addEventListener("fullscreenchange", updateFullscreenState);
         return () => document.removeEventListener("fullscreenchange", updateFullscreenState);
     }, []);
@@ -212,26 +253,25 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
             clearTimeout(controlsFadeTimeoutRef.current);
         }
 
-        if (!videourl || showDelaySettings) return;
+        if (!videourl || showDelaySettings || !isPlaying) return;
 
-        const hideDelay = initialFadeScheduledRef.current
-            ? PLAYER_CONTROLS_HIDE_DELAY
-            : INITIAL_CONTROLS_HIDE_DELAY;
-        initialFadeScheduledRef.current = true;
         controlsFadeTimeoutRef.current = setTimeout(() => {
             setPlayerControlsVisible(false);
-        }, hideDelay);
+        }, PLAYER_CONTROLS_HIDE_DELAY);
 
         return () => {
             if (controlsFadeTimeoutRef.current) {
                 clearTimeout(controlsFadeTimeoutRef.current);
             }
         };
-    }, [showDelaySettings, videourl]);
+    }, [isPlaying, showDelaySettings, videourl]);
 
     useEffect(() => () => {
         if (controlsFadeTimeoutRef.current) {
             clearTimeout(controlsFadeTimeoutRef.current);
+        }
+        if (touchTransitionTimeoutRef.current) {
+            clearTimeout(touchTransitionTimeoutRef.current);
         }
     }, []);
 
@@ -288,8 +328,11 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
                         controls
                         controlsList="nofullscreen"
                         autoPlay
+                        playsInline={/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)}
                         crossOrigin="anonymous"
                         ref={videoRef}
+                        onPlay={handlePlay}
+                        onPause={handlePause}
                     >
                         <source src={videourl} type="video/mp4"/>
                         Your browser does not support the video tag.
