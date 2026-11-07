@@ -19,7 +19,7 @@ import uuid
 import json
 from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
-from langcodes import Language
+import chardet
 from download_parallel import enqueue_download as enqueue_parallel_download
 from download_serial import SerialDownloadDispatcher
 import backend.SavedMedia.SavedMediaUtils as smut
@@ -47,8 +47,6 @@ def is_path_within_configured_roots(path):
     except Exception as e:
         print(f"Error occurred while checking path: {e}")
         return False
-    print(f"Checking if path {absolute_path} is within configured roots: Movies: {movies_root}, TV Shows: {tvshows_root}")
-    print(f"Absolute path parents: {list(absolute_path.parents)}")
     return absolute_path == movies_root or absolute_path == tvshows_root or movies_root in absolute_path.parents or tvshows_root in absolute_path.parents
 
 def refresh_all_libraries():
@@ -2204,7 +2202,8 @@ def subtitles():
             for sub in os.listdir(Path(file_path).parent):
                     if sub.lower().endswith(SUBTITLE_EXTENSIONS):
                         subtitles.append({"filepath": os.path.join(Path(file_path).parent, sub), "lang": findLangByName(sub), "label": generateLabelFromFilename(sub, False)})
-        
+
+        subtitles.extend(get_embedded_subtitles(file_path))
         
         # Return the subtitle file content
         return subtitles, 200
@@ -2231,9 +2230,58 @@ def findLangByName(filename):
 
 def generateLabelFromFilename(filename, isEmbed=False):
     lang_code = findLangByName(filename)
-    languagename = Language.get(lang_code).display_name()
+    try:
+    # lookup() automatically handles 'eng', 'gre', 'en', etc.
+        languagename = pycountry.languages.lookup(lang_code).name
+    except LookupError:
+    # Fallback if the code is truly invalid or missing
+        languagename = "English"
     subtype = "Embedded" if isEmbed else "External"
     return f"{languagename} ({subtype})"
+
+def subtitle_response(content):
+    """Return subtitle content with optional single-byte-range support."""
+    content_length = len(content)
+    range_header = request.headers.get('Range')
+    response_headers = {'Accept-Ranges': 'bytes'}
+
+    if not range_header:
+        response = Response(content, status=200, mimetype='text/vtt')
+        response.headers.update(response_headers)
+        return response
+
+    match = re.fullmatch(r'bytes=(\d*)-(\d*)', range_header.strip())
+    if not match or content_length == 0 or not any(match.groups()):
+        response = Response(status=416)
+        response.headers['Content-Range'] = f'bytes */{content_length}'
+        response.headers.update(response_headers)
+        return response
+
+    start_text, end_text = match.groups()
+    if start_text:
+        start = int(start_text)
+        end = int(end_text) if end_text else content_length - 1
+    else:
+        suffix_length = int(end_text)
+        if suffix_length == 0:
+            start = content_length
+            end = content_length - 1
+        else:
+            start = max(content_length - suffix_length, 0)
+            end = content_length - 1
+
+    if start >= content_length or start > end:
+        response = Response(status=416)
+        response.headers['Content-Range'] = f'bytes */{content_length}'
+        response.headers.update(response_headers)
+        return response
+
+    end = min(end, content_length - 1)
+    response = Response(content[start:end + 1], status=206, mimetype='text/vtt')
+    response.headers['Content-Range'] = f'bytes {start}-{end}/{content_length}'
+    response.headers['Content-Length'] = str(end - start + 1)
+    response.headers.update(response_headers)
+    return response
 
 @app.route('/subtitle', methods=['GET'])
 def serve_subtitle():
@@ -2248,8 +2296,72 @@ def serve_subtitle():
     if not subtitle_path.lower().endswith('.vtt'):
         # Convert anything else to VTT
         vtt_content = convert_subtitle_to_vtt(subtitle_path)
-        return Response(vtt_content, mimetype='text/vtt')
-    return send_file(subtitle_path, mimetype='text/vtt')
+        if isinstance(vtt_content, tuple):
+            return vtt_content
+        return subtitle_response(vtt_content)
+    with open(subtitle_path, 'rb') as subtitle_file:
+        return subtitle_response(subtitle_file.read())
+
+@app.route('/subtitle/embedded', methods=['GET'])
+def serve_embedded_subtitle():
+    video_path = request.args.get('videoPath', None)
+    track_index = request.args.get('trackIndex', None)
+
+    if not video_path or track_index is None:
+        return {"error": "Both 'videoPath' and 'trackIndex' are required"}, 400
+    if not is_path_within_configured_roots(video_path):
+        return {"error": "Access to the specified video file is not allowed."}, 403
+    if not os.path.exists(video_path):
+        return {"error": "Video not found"}, 404
+
+    # -i: Input video file
+    # -map 0:s:{track_index}: Select the specific embedded subtitle track
+    # -f webvtt: Force output to WebVTT format
+    # -: Output to stdout
+    command = [
+        'ffmpeg', 
+        '-i', video_path, 
+        '-map', f'0:s:{track_index}', 
+        '-f', 'webvtt', 
+        '-'
+    ]
+    
+    try:
+        process = subprocess.run(command, capture_output=True, check=True)
+        
+        # 1. FFmpeg always outputs UTF-8. Read it.
+        text = process.stdout.decode('utf-8', errors='replace')
+        
+        # 2. The Mojibake Reversal
+        try:
+            # If FFmpeg corrupted Greek/Bulgarian bytes by reading them as Western European, 
+            # we can reverse that process by encoding back to 'latin-1'.
+            # (If the text is actual perfect Greek/UTF-8, this line will throw an error 
+            # and drop to the except block below, leaving the perfect text alone!)
+            original_mkv_bytes = text.encode('latin-1')
+            
+            # Now we have the raw bytes. Let chardet figure out what they actually are.
+            detected = chardet.detect(original_mkv_bytes)
+            encoding = detected.get('encoding') or 'utf-8'
+            
+            # If it's a legacy regional encoding, decode it properly!
+            if encoding.lower() not in ['ascii', 'utf-8', 'iso-8859-1', 'windows-1252']:
+                text = original_mkv_bytes.decode(encoding, errors='replace')
+                
+        except UnicodeEncodeError:
+            # The text contained real Unicode characters that can't be pushed 
+            # back into Latin-1. This means it was already perfect UTF-8. Do nothing!
+            pass
+            
+        # 3. Serve the clean text
+        response = subtitle_response(text.encode('utf-8'))
+        response.content_type = 'text/vtt; charset=utf-8'
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        return response
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Extraction failed: {e.stderr}")
+        return {"error": "Failed to extract embedded subtitle"}, 500
 
 def performAction(action, *args, **kwargs):
     db_connection_string = getConfigurationInternal().get("DBConnectionString", "")
@@ -2273,6 +2385,47 @@ def convert_subtitle_to_vtt(sub_path):
     except subprocess.CalledProcessError as e:
         print(f"Subtitle conversion failed: {e.stderr}")
         return {"error": "Failed to convert subtitle"}, 500
+
+def get_embedded_subtitles(file_path):
+    try:
+        # Added stream_tags=title to catch metadata like "English (Forced)"
+        command = [
+            'ffprobe', '-v', 'error', '-select_streams', 's', 
+            '-show_entries', 'stream=index:stream_tags=language,title', 
+            '-of', 'json', file_path
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        streams_info = json.loads(result.stdout)
+        
+        embedded_subtitles = []
+        
+        # Use enumerate to get sub_index (0, 1, 2...) for the ffmpeg -map command
+        for sub_index, stream in enumerate(streams_info.get('streams', [])):
+            tags = stream.get('tags', {})
+            lang_code = tags.get('language', 'en')
+            
+            try:
+                # lookup() automatically handles 'eng', 'gre', 'en', etc.
+                lang_name = pycountry.languages.lookup(lang_code).name
+            except LookupError:
+            # Fallback if the code is truly invalid or missing
+                lang_name = "English"
+            
+            # Or use your custom generator
+            clean_label = generateLabelFromFilename(f"{file_path}-embedded-{lang_code}.vtt", isEmbed=True)
+            
+            embedded_subtitles.append({
+                # Keep sub_index available so the frontend can build the extraction URL
+                "filepath": f"{file_path}-embedded-{sub_index}.vtt", 
+                "lang": lang_code, 
+                "label": clean_label, # Passes a clean name like "English (Forced)"
+                "index": sub_index 
+            })
+        
+        return embedded_subtitles
+    except Exception as e:
+        print(f"Error fetching embedded subtitles: {e}")
+        return []
 
 if __name__ == '__main__':
     # Start the Flask app explicitly on Port 7000
