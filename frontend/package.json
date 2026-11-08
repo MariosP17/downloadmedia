@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.10",
+    "artplayer": "^5.4.0",
     "framer-motion": "^12.42.2",
     "next": "^16.3.5",
     "rc-tree": "^5.13.1",

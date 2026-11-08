@@ -51,9 +51,7 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
 
         const fetchVideoUrl = async () => {
             try {
-                const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-                const mobileQuery = isMobile ? "&mobile=true" : "";
-                const videoUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/stream?filePath=${encodeURIComponent(videopath)}${mobileQuery}`;
+                const videoUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/stream?filePath=${encodeURIComponent(videopath)}`;
                 if (cancelled) return;
                 setVideourl(videoUrl);
             } catch (error) {

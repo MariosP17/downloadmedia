@@ -6,7 +6,7 @@ import Loading from "../loader";
 import SubsModal from "./SubsModal";
 import EditSubtitlesModal from "./EditSubtitlesModal";
 import { getApiUrl } from "../Actions/RestApiConfig";
-import VideoPlayer from "./VideoPlayer";
+import ArtPlayer from "./ArtPlayer";
 
 
 type TreeItemProps = {
@@ -881,7 +881,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
               </button>
             </div>
             <div className="mb-4"></div>
-              <VideoPlayer videopath={itemPath} />
+              <ArtPlayer videopath={itemPath} />
             </div>
           </div>
       )}

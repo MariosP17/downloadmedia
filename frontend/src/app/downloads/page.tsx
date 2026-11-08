@@ -278,7 +278,7 @@ export default function DownloadsPage() {
     };
 
   return (
-      <main className="p-8 bg-zinc-950 min-h-screen text-white">
+      <main className="p-8 bg-zinc-950 text-white">
         <h1 className="text-2xl font-bold mb-2">Downloads</h1>
         <p className="text-zinc-400 mb-8">Your active and completed downloads will appear here.</p>
   

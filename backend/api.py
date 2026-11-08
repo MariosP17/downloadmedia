@@ -35,6 +35,8 @@ app = Flask(__name__)
 CORS(app)
 embedded_subtitle_cache = {}
 embedded_subtitle_locks = defaultdict(Lock)
+stream_remux_cache = {}
+stream_remux_lock = Lock()
 
 @app.route("/health", methods=["GET"])
 def health_check():
@@ -1395,7 +1397,6 @@ def get_embedded_subtitles():
         for stream in subtitle_streams:
             tags = stream.get('tags', {})
             lang_code = tags.get('language', 'unknown')
-
             # Translate the code using pycountry
             full_language_name = 'unknown'
             if lang_code != 'unknown':
@@ -1407,7 +1408,7 @@ def get_embedded_subtitles():
                     full_language_name = lang_code
             title = tags.get('title', 'unknown')
             subtitles.append(
-                title if title != 'unknown' else full_language_name + "."+ str(stream.get('codec_name'))
+                title if title != 'unknown' and title.strip() != '' else full_language_name + "."+ str(stream.get('codec_name'))
             )
     
         return jsonify({"subtitles": subtitles}), 200
@@ -2149,113 +2150,51 @@ def stream():
     if not os.path.isfile(file_path):
         return jsonify(resp.error_response("File not found")), 404
 
-    mobile_requested = request.args.get("mobile") == "true"
-    can_stream_directly = True
-    if mobile_requested:
-        try:
-            media_info = subprocess.run(
+    user_agent = request.headers.get('User-Agent', '')
+    is_phone = bool(re.search(r'Android|iPhone|iPod|Mobile', user_agent, re.IGNORECASE))
+    is_mp4 = Path(file_path).suffix.lower() == '.mp4'
+    if not is_phone or is_mp4:
+        return send_file(
+            file_path,
+            mimetype='video/mp4' if is_mp4 else None,
+            conditional=True,
+            etag=True,
+        )
+
+    source_stat = os.stat(file_path)
+    cache_key = (file_path, source_stat.st_mtime_ns, source_stat.st_size)
+    with stream_remux_lock:
+        remuxed_path = stream_remux_cache.get(cache_key)
+        if not remuxed_path or not os.path.isfile(remuxed_path):
+            temp_fd, remuxed_path = tempfile.mkstemp(prefix='downloadmedia-stream-', suffix='.mp4')
+            os.close(temp_fd)
+            result = subprocess.run(
                 [
-                    'ffprobe', '-v', 'error',
-                    '-show_entries', 'format=format_name:stream=codec_type,codec_name',
-                    '-of', 'json', file_path
+                    'ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', file_path,
+                    '-map', '0:V:0', '-map', '0:a:0?',
+                    '-c', 'copy',
+                    '-sn', '-dn',
+                    '-movflags', '+faststart',
+                    '-f', 'mp4', remuxed_path,
                 ],
                 capture_output=True,
                 text=True,
-                check=True,
+                check=False,
             )
-            media_info = json.loads(media_info.stdout)
-        except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as error:
-            print(f"Failed to inspect media file {file_path}: {error}")
-            return jsonify(resp.error_response("Unable to inspect the media file.")), 500
+            if result.returncode != 0:
+                error_output = result.stderr.strip()
+                if os.path.exists(remuxed_path):
+                    os.remove(remuxed_path)
+                print(f"FFmpeg failed to remux {file_path}: {error_output}")
+                return jsonify(resp.error_response("Unable to remux the media file for streaming.")), 500
+            stream_remux_cache[cache_key] = remuxed_path
 
-        streams = media_info.get("streams", [])
-        if not any(stream.get("codec_type") == "video" for stream in streams):
-            return jsonify(resp.error_response("The selected file does not contain a video stream.")), 415
-
-        format_names = set(media_info.get("format", {}).get("format_name", "").split(","))
-        video_stream = next(stream for stream in streams if stream.get("codec_type") == "video")
-        audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
-        can_stream_directly = bool(
-            format_names.intersection({"mp4", "mov", "isom", "iso2", "avc1", "m4v"})
-            and video_stream.get("codec_name") == "h264"
-            and (audio_stream is None or audio_stream.get("codec_name") == "aac")
-        )
-
-    if not can_stream_directly:
-        ffmpeg_process = subprocess.Popen(
-            [
-                'ffmpeg', '-nostdin', '-v', 'error', '-i', file_path,
-                '-map', '0:v:0', '-map', '0:a:0?',
-                '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
-                '-c:a', 'aac', '-b:a', '128k',
-                '-movflags', 'frag_keyframe+empty_moov+default_base_moof',
-                '-f', 'mp4', 'pipe:1'
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-
-        def transcoded_stream():
-            try:
-                while True:
-                    chunk = ffmpeg_process.stdout.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    yield chunk
-                return_code = ffmpeg_process.wait()
-                if return_code:
-                    error_output = ffmpeg_process.stderr.read().decode(errors="replace").strip()
-                    print(f"FFmpeg failed to transcode {file_path}: {error_output}")
-            finally:
-                if ffmpeg_process.poll() is None:
-                    ffmpeg_process.kill()
-                ffmpeg_process.stdout.close()
-                ffmpeg_process.stderr.close()
-
-        response = Response(
-            transcoded_stream(),
-            status=200,
-            mimetype='video/mp4',
-            direct_passthrough=True,
-        )
-        response.headers.add('Accept-Ranges', 'none')
-        return response
-
-    file_size = os.path.getsize(file_path)
-    
-    # Get the range header provided by the React video player
-    range_header = request.headers.get('Range', None)
-    
-    if not range_header:
-        return send_file(file_path, mimetype='video/mp4', conditional=True, etag=True)
-            
-    # Parse the Range header (e.g., "bytes=0-1000")
-    byte1, byte2 = 0, None
-    match = re.search(r'(\d+)-(?:\d*)', range_header)
-    if match:
-        byte1 = int(match.group(1))
-        
-    # Send chunks of 1MB at a time
-    chunk_size = 1024 * 1024 
-    byte2 = byte1 + chunk_size
-    
-    # Ensure we don't read past the file size
-    if byte2 >= file_size:
-        byte2 = file_size - 1
-        
-    length = byte2 - byte1 + 1
-
-    # Read the specific byte range from the file
-    with open(file_path, 'rb') as f:
-        f.seek(byte1)
-        data = f.read(length)
-
-    # Return the 206 Partial Content response
-    response = Response(data, 206, mimetype='video/mp4', direct_passthrough=True)
-    response.headers.add('Content-Range', f'bytes {byte1}-{byte2}/{file_size}')
-    response.headers.add('Accept-Ranges', 'bytes')
-    
-    return response
+    return send_file(
+        remuxed_path,
+        mimetype='video/mp4',
+        conditional=True,
+        etag=True,
+    )
 
 @app.route('/subtitles', methods=['GET'])
 def subtitles():
