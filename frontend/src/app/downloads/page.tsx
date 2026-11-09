@@ -402,9 +402,6 @@ export default function DownloadsPage() {
                   <div className="flex-1 min-w-0 w-full">
                     <a
                       href={handleNavigation(seriesOrMovieName, ttid.split(":")[0], type, type === "series" ? ttid.split(":")[1] : "")}
-                      onClick={(e) => {
-                        e.preventDefault();
-                      }}
                       // --- FIXED: Removed 'truncate', added 'break-words' and 'whitespace-normal' so long titles wrap nicely ---
                       className="text-left cursor-pointer text-zinc-100 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
                     >

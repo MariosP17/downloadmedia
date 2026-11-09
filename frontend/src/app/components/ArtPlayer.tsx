@@ -32,26 +32,28 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo }: 
     const playerRef = useRef<Artplayer | null>(null);
     const [loading, setLoading] = useState(true);
 
-     async function getTtid(cleanName: string, path: string) {
+     async function getName(cleanName: string, path: string) : Promise<string | undefined> {
         try {
             const { title, year } = parseTitleAndYear(name);
-            if (!title) return;
-            const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}`;
+            if (!title) return undefined;
+            const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}&season=${episodeInfo?.season}&episode=${episodeInfo?.episode}`;
             const OMDBResponse = await fetch(omdbUrl);
             const OMDBData = await OMDBResponse.json();
             if (!OMDBData || OMDBData.Response === "False") {
-              toast.error("Error getting ttid for " + cleanName);
-              return;
+              toast.error("Error getting ttid and title for " + cleanName);
+              return undefined;
             }
-            if (OMDBData.imdbID) {
-              const season = episodeInfo ? episodeInfo.season : undefined;
-              const episode = episodeInfo ? episodeInfo.episode : undefined;
-              const finalttid =  OMDBData.imdbID
-              return finalttid;
+            if (OMDBData.seriesID && OMDBData.Title) {
+              return OMDBData.Title ;
+            }
+            else {
+                toast.error("Error getting ttid and title for " + cleanName);
+                return undefined;
             }
         } catch (error) {
-        toast.error("Error getting ttid for " + cleanName);
-        console.error("Error getting ttid for media:", error);
+        toast.error("Error getting ttid and title for " + cleanName);
+        console.error("Error getting ttid and title for media:", error);
+        return undefined;
         }
     }
 
@@ -81,23 +83,14 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo }: 
 
   const getEpisodeName =async (episodeInfo?: { season: number; episode: number }): Promise<string | undefined> => {
     if (episodeInfo?.season !== undefined && episodeInfo?.episode !== undefined) {
-      const ttid = await getTtid(name.replace(/\s*\(\d{4}\).*$/, ""), videopath);
-      const ret = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getEpisodeName?ttid=${encodeURIComponent(ttid || "")}&season=${episodeInfo.season}&episode=${episodeInfo.episode}`);
-      if (!ret.ok) {
-        toast.error((await ret.json()).error || "Failed to fetch episode name");
-        console.error("Error fetching episode name:", ret.statusText);
-        return undefined;
+        const title = await getName(name.replace(/\s*\(\d{4}\).*$/, ""), videopath);
+        if ( title === undefined) {
+            console.error("Episode name is undefined. Cannot fetch episode name.");
+            toast.error("Episode name is undefined. Cannot fetch episode name.");
+            return undefined;
+        }
+        return title;
       }
-      const data = await ret.json();
-      if (data && data.episodeName) {
-        return data.episodeName;
-      } else {
-        toast.error("Episode name not found in response");
-        console.error("Episode name not found in response");
-        return undefined;
-      }
-    }
-    return undefined;
   };
 
     const getUrl = async (apiUrl: string) => {
