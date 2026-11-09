@@ -43,6 +43,7 @@ export default function SettingsPage() {
   const [batchProgressStore, setBatchProgressStore] = useState<Record<string, ProgressEntry>>({});
   const [archiveJobs, setArchiveJobs] = useState<ArchiveJob[]>([]);
   const [subtitlesInfo, setSubtitlesInfo] = useState<any>({});
+  const [OMDBCounter, setOMDBCounter] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(!apiUnavailable);
   const [isLoadingPage, setIsLoadingPage] = useState(false);
   const [isRefreshingLibraries, setIsRefreshingLibraries] = useState(false);
@@ -54,6 +55,24 @@ export default function SettingsPage() {
             const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getOpenSubtitlesInfo");
             const data = (await res.json())?.data ?? {};
             setSubtitlesInfo(data);
+  };
+
+  const fetchOMDBCounter = async () => {
+    setIsLoadingPage(true);
+    try {
+      const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getOMDBCounter");
+      const data = (await res.json());
+      if (!data.success){
+        throw new Error(data.message || "Failed to fetch OMDB counter");
+      }
+      setOMDBCounter(data.data);
+    } catch (error) {
+      console.error("Failed to fetch OMDB counter:", error);
+      toast.error("Failed to fetch OMDB counter: " + (error instanceof Error ? error.message : "Unknown error"));
+    }
+    finally {
+      setIsLoadingPage(false);
+    }
   };
 
   const loadOperationalState = async () => {
@@ -92,6 +111,7 @@ export default function SettingsPage() {
     void loadOperationalState();
     void loadRefreshLibrariesLog();
     void fetchSubtitlesInfo();
+    void fetchOMDBCounter();
   };
 
   useEffect(() => {
@@ -237,6 +257,7 @@ export default function SettingsPage() {
           {apiReady && <section>
             <h2 className="text-xl font-bold text-zinc-100">Logs</h2>
             {subtitlesInfo && <div className="text-sm text-zinc-400 text-right">Remaining subtitle downloads {subtitlesInfo?.remaining_downloads}</div>}
+            {OMDBCounter != null && <div className="text-sm text-zinc-400 text-right">Daily OMDB API requests {OMDBCounter}</div>}
             <LogComponent/>
           </section>}
         </div>

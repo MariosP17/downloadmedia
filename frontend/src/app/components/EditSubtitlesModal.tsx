@@ -11,9 +11,10 @@ type EditSubsProps = {
     cleanName: string;
     fullPath: string;
     onClose: () => void;
+    onCancel: () => void;
 };
 
-export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: EditSubsProps) {
+export default function EditSubtitlesModal({ cleanName, fullPath, onClose, onCancel }: EditSubsProps) {
     const [content, setContent] = useState<string>("");
     const [loadedContent, setLoadedContent] = useState<string>("");
     const [loading, setLoading] = useState<boolean>(true);
@@ -90,13 +91,13 @@ export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: Edi
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onClick={onCancel}>
             <div className="flex  w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl" onClick={(event) => event.stopPropagation()}>
                 
                 <div className="flex-shrink-0 border-b border-zinc-800 p-4 justify-between flex items-center">
                     <h2 className="text-lg font-semibold text-zinc-100">Edit Subtitles: <span className={`text-blue-400 ${applyBreak(cleanName)}`}>{cleanName}</span></h2>
                     <div className="flex gap-2"><button 
-                        onClick={() => {onClose();}}
+                        onClick={() => {onCancel();}}
                         className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
                     >
                         ✕
@@ -114,7 +115,7 @@ export default function EditSubtitlesModal({ cleanName, fullPath, onClose }: Edi
                 </div>
                 <div className="flex-shrink-0 border-t border-zinc-800 p-4 flex justify-end gap-2">
                     <button
-                        onClick={onClose}
+                        onClick={onCancel}
                         className="cursor-pointer px-4 py-2 bg-zinc-700 text-zinc-100 rounded-md hover:bg-zinc-600 transition-colors disabled:opacity-50"
                         disabled={loading || saving}
                     >

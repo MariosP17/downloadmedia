@@ -21,10 +21,12 @@ from collections import defaultdict
 from urllib.parse import unquote
 from dotenv import load_dotenv, set_key
 import chardet
+import hashlib
 from download_parallel import enqueue_download as enqueue_parallel_download
 from download_serial import SerialDownloadDispatcher
 import backend.SavedMedia.SavedMediaUtils as smut
 import backend.Languages.LanguagesUtils as lut
+import backend.Counters.CountersUtils as cut
 import backend.Abstract.Responses as resp
 from Jellyfin.JellyfinActions import *
 from Plex.PlexActions import *
@@ -1702,7 +1704,21 @@ def delete_jellyfin_user_endpoint(user_id):
         return jsonify({"message": "User deleted successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
+@app.route('/getJellyfinMediaId', methods=['GET'])
+def get_jellyfin_media_id_endpoint():
+    try:
+        name = request.args.get('name')
+        includeType = request.args.get('type', 'movie')  # Default to 'movie' if not provided
+        seriesName = request.args.get('seriesName')  # Optional parameter for series name
+        if not name or not includeType:
+            return jsonify({"error": "Name and includeType are required"}), 400
+
+        media_id = get_jellyfin_media_id(name, includeType, seriesName)
+        return jsonify({"media_id": media_id}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/destinationExists', methods=['POST'])
 def destination_exists():
     try:
@@ -1825,7 +1841,29 @@ def get_omdb_data():
     try:
         response = requests.get(f"http://www.omdbapi.com/?t={t}{f'&y={y}' if y else ''}{f'&type={type}' if type else ''}{f'&Season={season}' if season else ''}{f'&Episode={episode}' if episode else ''}&apikey={OMDB_API_KEY}")
         response.raise_for_status()
+        incrementOMDBCounter()  # Increment the OMDB API call counter
         return jsonify(response.json()), 200
+    except requests.RequestException as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/getEpisodeName", methods=['GET'])
+def get_episode_name():
+    series_id = request.args.get('ttid')
+    season_number = request.args.get('season')
+    episode_number = request.args.get('episode')
+
+    if not series_id or not season_number or not episode_number:
+        return jsonify({"error": "seriesName, seasonNumber, and episodeNumber are required"}), 400
+
+    try:
+        response = requests.get(f"http://www.omdbapi.com/?t={series_id}&Season={season_number}&Episode={episode_number}&apikey={OMDB_API_KEY}")
+        response.raise_for_status()
+        data = response.json()
+        incrementOMDBCounter()  # Increment the OMDB API call counter
+        if 'Title' in data:
+            return jsonify({"episodeName": data['Title']}), 200
+        else:
+            return jsonify({"error": "Episode title not found"}), 404
     except requests.RequestException as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2196,6 +2234,48 @@ def stream():
         etag=True,
     )
 
+@app.route('/jellyfin-stream/<path:proxy_path>', methods=['GET'])
+def jellyfin_stream(proxy_path):
+    try:
+        upstream = proxy_jellyfin_stream(
+            proxy_path,
+            request.args.to_dict(flat=False),
+            request.headers,
+        )
+    except JellyfinUnavailableError as error:
+        return jsonify(resp.error_response(str(error))), 503
+    except ValueError as error:
+        return jsonify(resp.error_response(str(error))), 400
+    except requests.RequestException as error:
+        print(f"Jellyfin stream request failed: {error}")
+        return jsonify(resp.error_response("Unable to reach Jellyfin.")), 502
+
+    if not upstream.ok:
+        error = upstream.text[:500]
+        upstream.close()
+        return jsonify(resp.error_response(
+            f"Jellyfin stream request failed ({upstream.status_code}): {error}"
+        )), upstream.status_code
+
+    response_headers = {}
+    for header in ('Content-Type', 'Content-Length', 'Content-Range', 'Accept-Ranges', 'ETag'):
+        value = upstream.headers.get(header)
+        if value:
+            response_headers[header] = value
+
+    def generate_stream():
+        try:
+            yield from upstream.iter_content(chunk_size=1024 * 1024)
+        finally:
+            upstream.close()
+
+    return Response(
+        generate_stream(),
+        status=upstream.status_code,
+        headers=response_headers,
+        direct_passthrough=True,
+    )
+
 @app.route('/subtitles', methods=['GET'])
 def subtitles():
     file_path = request.args.get('filePath', None)
@@ -2388,6 +2468,16 @@ def serve_embedded_subtitle():
     response.headers['Access-Control-Allow-Origin'] = '*'
     return response
 
+def performActionNoErrors(action, *args, **kwargs):
+    db_connection_string = getConfigurationInternal().get("DBConnectionString", "")
+    if not db_connection_string:
+        print("DB connection string is not configured")
+    try:
+        result = action(db_connection_string, *args, **kwargs)
+        print(f"Action performed successfully: {result}")
+    except Exception as e:
+        pass
+
 def performAction(action, *args, **kwargs):
     db_connection_string = getConfigurationInternal().get("DBConnectionString", "")
     if not db_connection_string:
@@ -2451,6 +2541,34 @@ def get_embedded_subtitles(file_path):
     except Exception as e:
         print(f"Error fetching embedded subtitles: {e}")
         return []
+
+def incrementOMDBCounter():
+    performActionNoErrors(cut.check_and_increment_or_reset_counter, counter_key=hashlib.sha256(OMDB_API_KEY.encode("utf-8")).hexdigest())
+
+@app.route('/getCounter', methods=['GET'])
+def get_omdb_counter():
+    key = request.args.get('key')
+    if not key:
+        return jsonify({"error": "Key is required"}), 400
+    return performAction(cut.get_counter_value, counter_key=key)
+
+@app.route('/getOMDBCounter', methods=['GET'])
+def get_omdb_counter_value():
+    return performAction(cut.get_counter_value, counter_key=hashlib.sha256(OMDB_API_KEY.encode("utf-8")).hexdigest())
+
+@app.route('/incrementCounter', methods=['POST'])
+def increment_omdb_counter():
+    key = request.json.get('key')
+    if not key:
+        return jsonify({"error": "Key is required"}), 400
+    return performAction(cut.increment_counter_value, counter_key=key)
+
+@app.route('/getLastCounterIncrementTime', methods=['GET'])
+def get_last_omdb_counter_increment_time():
+    key = request.args.get('key')
+    if not key:
+        return jsonify({"error": "Key is required"}), 400
+    return performAction(cut.get_last_updated_counter, counter_key=key)
 
 if __name__ == '__main__':
     # Start the Flask app explicitly on Port 7000

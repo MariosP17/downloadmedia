@@ -49,7 +49,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const isSeasonFolder =  itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 2;
   const isMovie = (itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase())) && (itemPath.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 1 || (itemPath.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 2 && isVideoExtension(cleanName)));
   const isEpisode = !isFolder && (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 3 && isVideoExtension(cleanName));
-  const type = isEpisode ? "series" : isMovieOrSeriesFolder ? itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) ? "movie" : "series" : "";
+  const type = isEpisode ? "series" : itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) ? "movie" : "series";
   const isSubtitleFile = !isFolder && (cleanName.endsWith(".srt") || cleanName.endsWith(".vtt") || cleanName.endsWith(".sub") || cleanName.endsWith(".ass") || cleanName.endsWith(".idx"));
 
   const [isOpen, setIsOpen] = useState(false);
@@ -453,6 +453,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
 
   const regex = /\b(?:S(\d{1,2})\s*E|(\d{1,2})\s*X)(\d{1,2})\b/gi;
   const match = regex.exec(cleanName);
+  const episodeInfo = match ? { season: parseInt(match[1] || match[2], 10), episode: parseInt(match[3], 10) } : undefined;
 
   function parseTitleAndYear(input: string): { title: string; year: string | null } {
     // Matches optional '(' or '[', followed by 19xx/20xx, followed by optional ')' or ']'
@@ -865,6 +866,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         <EditSubtitlesModal
           cleanName={cleanName}
           fullPath={itemPath}
+          onCancel={() => setIsEditSubtitlesModalOpen(false)}
           onClose={async () => { setIsEditSubtitlesModalOpen(false);await onRefreshParent?.();}}
         />
       )}
@@ -881,7 +883,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
               </button>
             </div>
             <div className="mb-4"></div>
-              <ArtPlayer videopath={itemPath} />
+              <ArtPlayer videopath={itemPath} name={type === "movie" ? itemPath.split("/")[itemPath.split("/").length - 2] : itemPath.split("/")[itemPath.split("/").length - 3]} type={type} episodeInfo={episodeInfo} />
             </div>
           </div>
       )}
