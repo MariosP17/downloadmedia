@@ -9,7 +9,7 @@ import { initiator } from "../../../Props";
 import { Tooltip } from 'react-tooltip'
 import  Loader  from "../loader";
 import LogComponent from "./LogComponent";
-import { getApiUrl } from "../Actions/RestApiConfig";
+import { getApiUrl, restartApi } from "../Actions/RestApiConfig";
 
 type ArchiveJob = {
   job_id: string;
@@ -50,6 +50,42 @@ export default function SettingsPage() {
   const [isCleaningArchives, setIsCleaningArchives] = useState(false);
   const [clearingStore, setClearingStore] = useState<"progress" | "batch" | null>(null);
   const [refreshLibrariesLog, setRefreshLibrariesLog] = useState<{ lastRefreshed: string; lastRefreshedBy: string } | null>(null);
+  const [restartingApi, setRestartingApi] = useState(false);
+
+  const handleRestartApi = async () => {
+    setRestartingApi(true);
+    setApiReady(false);
+    try{
+      const result = await restartApi();
+      if (!result.success) {
+        console.log(result);
+        throw new Error(result?.error);
+      }
+      const toastmsg = toast.loading("API restarted successfully. Waiting for API to be ready...");
+      while (true) {
+        try {
+          const abortController = new AbortController();
+          const timeoutId = setTimeout(() => abortController.abort(), 2000);
+          const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/health", { signal: abortController.signal });
+          clearTimeout(timeoutId);
+          if (res.ok) {
+            toast.dismiss(toastmsg);
+            toast.success("API is ready.");
+            break;
+          }
+        } catch (error) {
+          // Ignore errors and continue retrying
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+    } catch (error) {
+      console.error("Failed to restart API:", error);
+      toast.error("Failed to restart API: " + (error instanceof Error ? error.message : "Unknown error"));
+    } finally {
+      setRestartingApi(false);
+      setApiReady(true);
+    }
+  };
 
   const fetchSubtitlesInfo = async () => {
             const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getOpenSubtitlesInfo");
@@ -192,6 +228,14 @@ export default function SettingsPage() {
         <div className="mx-auto max-w-5xl">
           <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-5">
             <h1 className="text-2xl font-bold text-zinc-100">Settings</h1>
+            <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleRestartApi}
+              className="h-9 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800 cursor-pointer"
+            >
+              {restartingApi ? "Restarting..." : "Restart Api"}
+            </button>
             <button
               type="button"
               onClick={() => { loadAll(); }}
@@ -200,6 +244,7 @@ export default function SettingsPage() {
             >
               {isLoading ? "Loading..." : "Refresh State"}
             </button>
+            </div>
           </div>
           <section className="mb-8">
             <h2 className="text-xl font-bold text-zinc-100">Rest API</h2>

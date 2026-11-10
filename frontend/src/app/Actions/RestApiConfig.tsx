@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { exec } from 'child_process';
 
 export async function saveRestApiConfig(selection: string, url: string | null, port: number | null) {
   try {
@@ -65,4 +66,31 @@ export async function getApiUrl(hostname: string, protocol: string = "http", por
     console.error("Failed to read config file:", error);
     return `${protocol}://${hostname}:${port || 7000}`;
   }
+}
+
+export async function restartApi() : Promise<{ success: boolean; error?: string }> {
+  return new Promise(async (resolve) => {
+    const config = await getRestApiConfig();
+    if (config.REST_API_SELECTION === "remote") {
+      console.error("Cannot restart API when using remote configuration");
+      resolve({ success: false, error: "Cannot restart API when using remote configuration" });
+      return;
+    }
+    // Added 'restart' to the command string
+    exec('sudo -n systemctl restart stremio-downloader-api.service', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Error restarting API: ${error.message}`);
+        // Use resolve() instead of return to pass the data back out of the Promise
+        resolve({ success: false, error: error.message });
+        return; 
+      }
+      if (stderr) {
+        console.error(`Error output while restarting API: ${stderr}`);
+        resolve({ success: false, error: stderr });
+        return;
+      }
+      console.log(`API restarted successfully: ${stdout}`);
+      resolve({ success: true });
+    });
+  });
 }
