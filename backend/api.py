@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import re
 import threading
 import os
+import mimetypes
 import subprocess
 from time import time
 from click import File
@@ -2188,48 +2189,9 @@ def stream():
     if not os.path.isfile(file_path):
         return jsonify(resp.error_response("File not found")), 404
 
-    user_agent = request.headers.get('User-Agent', '')
-    is_phone = bool(re.search(r'Android|iPhone|iPod|Mobile', user_agent, re.IGNORECASE))
-    is_mp4 = Path(file_path).suffix.lower() == '.mp4'
-    if not is_phone or is_mp4:
-        return send_file(
-            file_path,
-            mimetype='video/mp4' if is_mp4 else None,
-            conditional=True,
-            etag=True,
-        )
-
-    source_stat = os.stat(file_path)
-    cache_key = (file_path, source_stat.st_mtime_ns, source_stat.st_size)
-    with stream_remux_lock:
-        remuxed_path = stream_remux_cache.get(cache_key)
-        if not remuxed_path or not os.path.isfile(remuxed_path):
-            temp_fd, remuxed_path = tempfile.mkstemp(prefix='downloadmedia-stream-', suffix='.mp4')
-            os.close(temp_fd)
-            result = subprocess.run(
-                [
-                    'ffmpeg', '-nostdin', '-v', 'error', '-y', '-i', file_path,
-                    '-map', '0:V:0', '-map', '0:a:0?',
-                    '-c', 'copy',
-                    '-sn', '-dn',
-                    '-movflags', '+faststart',
-                    '-f', 'mp4', remuxed_path,
-                ],
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if result.returncode != 0:
-                error_output = result.stderr.strip()
-                if os.path.exists(remuxed_path):
-                    os.remove(remuxed_path)
-                print(f"FFmpeg failed to remux {file_path}: {error_output}")
-                return jsonify(resp.error_response("Unable to remux the media file for streaming.")), 500
-            stream_remux_cache[cache_key] = remuxed_path
-
     return send_file(
-        remuxed_path,
-        mimetype='video/mp4',
+        file_path,
+        mimetype=mimetypes.guess_type(file_path)[0] or 'application/octet-stream',
         conditional=True,
         etag=True,
     )
