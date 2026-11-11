@@ -58,7 +58,6 @@ export default function SettingsPage() {
     try{
       const result = await restartApi();
       if (!result.success) {
-        console.log(result);
         throw new Error(result?.error);
       }
       const toastmsg = toast.loading("API restarted successfully. Waiting for API to be ready...");

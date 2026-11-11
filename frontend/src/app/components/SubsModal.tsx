@@ -265,8 +265,8 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 							<p className="text-sm text-zinc-500">No embedded subtitles found.</p>
 						) : (
 							<div className="space-y-2">
-								{embeddedSubs.map((subtitle) => (
-									<div key={subtitle} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2">
+								{embeddedSubs.map((subtitle, index) => (
+									<div key={subtitle+"-"+index} className="flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2">
 										<div className="min-w-0">
 											<p className="break-all text-sm text-zinc-200">{subtitle}</p>
 										</div>
@@ -328,7 +328,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 										</svg>
 									</div>
 								</div>
-								<button type="button" onClick={() => void searchSubtitles()} disabled={searching || !ttid} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">
+								<button type="button" onClick={() => void searchSubtitles()} disabled={searching || !ttid} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white enabled:hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer">
 									{searching ? "Searching..." : "Search"}
 								</button>
 							</div>

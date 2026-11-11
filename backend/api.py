@@ -152,6 +152,7 @@ def get_subtitles():
     language = request.args.get("language", "en")
     if not ttid:
         return {"error": "Missing ttid parameter"}, 400
+    ttid = unquote(ttid)
     try:
         subs = getSubtitles(ttid, language)
         if not subs:
@@ -162,8 +163,7 @@ def get_subtitles():
 
 def getSubtitles(ttid, language="en"):
     """Fetches the subtitles for a given ttid and language."""
-    isMovie = False if ":" in ttid else True
-    url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid}&languages={language}" if isMovie else f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid.split(':')[0]}&languages={language}&season_number={ttid.split(':')[1]}&episode_number={ttid.split(':')[2]}"
+    url = f"https://api.opensubtitles.com/api/v1/subtitles?imdb_id={ttid}&languages={language}"
     headers = {
         "Content-Type": "application/json",
         "Api-Key": OPEN_SUBTITLES_API_KEY,
