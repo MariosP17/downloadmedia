@@ -75,8 +75,10 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Could not load subtitles");
 			setLoadingSubtitlesError(false);
+			const filename = pathname.split("/").pop() || "";
+			const cleanedPathname = filename.split(".").slice(0, -1).join(".") || "";
 			setExistingSubs(
-				(data.items || []).filter((item: ExistingSubtitle) => isEpisode ? item.name.includes(pathname.split(".")[0]?.split("/").pop() || "") : true)
+				(data.items || []).filter((item: ExistingSubtitle) => isEpisode ? item.name.includes(cleanedPathname) : true)
 			);
 		} catch (error) {
 			setLoadingSubtitlesError(true);

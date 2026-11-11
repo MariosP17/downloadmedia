@@ -903,11 +903,11 @@ def download_folder_to_client():
     if absolute_path is None:
         print("archive request rejected: folder not found")
         return jsonify({"error": "Target folder path not found on server.", "status": "Failed"}), 404
-
-    temp_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-    temp_zip_path = temp_zip.name
-    temp_zip.close()
+    folder_name= absolute_path.name
     job_id = uuid.uuid4().hex
+    temp_zip_path = os.path.join(tempfile.gettempdir(), f"downloader-{job_id}-[{folder_name}].zip")
+    with open(temp_zip_path, "xb"):
+        pass
     with archive_jobs_lock:
         archive_jobs[job_id] = {
             "status": "queued", "progress": 0.0, "total_bytes": 0,
