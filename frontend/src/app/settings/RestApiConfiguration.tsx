@@ -134,7 +134,7 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
     return (
          <div className="relative mt-4 flex flex-col">
             <OptionType typeKey="rest_api_selection" value={restApiConfig?.rest_api_selection || "local"} type="<dropdown>" options={[{key: "local", value: "Local"}, {key: "remote", value: "Remote" }] } onChange={async (newValue) => {await onUpdateRestApiConfig(newValue); setRestApiConfig((prev) => ({ ...prev, "rest_api_selection": newValue } ))}} />
-            <OptionType asNumber={true} allHidden={restApiConfig["rest_api_selection"] === "remote"} typeKey="rest_api_url_port" value={restApiConfig["rest_api_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdateRestApiConfigPort(newValue); setRestApiConfig((prev) => ({ ...prev, "rest_api_url_port": newValue }))}} />
+            <OptionType asNumber={true} allHidden={restApiConfig["rest_api_selection"] === "remote"} typeKey="rest_api_url_port" value={restApiConfig["rest_api_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdateRestApiConfigPort(newValue); setRestApiConfig((prev) => ({ ...prev, "rest_api_url_port": parseInt(newValue) }))}} />
             <OptionType disabled={restApiConfig["rest_api_selection"] !== "remote"} typeKey="rest_api_url" value={restApiConfig["rest_api_url"] || ""} type="<string>" onChange={(newValue) => setRestApiConfig((prev) => ({ ...prev, "rest_api_url": newValue }))} />
         <div className="flex justify-end">
                 <button onClick={saveRestApi} disabled={disabledSave} className="bg-blue-700 cursor-pointer enabled:hover:bg-blue-900 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">Save</button>

@@ -44,12 +44,15 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const itemPath = isRoot ? currentPath : currentPath ? `${currentPath}/${cleanName}` : cleanName;
   const isSeasonFolder =  itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 2;
   const isMovie = (itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase())) && (itemPath.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 1 || (itemPath.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 2 && isVideoExtension(cleanName)));
-  const isEpisode = !isFolder && (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 3 && isVideoExtension(cleanName));
+  const isEpisodeLength3 = !isFolder && (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 3) && isVideoExtension(cleanName);
+  const isEpisodeLength4 = !isFolder && (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 4) && isVideoExtension(cleanName);
+  const isEpisodeItem = isEpisodeLength3 || isEpisodeLength4; 
+  const isEpisodeFolder = isFolder && (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 3);
   const isMovieOrSeriesFolder = (isFolder && (
   (itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) && itemPath.toLowerCase().length > config["MoviesFolder"].toLowerCase().length) || 
   (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().length > config["TVShowsFolder"].toLowerCase().length)
-)) || isEpisode;
-  const type = isEpisode ? "series" : itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) ? "movie" : "series";
+)) || isEpisodeItem;
+  const type = isEpisodeItem ? "series" : itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) ? "movie" : "series";
   const isSubtitleFile = !isFolder && (cleanName.endsWith(".srt") || cleanName.endsWith(".vtt") || cleanName.endsWith(".sub") || cleanName.endsWith(".ass") || cleanName.endsWith(".idx"));
 
   const [isOpen, setIsOpen] = useState(false);
@@ -457,6 +460,19 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const match = regex.exec(cleanName);
   const episodeInfo = match ? { season: parseInt(match[1] || match[2], 10), episode: parseInt(match[3], 10) } : undefined;
 
+  function parseSeasonAndEpisodeAndNameFromFolderName(folderName: string): { season: number | null; episode: number | null; name: string | null } {
+    if (!isEpisodeFolder && !folderName) {
+      return { season: null, episode: null, name: null };
+    }
+    const regex = /[Ss](\d{1,2})[Ee](\d{1,2})/;
+    const match = folderName.match(regex);
+    const nameWithoutSeasonEpisode = folderName.replace(regex, "").trim();
+    if (!match) {
+      return { season: null, episode: null, name: null };
+    }
+    return { season: parseInt(match[1], 10), episode: parseInt(match[2], 10), name: nameWithoutSeasonEpisode };
+  }
+
   function parseTitleAndYear(input: string): { title: string; year: string | null } {
     // Matches optional '(' or '[', followed by 19xx/20xx, followed by optional ')' or ']'
     const yearPattern = /[([]?\b((?:19|20)\d{2})\b[)\]]?/;
@@ -484,9 +500,10 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   async function getAndSetTtid(cleanName: string, path: string)  {
     try {
         const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
-        const { title, year } = parseTitleAndYear(isSeasonFolder || isEpisode ? replacedPath.split("/")[0] : isMovie ? replacedPath.split("/")[0] : cleanName);
+        const { season, episode, name } = parseSeasonAndEpisodeAndNameFromFolderName(cleanName);
+        const { title, year } = parseTitleAndYear(isSeasonFolder || isEpisodeItem ? replacedPath.split("/")[0] : isMovie ? replacedPath.split("/")[0] : isEpisodeFolder ? replacedPath.split("/")[0] : cleanName);
         if (!title) return;
-        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${isEpisode && episodeInfo ? `&season=${episodeInfo.season}&episode=${episodeInfo.episode}` : ""}`;
+        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${isEpisodeItem && episodeInfo ? `&season=${episodeInfo.season}&episode=${episodeInfo.episode}` : isEpisodeFolder && season !== null && episode !== null ? `&season=${season}&episode=${episode}` : ""}`;
         const OMDBResponse = await fetch(omdbUrl);
         const OMDBData = await OMDBResponse.json();
         if (!OMDBData || OMDBData.Response === "False") {
@@ -495,11 +512,11 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         }
         if (OMDBData.imdbID) {
           setTtid(OMDBData.imdbID);
-          if (isEpisode && OMDBData.seriesID && episodeInfo) {
-            setEpisodeTtid(OMDBData.seriesID+ `:${episodeInfo.season}:${episodeInfo.episode}`);
+          if ((isEpisodeItem && episodeInfo) || (isEpisodeFolder && season !== null && episode !== null) && OMDBData.seriesID) {
+            setEpisodeTtid(OMDBData.seriesID+ `:${episodeInfo?.season || season}:${episodeInfo?.episode || episode}`);
           }
-          if (isEpisode && OMDBData.Title) {
-            setEpisodeName(OMDBData.Title);
+          if ((isEpisodeItem || isEpisodeFolder) && (name || OMDBData.Title)) {
+            setEpisodeName(name || OMDBData.Title);
           }
           return OMDBData.imdbID;
         }
@@ -509,13 +526,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       }
   }
 
-  async function getAndSetTtidAndName(cleanName: string, path: string) : Promise<{ targetTtid: string; targetEpisodeName: string }> {
-    if (!episodeInfo || !isEpisode) return { targetTtid: "", targetEpisodeName: "" };
+  async function getAndSetTtidAndNameForEpisodeItem(cleanName: string, path: string) : Promise<{ targetTtid: string; targetEpisodeName: string }> {
+    if (!episodeInfo || !isEpisodeItem) return { targetTtid: "", targetEpisodeName: "" };
     try {
         const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
         const { title, year } = parseTitleAndYear(replacedPath.split("/")[0]);
         if (!title) return { targetTtid: "", targetEpisodeName: "" };
-        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${isEpisode && episodeInfo ? `&season=${episodeInfo.season}&episode=${episodeInfo.episode}` : ""}`;
+        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${isEpisodeItem && episodeInfo ? `&season=${episodeInfo.season}&episode=${episodeInfo.episode}` : ""}`;
         const OMDBResponse = await fetch(omdbUrl);
         const OMDBData = await OMDBResponse.json();
         if (!OMDBData || OMDBData.Response === "False") {
@@ -538,19 +555,52 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       }
   }
 
+  async function getAndSetTtidAndNameForEpisodeFolder(cleanName: string, path: string) : Promise<{ targetTtid: string; targetEpisodeName: string }> {
+    if (!isEpisodeFolder) return { targetTtid: "", targetEpisodeName: "" };
+    const { season, episode, name } = parseSeasonAndEpisodeAndNameFromFolderName(cleanName);
+    try {
+        const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
+        const { title, year } = parseTitleAndYear(replacedPath.split("/")[0]);
+        if (!title) return { targetTtid: "", targetEpisodeName: "" };
+        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${season !== null && episode !== null ? `&season=${season}&episode=${episode}` : ""}`;
+        const OMDBResponse = await fetch(omdbUrl);
+        const OMDBData = await OMDBResponse.json();
+        if (!OMDBData || OMDBData.Response === "False") {
+          toast.error("Error getting ttid and name for " + cleanName);
+          return { targetTtid: "", targetEpisodeName: "" };
+        }
+        if (OMDBData.seriesID || OMDBData.EpisodeName) {
+            const season = match ? parseInt(match[1] || match[2], 10) : undefined;
+            const episode = match ? parseInt(match[3], 10) : undefined;
+            const finalttid = OMDBData.seriesID+ (season !== undefined && episode !== undefined ? `:${season}:${episode}` : "");
+          setEpisodeTtid(finalttid || "");
+          setEpisodeName(name || OMDBData.Title);
+          return {targetTtid: finalttid || "", targetEpisodeName: name || OMDBData.Title || ""};
+        }
+        return { targetTtid: "", targetEpisodeName: ""};
+      } catch (error) {
+        toast.error("Error getting ttid and name for " + cleanName);
+        console.error("Error getting ttid and name for media:", error);
+        return { targetTtid: "", targetEpisodeName: ""};
+      }
+  }
+
   async function navigateToMedia(cleanName: string,path: string, blank: boolean = false) {
     if (!isMovieOrSeriesFolder || !type) return;
     setPageLoading(true);
     const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
     let season = isSeasonFolder ? parseInt(replacedPath.split("/")[1].match(/\d+/)?.[0] || "-1", 10) : undefined;
-    let cleanNameForTtid = isSeasonFolder || isEpisode ? replacedPath.split("/")[0] : cleanName;
+    let cleanNameForTtid = isSeasonFolder || isEpisodeItem ? replacedPath.split("/")[0] : cleanName;
     const {title, year} = parseTitleAndYear(cleanNameForTtid);
-    let targetTtid = isEpisode ? episodeTtid : ttid;
+    let targetTtid = isEpisodeItem || isEpisodeFolder ? episodeTtid : ttid;
     let targetEpisodeName = episodeName;
     try {
       if (targetTtid == ""){
-        if (isEpisode && episodeInfo) {
-          ({targetTtid, targetEpisodeName} = await getAndSetTtidAndName(cleanNameForTtid, path));
+        if (isEpisodeItem && episodeInfo) {
+          ({targetTtid, targetEpisodeName} = await getAndSetTtidAndNameForEpisodeItem(cleanNameForTtid, path));
+        }
+        else if (isEpisodeFolder){
+          ({targetTtid, targetEpisodeName} = await getAndSetTtidAndNameForEpisodeFolder(cleanName, path));
         }
         else{
           targetTtid = await getAndSetTtid(cleanNameForTtid, path);
@@ -660,7 +710,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 Rename
               </button>
 
-              {(isMovie || isEpisode) && (
+              {(isMovie || isEpisodeItem || isEpisodeFolder) && (
                 <button
                   onClick={async(e) => {
                     let targetTtid = ttid;
@@ -886,7 +936,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           ttid={ttid}
           onClose={() => setSubsModalOpen(false)}
           onChanged={() => {
-            if (isEpisode) {
+            if (isEpisodeItem) {
               void onRefreshParent?.();
             } else {
               void fetchDirectoryContents(false);
@@ -894,7 +944,8 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
             }
             refreshStats();
           }}
-          isEpisode={isEpisode}
+          isEpisode={isEpisodeItem}
+          isEpisodeInFolderOrFolder={isEpisodeLength4 || isEpisodeFolder}
           options={options}
           config={configuration}
         />

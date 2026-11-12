@@ -44,3 +44,21 @@ def get_plex_users():
             errorMessages = [error.get('message', 'Unknown error') for error in errorMessagesList]
             raise Exception(f"Failed to get Plex users. Status code: {response.status_code}, Response: {'; '.join(errorMessages)}")
         raise Exception(f"Failed to get Plex users. Status code: {response.status_code}, Response: No response text")
+
+def check_plex(url):
+    _load_dotenv(override=True)  # Load environment variables from .env file
+    _refresh_all_environment_variables()  # Refresh the global variables with the latest values
+    url = url.rstrip('/') + "/identity"  # Ensure the URL ends with /identity
+    headers = {
+        "Accept": "application/json"
+    }
+    response = _requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        return "Ok"
+    else:
+        errorMessagesList = response.json().get('errors', [])
+        if errorMessagesList:
+            errorMessages = [error.get('message', 'Unknown error') for error in errorMessagesList]
+            raise Exception(f"Failed to get Plex identity. Status code: {response.status_code}, Response: {'; '.join(errorMessages)}")
+        raise Exception(f"Failed to get Plex identity. Status code: {response.status_code}, Response: No response text")

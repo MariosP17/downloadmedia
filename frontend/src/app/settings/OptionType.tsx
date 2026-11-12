@@ -4,7 +4,7 @@ import { LanguagesEditor } from "../components/LanguagesEditor";
 type OptionType = {
   typeKey: string;
   value: any;
-  type: "<boolean>" | "<string>" | "<number>" | "<dropdown>" | "<languages>"| "<Folder>";
+  type: "<boolean>" | "<string>" | "<number>" | "<dropdown>" | "<languages>"| "<Folder>" | "<button>";
   min?: number;
   max?: number;
   maxWidth?: string;
@@ -14,12 +14,15 @@ type OptionType = {
   allHidden?: boolean;
   asNumber?: boolean;
   onChange?: (newValue: any) => void;
+  onClick?: () => void;
+  iconClassName?: string;
+  icon?: string;
   options?: { [key: string]: any }[];
 }
 import { OptionsNames } from "../../../Props";
 import FolderPicker  from "../components/FolderPicker";
 
-export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber, onChange, options}: OptionType) {
+export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber, onChange,onClick, icon,iconClassName, options}: OptionType) {
 
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
@@ -151,6 +154,20 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
             onSelectFolder={(newValue) => onChange && onChange(newValue)}
             folderName={OptionsNames[typeKey]}
           />
+        </div>
+      );
+    case "<button>":
+      return (
+        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p>{OptionsNames[typeKey]}</p>
+          <button
+            title={OptionsNames[typeKey]}
+            disabled={disabled}
+            onClick={onClick}
+            className="bg-blue-700 cursor-pointer enabled:hover:bg-blue-900 text-white font-bold p-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {icon && <img src={icon} alt="icon" className={iconClassName || " " + " inline-block"} />}
+          </button>
         </div>
       );
     default:

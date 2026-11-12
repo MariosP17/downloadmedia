@@ -684,7 +684,6 @@ def batch_download():
     if not path:
         return jsonify({"error": "A valid path is required."}), 400
         
-    
     if os.path.abspath(path) == get_configured_media_folder("StremioFolder", "stremio-server"):
         return jsonify({"error": "Cannot download to protected folder"}), 403
         
@@ -698,14 +697,14 @@ def batch_download():
 
     for item in items:
         identifier = item.get('identifier')
-        
         # --- FIXED: Explicit Parameter Falling-Back Validation Mapping ---
         # Coerce idx vs fileIdx safely, and guarantee strings aren't treated as 'not idx'
         idx = item.get('idx') if item.get('idx') is not None else item.get('fileIdx')
         name = item.get('name', "") or item.get('filename', "") or item.get('title', "")
         ttid = item.get('ttid', "")
-        
-        print(f"Preparing to download: identifier={identifier}, idx={idx}, name={name}, ttid={ttid}, path={path}\n")
+        folder_name = item.get('folderName', None)
+        item_path = os.path.join(path, folder_name) if folder_name else path
+        print(f"Preparing to download: identifier={identifier}, idx={idx}, name={name}, ttid={ttid}, path={item_path}\n")
         
         # Safe truthiness check allowing string/integer 0 or "0" to pass through cleanly
         if identifier is None or identifier == "" or idx is None or idx == "":
@@ -723,10 +722,10 @@ def batch_download():
             task_ids.append(task_key)
             continue
         
-        local_task_ids.append({"identifier": identifier, "idx": str(idx),"path": path, "name": name, "ttid": ttid})
+        local_task_ids.append({"identifier": identifier, "idx": str(idx),"path": item_path, "name": name, "ttid": ttid})
         with batch_progress_lock:
             batch_progress_store.append(task_key)
-        enqueue_download(identifier, str(idx), path, name, ttid)
+        enqueue_download(identifier, str(idx), item_path, name, ttid)
         task_ids.append(task_key)
 
     # batchDownloadsInitialiseAndStart(local_task_ids)
@@ -1660,6 +1659,17 @@ def get_plex_users_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/checkPlex', methods=['GET'])
+def check_plex_endpoint():
+    try:
+        url = request.args.get('url')
+        if not url:
+            return jsonify({"error": "URL parameter is required"}), 400
+        result = check_plex(url)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/getJellyfinUser/<user_id>', methods=['GET'])
 def get_jellyfin_user_endpoint(user_id):
     try:
@@ -1717,6 +1727,18 @@ def get_jellyfin_media_id_endpoint():
 
         media_id = get_jellyfin_media_id(name, includeType, seriesName)
         return jsonify({"media_id": media_id}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/checkJellyfin', methods=['GET'])
+def check_jellyfin_endpoint():
+    try:
+        url = request.args.get('url')
+        if not url:
+            return jsonify({"error": "URL is required"}), 400
+
+        status = check_jellyfin(url)
+        return jsonify({"status": status}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

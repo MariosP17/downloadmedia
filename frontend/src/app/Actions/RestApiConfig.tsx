@@ -20,12 +20,12 @@ export async function saveRestApiConfig(selection: string, url: string | null, p
       config = {};
     }
     }
-
-    config.REST_API_SELECTION = selection;
+    const REST_API_SECTION = config.REST_API_SECTION || {};
+    REST_API_SECTION.REST_API_SELECTION = selection;
     if (url !== null)
-        config.REST_API_URL = url;
+        REST_API_SECTION.REST_API_URL = url;
     if (port !== null)
-        config.REST_API_URL_PORT = port;
+        REST_API_SECTION.REST_API_URL_PORT = port;
 
     // Write directly to the local server disk
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
@@ -41,7 +41,7 @@ export async function getRestApiConfig() {
   try {
     const configPath = path.join(process.cwd(), 'config.json');
     
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).REST_API_SECTION;
       return { REST_API_SELECTION: config.REST_API_SELECTION || null, REST_API_URL: config.REST_API_URL || null, REST_API_URL_PORT: config.REST_API_URL_PORT || 7000 };
   }
   catch (error) {
@@ -56,7 +56,7 @@ export async function getApiUrl(hostname: string, protocol: string = "http", por
   try {
     protocol = protocol.replace(":", ""); // Remove colon if present
     const configPath = path.join(process.cwd(), 'config.json');
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).REST_API_SECTION;
     if (config.REST_API_SELECTION === "remote" && config.REST_API_URL && config.REST_API_URL.trim() !== "") {
       return config.REST_API_URL;
     } else {

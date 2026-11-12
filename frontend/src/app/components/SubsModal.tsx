@@ -27,11 +27,12 @@ type SubsModalProps = {
 	onClose: () => void;
 	onChanged?: () => void;
     isEpisode?: boolean;
+	isEpisodeInFolderOrFolder?: boolean;
     options: Record<string, any>
 	config: Record<string, any>
 };
 
-export default function SubsModal({ pathname, replacedPath, ttid, onClose, onChanged, isEpisode =false,options,config }: SubsModalProps) {
+export default function SubsModal({ pathname, replacedPath, ttid, onClose, onChanged, isEpisode =false,isEpisodeInFolderOrFolder =false,options,config }: SubsModalProps) {
 	const [existingSubs, setExistingSubs] = useState<ExistingSubtitle[]>([]);
 	const [results, setResults] = useState<SubtitleResult[]>([]);
 	const [language, setLanguage] = useState("en");
@@ -78,8 +79,9 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 			const filename = pathname.split("/").pop() || "";
 			const cleanedPathname = filename.split(".").slice(0, -1).join(".") || "";
 			setExistingSubs(
-				(data.items || []).filter((item: ExistingSubtitle) => isEpisode ? item.name.includes(cleanedPathname) : true)
+				(data.items || []).filter((item: ExistingSubtitle) => !isEpisodeInFolderOrFolder ? item.name.includes(cleanedPathname) : true)
 			);
+			console.log("used filter", !isEpisodeInFolderOrFolder ? true : false);
 		} catch (error) {
 			setLoadingSubtitlesError(true);
 			toast.error(error instanceof Error ? error.message : "Could not load subtitles");
@@ -88,7 +90,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 		}
 	};
 
-	const getMovieFilePathFromFolder = async (folderPath: string): Promise<string> => {
+	const getMovieFilePathOrEpisodeFilePathFromFolder = async (folderPath: string): Promise<string> => {
 		try {
 			const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + `/getItems?folder=${encodeURIComponent(folderPath)}`);
 			const data = await response.json();
@@ -106,9 +108,9 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 		setLoadingEmbedded(true);
 		try {
 			let finalpathname = pathname;
-			if (pathname.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) && pathname.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 1) {
+			if ((pathname.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase()) && pathname.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 1) || (pathname.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && pathname.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 3 && !isEpisode)) {
 				try {
-				finalpathname = await getMovieFilePathFromFolder(pathname);
+				finalpathname = await getMovieFilePathOrEpisodeFilePathFromFolder(pathname);
 				} catch (error) {
 					setLoadingEmbeddedError(true);
 					return [];

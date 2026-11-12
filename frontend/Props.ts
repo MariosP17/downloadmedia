@@ -45,7 +45,16 @@ export const OptionsNames : Record<string, string> =
     "rest_api_url" : "Rest API URL",
     "rest_api_url_port" : "Local Rest API Port",
     "batchSizeThreshold" : "Batch Size Threshold for batch bookmarking",
-    "BatchSize" : "Batch Size for batch bookmarking"
+    "BatchSize" : "Batch Size for batch bookmarking",
+    "plex_selection" : "Plex location",
+    "plex_url" : "Plex URL",
+    "plex_url_port" : "Local Plex Port",
+    "plex_installed" : "Plex Installed",
+    "jellyfin_selection" : "Jellyfin location",
+    "jellyfin_url" : "Jellyfin URL",
+    "jellyfin_url_port" : "Local Jellyfin Port",
+    "jellyfin_installed" : "Jellyfin Installed",
+    "manage_jellyfin_users" : "Manage Jellyfin Users"
 
 };
 
@@ -62,4 +71,19 @@ export const cleanExtension = (fileName: string) => {
 export enum MediaType {
     movie = 1,
     series = 2,
+}
+
+export type User = {
+    id: string;
+    name: string;
+    type: string;
+    username: string;
+    password: string;
+};
+
+export enum UsersOrigin {
+    Jellyfin = 1,
+    Plex = 2,
+    Local = 3,
+    RestAPI = 4
 }

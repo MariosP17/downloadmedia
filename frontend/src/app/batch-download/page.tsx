@@ -181,7 +181,7 @@ export default function BatchDownloadPage() {
               );
               if (matchingVideo) {
                 displayName = `${cached.name}`;
-                episodeTitle = `S${matchingVideo.season.toString().padStart(2, '0')}E${matchingVideo.number.toString().padStart(2, '0')}: ${matchingVideo.name}`;
+                episodeTitle = `${matchingVideo.name || "Episode"} S${matchingVideo.season.toString().padStart(2, "0")}E${matchingVideo.number.toString().padStart(2, "0")}`;
                 posterUrl = matchingVideo.poster || matchingVideo.thumbnail || posterUrl;
               } else {
                 displayName = cached.name;
@@ -355,8 +355,9 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     return data;
   };
 
-  const checkExists = async (meta: any, season: number = -1) => {
+  const checkExists = async (meta: any, ttid: string) => {
     let pathToCheck = "";
+    let season = ttid.split(":").length > 1 ? parseInt(ttid.split(":")[1]) : -1;
     if (meta && meta.type && meta.name && meta.year) {
       pathToCheck = `${meta.type === "series" ? configuration["TVShowsFolder"] : configuration["MoviesFolder"]}/${meta.name} (${meta.year.toString().split("–")[0]})`;
       if (meta.type === "series" && season >= 0){
@@ -392,7 +393,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     if (Array.from(checkedItems).length > 0 && checkIfItemsAreFromSameSeriesOrSameMovie(Array.from(checkedItems))) {
       const firstCheckedKey = decodeURIComponent(Array.from(checkedItems)[0].split("-")[2]);
       const data = await getCinemetaData(firstCheckedKey, firstCheckedKey.split(":").length > 1 ? "series" : "movie");
-      const localExists = await checkExists(data.meta, firstCheckedKey.split(":").length > 1 ? parseInt(firstCheckedKey.split(":")[1]) : -1);
+      const localExists = await checkExists(data.meta, firstCheckedKey);
       if (localExists.exists) {
         setTemporarySelectedPath(localExists.path);
         await openModal();
@@ -443,7 +444,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
       if (selectedElement) {
         selectedElement.scrollIntoView({ behavior: "smooth", block: "center" });
       }
-    }, 600); // Delay to ensure the modal content is rendered
+    }, 800); // Delay to ensure the modal content is rendered
   };
 
   const createFolderAndContinue = async () => {
@@ -515,7 +516,8 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
               identifier: item.infoHash,
               idx: item.fileIdx,
               name: item.filename ||"Raw Stream Index Output",
-              ttid: item.ttid
+              ttid: item.ttid,
+              folderName: item.episodeTitle || null
             })),
             path: targetPath
           })

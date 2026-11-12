@@ -355,7 +355,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     if (data && data.meta && data.meta.name && data.meta.year && data.meta.type) {
       path = `${data.meta.type === "series" ? configuration["TVShowsFolder"] : configuration["MoviesFolder"]}/${data.meta.name} (${data.meta.year.toString().split("–")[0]})`;
       if (data.meta.type === "series" && decodeURIComponent(ttid).split(":").length > 1) {
-        path += decodeURIComponent(ttid).split(":")[1] != "0" ? `/Season ${decodeURIComponent(ttid).split(":")[1].padStart(2, "0")}` : "/Specials";
+        path += (decodeURIComponent(ttid).split(":")[1] != "0" ? `/Season ${decodeURIComponent(ttid).split(":")[1].padStart(2, "0")}` : "/Specials")+`/${((data.meta.videos.filter((video: any) => (video.season !== null && video.season !== undefined) && video.season == decodeURIComponent(ttid).split(":")[1] && (video.episode !== null && video.episode !== undefined) && video.episode == decodeURIComponent(ttid).split(":")[2])[0]?.name) || "Episode") +` S${decodeURIComponent(ttid).split(":")[1].padStart(2, "0")}E${decodeURIComponent(ttid).split(":")[2].padStart(2, "0")}`}`;
       }
     }
     return path;

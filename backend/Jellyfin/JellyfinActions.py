@@ -216,3 +216,17 @@ def get_jellyfin_media_id(name, includeType, seriesName=None):
             raise Exception(f"No media found with name: {name} {'and series name: ' + seriesName if seriesName else ''}.")
     else:
         raise Exception(f"Failed to get Jellyfin media ID. Status code: {response.status_code}, Response: {response.text}")
+
+def check_jellyfin(url):
+    _load_dotenv(override=True)  # Load environment variables from .env file
+    _refresh_all_environment_variables()  # Refresh the global variables with the latest values
+    url = url.rstrip('/') + "/System/Ping"  # Ensure the URL ends with /System/Ping
+    headers = {
+        "Accept": "application/json"
+    }
+    response = _requests.get(url, headers=headers)
+    
+    if response.status_code == 200:
+        return "Ok"
+    else:
+        raise Exception(f"Failed to check Jellyfin. Status code: {response.status_code}, Response: {response.text or 'No response text'}")

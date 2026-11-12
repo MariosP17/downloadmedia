@@ -10,6 +10,7 @@ import { Tooltip } from 'react-tooltip'
 import  Loader  from "../loader";
 import LogComponent from "./LogComponent";
 import { getApiUrl, restartApi } from "../Actions/RestApiConfig";
+import MediaServersConfig from "./MediaServersConfig";
 
 type ArchiveJob = {
   job_id: string;
@@ -251,6 +252,10 @@ export default function SettingsPage() {
               onApiReady={() => setApiReady(true)}
             />
           </section>
+          {apiReady && <section className="mb-8">
+            <h2 className="text-xl font-bold text-zinc-100">Media Servers</h2>
+            <MediaServersConfig />
+          </section>}
           {apiReady && <section className="mb-8">
             <h2 className="text-xl font-bold text-zinc-100">Configuration</h2>
             <Configuration />
