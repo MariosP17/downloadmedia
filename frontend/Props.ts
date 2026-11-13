@@ -54,7 +54,9 @@ export const OptionsNames : Record<string, string> =
     "jellyfin_url" : "Jellyfin URL",
     "jellyfin_url_port" : "Local Jellyfin Port",
     "jellyfin_installed" : "Jellyfin Installed",
-    "manage_jellyfin_users" : "Manage Jellyfin Users"
+    "manage_jellyfin_users" : "Manage Jellyfin Users",
+    "jellyfin_api_key" : "Jellyfin API Key",
+    "plex_api_key" : "Plex API Key"
 
 };
 

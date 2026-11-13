@@ -81,7 +81,6 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 			setExistingSubs(
 				(data.items || []).filter((item: ExistingSubtitle) => !isEpisodeInFolderOrFolder ? item.name.includes(cleanedPathname) : true)
 			);
-			console.log("used filter", !isEpisodeInFolderOrFolder ? true : false);
 		} catch (error) {
 			setLoadingSubtitlesError(true);
 			toast.error(error instanceof Error ? error.message : "Could not load subtitles");

@@ -76,6 +76,60 @@ export async function getPlexUrl(hostname: string, protocol: string = "http", po
   }
 }
 
+export async function savePlexApiKey(apiKey: string) {
+  try {
+    const configPath = path.join(process.cwd(), "..", "backend", ".env");
+    
+    // 1. Read the existing .env file (or start with an empty string if it doesn't exist)
+    let envContent = '';
+    if (fs.existsSync(configPath)) {
+      envContent = fs.readFileSync(configPath, 'utf8');
+    }
+
+    // 2. Check if the key already exists in the file
+    const keyRegex = /^PLEX_API_KEY=.*$/m;
+    
+    if (keyRegex.test(envContent)) {
+      // 3a. If it exists, replace the whole line with the new key
+      envContent = envContent.replace(keyRegex, `PLEX_API_KEY=${apiKey}`);
+    } else {
+      // 3b. If it doesn't exist, append it to the end
+      // Ensure there's a newline before appending if the file isn't empty
+      const prefix = envContent && !envContent.endsWith('\n') ? '\n' : '';
+      envContent += `${prefix}PLEX_API_KEY=${apiKey}\n`;
+    }
+
+    // 4. Write the updated text back to the .env file
+    fs.writeFileSync(configPath, envContent, 'utf8');
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to write env file:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to write file to local disk" 
+    };
+  }
+};
+
+export async function plexApiKeyExists() {
+  try {
+    const configPath = path.join(process.cwd(), "..", "backend", ".env");
+    
+    if (!fs.existsSync(configPath)) {
+      return false;
+    }
+
+    const envContent = fs.readFileSync(configPath, 'utf8');
+    const keyRegex = /^PLEX_API_KEY=.*$/m;
+    
+    return keyRegex.test(envContent);
+  } catch (error) {
+    console.error("Failed to read env file:", error);
+    return false;
+  }
+};
+
 export async function saveJellyfinConfig(selection: string, url: string | null, port: number | null, installed: boolean) {
   try {
     if (installed && (!selection || (selection === "remote" && (!url || url.trim() === "")) || (selection === "local" && port === null))) {
@@ -130,9 +184,6 @@ export async function getJellyfinConfig() {
   }
 }
 
-
-
-
 export async function getJellyfinUrl(hostname: string, protocol: string = "http", port?: number) {
   try {
     protocol = protocol.replace(":", ""); // Remove colon if present
@@ -146,5 +197,59 @@ export async function getJellyfinUrl(hostname: string, protocol: string = "http"
   } catch (error) {
     console.error("Failed to read config file:", error);
     return `${protocol}://${hostname}:${port || 8096}`;
+  }
+}
+
+export async function saveJellyfinApiKey(apiKey: string) {
+  try {
+    const configPath = path.join(process.cwd(), "..", "backend", ".env");
+    
+    // 1. Read the existing .env file (or start with an empty string if it doesn't exist)
+    let envContent = '';
+    if (fs.existsSync(configPath)) {
+      envContent = fs.readFileSync(configPath, 'utf8');
+    }
+
+    // 2. Check if the key already exists in the file
+    const keyRegex = /^JELLYFIN_API_KEY=.*$/m;
+    
+    if (keyRegex.test(envContent)) {
+      // 3a. If it exists, replace the whole line with the new key
+      envContent = envContent.replace(keyRegex, `JELLYFIN_API_KEY=${apiKey}`);
+    } else {
+      // 3b. If it doesn't exist, append it to the end
+      // Ensure there's a newline before appending if the file isn't empty
+      const prefix = envContent && !envContent.endsWith('\n') ? '\n' : '';
+      envContent += `${prefix}JELLYFIN_API_KEY=${apiKey}\n`;
+    }
+
+    // 4. Write the updated text back to the .env file
+    fs.writeFileSync(configPath, envContent, 'utf8');
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to write env file:", error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : "Failed to write file to local disk" 
+    };
+  }
+}
+
+export async function jellyfinApiKeyExists() {
+  try {
+    const configPath = path.join(process.cwd(), "..", "backend", ".env");
+    
+    if (!fs.existsSync(configPath)) {
+      return false;
+    }
+
+    const envContent = fs.readFileSync(configPath, 'utf8');
+    const keyRegex = /^JELLYFIN_API_KEY=.*$/m;
+    
+    return keyRegex.test(envContent);
+  } catch (error) {
+    console.error("Failed to read env file:", error);
+    return false;
   }
 }

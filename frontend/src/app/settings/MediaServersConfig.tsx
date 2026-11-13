@@ -28,11 +28,28 @@ export default function RestApiConfiguration() {
     const [plexloading, setPlexLoading] = useState(true);
     const [jellyfinloading, setJellyfinLoading] = useState(true);
     const [manageJellyfinUsers, setManageJellyfinUsers] = useState(false);
+    const [jellyfinApiKey, setJellyfinApiKey] = useState<string>("");
+    const [plexApiKey, setPlexApiKey] = useState<string>("");
+    const [jellyfinHasApiKey, setJellyfinHasApiKey] = useState<boolean>(false);
+    const [plexHasApiKey, setPlexHasApiKey] = useState<boolean>(false);
 
     useEffect(() => {
-        setDisabledPlexSave(JSON.stringify(plexConfig) === JSON.stringify(loadedPlexConfig));
-        setDisabledJellyfinSave(JSON.stringify(jellyfinConfig) === JSON.stringify(loadedJellyfinConfig));
-    }, [jellyfinConfig, loadedJellyfinConfig, plexConfig, loadedPlexConfig]);
+        const fetchPlexApiKeyStatus = async () => {
+                const response = await MediaServersConfig.plexApiKeyExists();
+                setPlexHasApiKey(response);
+        }
+        const fetchJellyfinApiKeyStatus = async () => {
+                const response = await MediaServersConfig.jellyfinApiKeyExists();
+                setJellyfinHasApiKey(response);
+        };
+        fetchPlexApiKeyStatus();
+        fetchJellyfinApiKeyStatus();
+        }, []);
+
+    useEffect(() => {
+        setDisabledPlexSave(JSON.stringify(plexConfig) === JSON.stringify(loadedPlexConfig) && plexApiKey.trim() === "");
+        setDisabledJellyfinSave(JSON.stringify(jellyfinConfig) === JSON.stringify(loadedJellyfinConfig) && jellyfinApiKey.trim() === "");
+    }, [jellyfinConfig, loadedJellyfinConfig, plexConfig, loadedPlexConfig, jellyfinApiKey, plexApiKey]);
     
     const getPlex = async () => {
         const response = await MediaServersConfig.getPlexConfig();
@@ -90,6 +107,28 @@ export default function RestApiConfiguration() {
             }
         }
         toast.success("Plex configuration saved successfully");
+        if (plexApiKey.trim() !== "") {
+            try {
+                const pass = await checkPlexApiKey(plexApiKey);
+                if (!pass) {
+                    throw new Error("Invalid Plex API Key");
+                }
+                const apiKeyResponse = await MediaServersConfig.savePlexApiKey(plexApiKey);
+                if (!apiKeyResponse.success) {
+                    throw new Error(apiKeyResponse.error || "Failed to save Plex API Key");
+                }
+                setPlexHasApiKey(true);
+                toast.success("Plex API Key saved successfully");
+            }
+            catch (error) {
+                console.error("Error saving Plex API Key:", error);
+                toast.error(`Could not save Plex API Key. ${error instanceof Error ? error.message : ""}`);
+            }
+            finally {
+                setPlexApiKey("");
+            }
+        }
+        
         setLoadedPlexConfig(plexConfig);
     } catch (error) {
         console.error("Error saving Plex configuration:", error);
@@ -97,6 +136,23 @@ export default function RestApiConfiguration() {
     } finally {
         setPlexLoading(false);
     }
+    };
+
+    const checkPlexApiKey = async (apiKey: string): Promise<boolean> => {
+     try {
+            const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/checkPlexApiKey`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ apiKey })
+            });
+            const data = await response.json();
+            return data.valid || false;
+        } catch (error) {
+            console.error("Error checking Jellyfin API Key:", error);
+            return false;
+        }
     };
 
     const saveJellyfin = async () => {
@@ -135,6 +191,27 @@ export default function RestApiConfiguration() {
             }
         }
         toast.success("Jellyfin configuration saved successfully");
+        if (jellyfinApiKey.trim() !== "") {
+            try {
+                const pass = await checkJellyfinApiKey(jellyfinApiKey);
+                if (!pass) {
+                    throw new Error("Invalid Jellyfin API Key");
+                }
+                const apiKeyResponse = await MediaServersConfig.saveJellyfinApiKey(jellyfinApiKey);
+                if (!apiKeyResponse.success) {
+                    throw new Error(apiKeyResponse.error || "Failed to save Jellyfin API Key");
+                }
+                setJellyfinHasApiKey(true);
+                toast.success("Jellyfin API Key saved successfully");
+            }
+            catch (error) {
+                console.error("Error saving Jellyfin API Key:", error);
+                toast.error(`Could not save Jellyfin API Key. ${error instanceof Error ? error.message : ""}`);
+            }
+            finally {
+                setJellyfinApiKey("");
+            }
+        }
         setLoadedJellyfinConfig(jellyfinConfig);
     } catch (error) {
         console.error("Error saving Jellyfin configuration:", error);
@@ -142,6 +219,23 @@ export default function RestApiConfiguration() {
     } finally {
         setJellyfinLoading(false);
     }
+    };
+
+    const checkJellyfinApiKey = async (apiKey: string): Promise<boolean> => {
+        try {
+            const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/checkJellyfinApiKey`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ apiKey })
+            });
+            const data = await response.json();
+            return data.valid || false;
+        } catch (error) {
+            console.error("Error checking Jellyfin API Key:", error);
+            return false;
+        }
     };
 
     const onUpdatePlexConfig = async (newValue : string) => {
@@ -198,7 +292,6 @@ export default function RestApiConfiguration() {
     }
 
     const onUpdateJellyfinPort = async (newValue : number) => {
-        console.log("loadedJellyfinConfig:", loadedJellyfinConfig, "jellyfinConfig:", jellyfinConfig, "newValue:", newValue);
         try{
             const respone = await MediaServersConfig.getJellyfinConfig();
             setJellyfinConfig({"jellyfin_installed": respone.JELLYFIN_INSTALLED, "jellyfin_selection": "local", "jellyfin_url": `${await MediaServersConfig.getJellyfinUrl(window.location.hostname, window.location.protocol, newValue)}`, "jellyfin_url_port": newValue.toString() });
@@ -249,7 +342,7 @@ export default function RestApiConfiguration() {
             const response = await `${await getApiUrl(window.location.hostname, window.location.protocol)}/getJellyfinUsers`;
             const users = await fetch(response);
             if (!users.ok) {
-                throw new Error(`Failed to fetch Jellyfin users: ${users.statusText}`);
+                throw new Error((await users.json()).error || "Failed to fetch Jellyfin users");
             }
             return (await users.json()).map((user: any) => ({
                 id: user.Id,
@@ -306,6 +399,37 @@ export default function RestApiConfiguration() {
         }
     };
 
+    const EditJellyfinUser : (id: string, name: string, password: string) => Promise<void> = async (id, name, password) => {
+        try {
+            const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/updateJellyfinUser/${id}`, {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ name: name}),
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to edit Jellyfin user: ${response.statusText}`);
+            }
+            if (password && password.trim() !== "") {
+                const passwordResponse = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/updateJellyfinUserPassword/${id}`, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ password: password}),
+                });
+                if (!passwordResponse.ok) {
+                    throw new Error(`Failed to update Jellyfin user password: ${passwordResponse.statusText}`);
+                }
+            }
+            toast.success(`User ${name} edited successfully.`);
+        } catch (error) {
+            console.error("Error editing Jellyfin user:", error);
+            toast.error("Error editing Jellyfin user: " + (error instanceof Error ? error.message : ""));
+        }
+    };
+
     return (
     <div className="flex flex-col gap-4">
         <div className="relative">
@@ -318,7 +442,33 @@ export default function RestApiConfiguration() {
                 <OptionType typeKey="jellyfin_selection" value={jellyfinConfig?.jellyfin_selection || "local"} type="<dropdown>" options={[{key: "local", value: "Local"}, {key: "remote", value: "Remote" }] } onChange={async (newValue) => {await onUpdateJellyfinConfig(newValue); setJellyfinConfig((prev) => ({ ...prev, "jellyfin_selection": newValue } ))}} />
                 <OptionType asNumber={true} allHidden={jellyfinConfig["jellyfin_selection"] === "remote"} typeKey="jellyfin_url_port" value={jellyfinConfig["jellyfin_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdateJellyfinPort(newValue); setJellyfinConfig((prev) => ({ ...prev, "jellyfin_url_port": parseInt(newValue) }))}} />
                 <OptionType disabled={jellyfinConfig["jellyfin_selection"] !== "remote"} typeKey="jellyfin_url" value={jellyfinConfig["jellyfin_url"] || ""} type="<string>" onChange={(newValue) => setJellyfinConfig((prev) => ({ ...prev, "jellyfin_url": newValue }))} />
+                {loadedJellyfinConfig["jellyfin_installed"] && (
                 <OptionType typeKey="manage_jellyfin_users" type="<button>" value={null} onClick={async () => {setManageJellyfinUsers(true);}} icon="/manager-users.svg" iconClassName="w-5 h-5 ml-0.5" />
+                )}
+                <OptionType typeKey="jellyfin_api_key" asPassword value={jellyfinApiKey || ""} type="<string>" onChange={(newValue) => setJellyfinApiKey(newValue)} />
+                    <div className="mb-4 flex min-w-0 items-center justify-end gap-4">
+                        {jellyfinApiKey.trim() != "" && (
+                        <span className="text-sm text-zinc-400">
+                            API Key will be updated after saving the configuration.
+                        </span>
+                        )}
+                        {jellyfinHasApiKey ? (
+                            <div className="flex items-center gap-1">
+                                <span className="text-sm text-green-600">
+                                API Key set
+                                </span>
+                                <img src="/check.svg" className="w-4 h-4 ml-1" alt="API Key Set" />
+                            </div>
+                        )
+                        :
+                            <div className="flex items-center gap-1">
+                                <span className="text-sm text-red-500">
+                                No API Key set
+                                </span>
+                                <img src="/cross.svg" className="w-4 h-4 ml-1" alt="No API Key Set" />
+                            </div>
+                        }
+                    </div>
             </div>
             )}
             <div className="flex justify-end">
@@ -340,6 +490,24 @@ export default function RestApiConfiguration() {
                 <OptionType typeKey="plex_selection" value={plexConfig?.plex_selection || "local"} type="<dropdown>" options={[{key: "local", value: "Local"}, {key: "remote", value: "Remote" }] } onChange={async (newValue) => {await onUpdatePlexConfig(newValue); setPlexConfig((prev) => ({ ...prev, "plex_selection": newValue } ))}} />
                 <OptionType asNumber={true} allHidden={plexConfig["plex_selection"] === "remote"} typeKey="plex_url_port" value={plexConfig["plex_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdatePlexPort(newValue); setPlexConfig((prev) => ({ ...prev, "plex_url_port": parseInt(newValue) }))}} />
                 <OptionType disabled={plexConfig["plex_selection"] !== "remote"} typeKey="plex_url" value={plexConfig["plex_url"] || ""} type="<string>" onChange={(newValue) => setPlexConfig((prev) => ({ ...prev, "plex_url": newValue }))} />
+                <OptionType typeKey="plex_api_key" asPassword value={plexApiKey || ""} type="<string>" onChange={(newValue) => setPlexApiKey(newValue)} />
+                {(plexApiKey.trim() != "" || plexHasApiKey) && (
+                    <div className="mb-4 flex min-w-0 items-center justify-end gap-4">
+                        {plexApiKey.trim() != "" && (
+                        <span className="text-sm text-zinc-400">
+                            API Key will be updated after saving the configuration.
+                        </span>
+                        )}
+                        {plexHasApiKey && (
+                        <div className="flex items-center gap-1">
+                            <span className="text-sm text-green-600">
+                            API Key set
+                            </span>
+                            <img src="/check.svg" className="w-4 h-4 ml-1" alt="API Key Set" />
+                        </div>
+                        )}
+                    </div>
+                )}
             </div>
             )}
             <div className="flex justify-end">
@@ -363,7 +531,7 @@ export default function RestApiConfiguration() {
                     </button>
                 </div>
                 
-                <UsersComponent GetUsers={getJellyfinUsers} DeleteUser={DeleteJellyfinUser} AddUser={AddJellyfinUser} origin={UsersOrigin.Jellyfin} /> 
+                <UsersComponent GetUsers={getJellyfinUsers} DeleteUser={DeleteJellyfinUser} AddUser={AddJellyfinUser} EditUser={EditJellyfinUser} origin={UsersOrigin.Jellyfin} /> 
             </div>
         </div>
     )}

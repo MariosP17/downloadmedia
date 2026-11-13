@@ -21,13 +21,38 @@ type Props = {
   };
 };
 
+const getAllSavedMediaIds = async (): Promise<Set<string>> => {
+  try {
+    const headersList = await headers();
+    const host = headersList.get("host")?.split(":")[0] || "localhost";
+    const protocol = headersList.get("x-forwarded-proto") || "http";
+    const res = await fetch(`${await getApiUrl(host, protocol)}/getSavedMediaIds?type=episodes`);
+    const data = await res.json();
+    if (data.success !== true) {
+      throw new Error(data.message || 'Failed to fetch saved media IDs');
+    }
+    return new Set(data.data);
+  } catch (error) {
+    console.error('Error checking saved status:', error);
+    return new Set(); // Return an empty set on error
+  }
+};
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { name } = await params;
   return {
     title: `Download ${name}`,
   };
 }
-const normalizeSeasons = (data: any) => {
+
+const allSavedMediaIdsCache: Set<string> = await getAllSavedMediaIds(); // Cache to store all saved media IDs
+
+
+const isMediaInSaved = (ttid: string): boolean => {
+  return allSavedMediaIdsCache.has(ttid);
+};
+
+const normalizeSeasons = async (data: any) => {
   let normalized: any[] = [];
 
   if (!data) return normalized;
@@ -35,12 +60,14 @@ const normalizeSeasons = (data: any) => {
   // Cinemeta meta endpoint provides a `videos` array with episode info
   if (Array.isArray(data.videos) && data.videos.length > 0) {
     const bySeason: Record<string, any[]> = {};
-    data.videos.forEach((ep: any) => {
+    for (const ep of data.videos) {
+      const isInSavedMedia = isMediaInSaved(ep.id);
       const sn = ep.season ?? ep.seasonNumber ?? String(ep.season || 0);
       bySeason[sn] = bySeason[sn] || [];
-      bySeason[sn].push(ep);
-    });
-
+      const episodeWithSavedStatus = { ...ep, isInSaved: isInSavedMedia };
+      bySeason[sn].push(episodeWithSavedStatus);
+    };
+    
     normalized = Object.keys(bySeason).map((k) => ({
       id: k,
       number: Number(k),
@@ -211,7 +238,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
   const configuration = await fetch(`${await getApiUrl(host,protocol)}/getConfiguration`).then(res => res.json());
 
   if (type === "series" && !decodeURIComponent(id).includes(":")) {
-    const seasons = normalizeSeasons(mediaData);
+    const seasons = await normalizeSeasons(mediaData);
 
     if (type === "series" && seasons.length > 0) {
       return (
@@ -221,7 +248,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
           </div>
           <h1 className="text-2xl font-bold mb-6">Season results for {decodeURIComponent(name)}</h1>
   
-          <SeasonsAccordion seasons={seasons} type={type} ttid={id} paramsOpenSeason={season} options={options} config={configuration} />
+          <SeasonsAccordion seasons={seasons} type={type} ttid={id} series_name={decodeURIComponent(name)} paramsOpenSeason={season} options={options} config={configuration} />
         </main>
       );
     }

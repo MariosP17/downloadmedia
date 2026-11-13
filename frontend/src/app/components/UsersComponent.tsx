@@ -9,10 +9,11 @@ interface UsersComponentProps {
     GetUsers: () => Promise<User[]>;
     DeleteUser: (id: string) => Promise<void>;
     AddUser: (username: string, password: string) => Promise<void>;
+    EditUser: (id: string, name: string, password: string) => Promise<void>;
     origin : UsersOrigin;
 }
 
-export default function UsersComponent({ GetUsers, DeleteUser, AddUser, origin }: UsersComponentProps) {
+export default function UsersComponent({ GetUsers, DeleteUser, AddUser, EditUser, origin }: UsersComponentProps) {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [newUsername, setNewUsername] = useState<string>("");
@@ -75,9 +76,13 @@ export default function UsersComponent({ GetUsers, DeleteUser, AddUser, origin }
         }
         await AddUser(newUsername, newPassword);
         await fetchUsers(); // Refresh the user list
+        clearNewUserFields();
+        setAddingUserModal(false);
+    };
+
+    const clearNewUserFields = () => {
         setNewUsername("");
         setNewPassword("");
-        setAddingUserModal(false);
     };
 
     return (
@@ -87,39 +92,52 @@ export default function UsersComponent({ GetUsers, DeleteUser, AddUser, origin }
                 <ComponentLoader />
             ) : (
                 <div>
-                    <table className="min-w-full border border-gray-300">
-                        <thead>
-                            <tr>
-                                <th className="py-2 px-4 border-b">Type</th>
-                                <th className="py-2 px-4 border-b">Username</th>
-                                {origin != UsersOrigin.Jellyfin && <th className="py-2 px-4 border-b">Name</th>}
-                                <th className="py-2 px-4 border-b">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {users.map((user) => (
-                                <tr key={user.id}>
-                                    <td className="py-2 px-4 border-b text-center">{user.type}</td>
-                                    <td className="py-2 px-4 border-b text-center">{user.username}</td>
-                                    {origin != UsersOrigin.Jellyfin && <td className="py-2 px-4 border-b text-center">{user.name}</td>}
-                                    <td className="py-2 px-4 gap-2 flex border-b items-center justify-center">
-                                        <button
-                                            onClick={() =>{ setUserToEdit(user);  setEditModalOpen(true)}}
-                                            className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded cursor-pointer"
-                                        >
-                                            Edit
-                                        </button>
-                                        <button
-                                            onClick={() =>{ setUserToDelete(user);  setDeleteModalOpen(true)}}
-                                            className="bg-red-500 hover:bg-red-700 text-white font-bold py-1 px-2 rounded cursor-pointer"
-                                        >
-                                            Delete
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <div className="w-full rounded-lg overflow-hidden">
+                        {users.map((user) => (
+                            <div 
+                                key={user.id} 
+                                className="flex items-center justify-between p-4 odd:bg-zinc-700 even:bg-zinc-800 transition-colors"
+                            >
+                                {/* Left Side: User Info */}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-6 flex-grow overflow-hidden">
+                                    {/* Type Badge (Optional: you can style this like a pill if you want) */}
+                                    <span className="text-xs font-semibold text-white-500 uppercase tracking-wide w-16">
+                                        {user.type}
+                                    </span>
+                                    
+                                    {/* Username */}
+                                    <span className="text-sm font-medium text-white-900 truncate">
+                                        {user.username}
+                                    </span>
+                                    
+                                    {/* Name (Conditional) */}
+                                    {origin !== UsersOrigin.Jellyfin && (
+                                        <span className="text-sm text-white-600 truncate">
+                                            {user.name}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Right Side: Actions */}
+                                <div className="flex items-center gap-2 ml-4 shrink-0">
+                                    <button
+                                        onClick={() => { setUserToEdit(user); setEditModalOpen(true); }}
+                                        className="bg-blue-700/90 hover:bg-blue-900 text-white font-bold py-2 px-3 rounded cursor-pointer transition-colors"
+                                        aria-label="Edit user"
+                                    >
+                                        <img src="/edit.png" alt="Edit" className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => { setUserToDelete(user); setDeleteModalOpen(true); }}
+                                        className="bg-black hover:bg-black/35 text-white font-bold py-2 px-3 rounded cursor-pointer transition-colors"
+                                        aria-label="Delete user"
+                                    >
+                                        <img src="/delete.png" alt="Delete" className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                     {!addingUserModal && (
                     <div className="mt-4 flex justify-end items-center">
                         <button
@@ -168,12 +186,12 @@ export default function UsersComponent({ GetUsers, DeleteUser, AddUser, origin }
             </div>
         )}
         {addingUserModal && (
-            <div onClick={() => setAddingUserModal(false)} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div onClick={() => { clearNewUserFields(); setAddingUserModal(false); }} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                 <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
                     <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
                     <label className="block text-sm font-bold text-zinc-400 tracking-wider">Add New User</label>
                     <button 
-                        onClick={() => setAddingUserModal(false)}
+                        onClick={() => { clearNewUserFields(); setAddingUserModal(false); }}
                         className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
                     >
                         ✕
@@ -208,7 +226,7 @@ export default function UsersComponent({ GetUsers, DeleteUser, AddUser, origin }
                         Add User
                     </button>
                     <button 
-                        onClick={() => setAddingUserModal(false)} 
+                        onClick={() => {clearNewUserFields(); setAddingUserModal(false);}} 
                         className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors cursor-pointer"
                     >
                         Cancel
@@ -218,12 +236,12 @@ export default function UsersComponent({ GetUsers, DeleteUser, AddUser, origin }
             </div>
         )}
         {editModalOpen && userToEdit && (
-            <div onClick={() => setEditModalOpen(false)} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div onClick={(e) => {clearNewUserFields(); setEditModalOpen(false)}} className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                 <div onClick={(e) => e.stopPropagation()} className="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-xl p-5 flex flex-col shadow-2xl">
                     <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
                     <label className="block text-sm font-bold text-zinc-400 tracking-wider">Edit User</label>
                     <button 
-                        onClick={() => setEditModalOpen(false)}
+                        onClick={() => {clearNewUserFields(); setEditModalOpen(false);}}
                         className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
                     >
                         ✕
@@ -233,30 +251,41 @@ export default function UsersComponent({ GetUsers, DeleteUser, AddUser, origin }
                         <label className="block text-sm font-bold text-zinc-400 tracking-wider mb-1">Username</label>
                         <input 
                             type="text"
-                            value={userToEdit.username}
-                            onChange={(e) => setUserToEdit({ ...userToEdit, username: e.target.value })}
+                            value={userToEdit.name}
+                            onChange={(e) => setUserToEdit({ ...userToEdit, name: e.target.value })}
                             className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
-                        <label className="block text-sm font-bold text-zinc-400 tracking-wider mb-1 mt-4">Password</label>
+                        <label className="block text-sm font-bold text-zinc-400 tracking-wider mb-1 mt-4">New Password</label>
                         <input 
                             type="password"
-                            value={""}
-                            onChange={(e) => setUserToEdit({ ...userToEdit, password: e.target.value })}
+                            value={newPassword}
+                            onChange={(e) => {setNewPassword(e.target.value); setUserToEdit({ ...userToEdit, password: e.target.value });}}
                             className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
+                        {newPassword && newPassword.trim() !== "" && (
+                                <p className="text-xs text-zinc-500 mt-1">
+                                    Password will be updated
+                                </p>
+                        )}
                     </div>
                     <div className="flex justify-end gap-2 pt-2">
                     <button 
-                        onClick={() => {
-                            // Implement the logic to save the edited user details
+                        onClick={async () => {
+                            await EditUser(userToEdit.id, userToEdit.name, userToEdit.password || ""); // Pass the current password if needed
+                            await fetchUsers(); // Refresh the user list
                             setEditModalOpen(false);
+                            clearNewUserFields();;
                         }} 
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white transition-colors cursor-pointer"
+                        disabled={(!userToEdit.name || userToEdit.name.trim() === "")}
+                        className="px-3 py-1.5 bg-blue-600 enabled:hover:bg-blue-500 rounded-lg text-sm font-medium text-white transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         Save Changes
                     </button>
                     <button 
-                        onClick={() => setEditModalOpen(false)} 
+                        onClick={() => {
+                            setEditModalOpen(false);
+                            clearNewUserFields();
+                        }} 
                         className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors cursor-pointer"
                     >
                         Cancel

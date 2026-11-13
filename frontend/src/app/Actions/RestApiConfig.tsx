@@ -89,7 +89,6 @@ export async function restartApi() : Promise<{ success: boolean; error?: string 
         resolve({ success: false, error: stderr });
         return;
       }
-      console.log(`API restarted successfully: ${stdout}`);
       resolve({ success: true });
     });
   });

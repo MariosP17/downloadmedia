@@ -1,7 +1,12 @@
 "use client";
 import FallbackImage from "../components/fallbackimg";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useRef, Suspense } from "react";
+import { getApiUrl } from "../Actions/RestApiConfig";
+import { toast } from "react-hot-toast";
+import CustomContextMenu from "../components/CustomContextMenu";
+import { MediaType } from "../../../Props";
+
 
 // 1. Child Component: Performs data fetching and hooks into search parameters safely
 function SearchResultsList() {
@@ -17,12 +22,74 @@ function SearchResultsList() {
   
   const [showMovies, setShowMovies] = useState(true);
   const [showSeries, setShowSeries] = useState(true);
+
+  const [menu, setMenu] = useState<{ isOpen: boolean; x: number; y: number; media: any; type: MediaType | null }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    media: null,
+    type: null
+  });
+
+  
+ const handleSavedMediaDeleted = (event: Event) => {
+  const { ttid } = (event as CustomEvent<{ ttid?: string }>).detail ?? {};
+  if (!ttid) return;
+
+  setSeries((prev) =>
+    prev.map((item) =>
+      item.id === ttid ? { ...item, isInSaved: false } : item
+    )
+  );
+
+  setMovies((prev) =>
+    prev.map((item) =>
+      item.id === ttid ? { ...item, isInSaved: false } : item
+    )
+  );
+};
+
+  const handleSavedMediaDeletedAll = () => {
+    setSeries((prev) => prev.map((s) => ({ ...s, isInSaved: false })));
+    setMovies((prev) => prev.map((m) => ({ ...m, isInSaved: false })));
+  };
+
+  const pointerType = useRef<string | null>(null);
+
+  const handleContextMenu = (e: React.MouseEvent, media: any) => {
+    if (pointerType.current === "mouse") {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      media: media,
+      type: media.type === "movie" ? MediaType.movie : MediaType.series
+    });
+    }
+  };
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+      pointerType.current = e.pointerType;
+  };
   
   // React elements mapping references replacing old document.getElementById selectors
   const moviesContainerRef = useRef<HTMLDivElement>(null);
   const seriesContainerRef = useRef<HTMLDivElement>(null);
-  
-  const router = useRouter();
+
+  const isMediaInSaved = (id: string, savedIds: string[]) => {
+    return savedIds.includes(id);
+  }
+
+  useEffect(() => {
+    window.addEventListener("saved-media-deleted", handleSavedMediaDeleted);
+    window.addEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+    return () => {
+      window.removeEventListener("saved-media-deleted", handleSavedMediaDeleted);
+      window.removeEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+    };
+  }, []);
 
   useEffect(() => {
     if (!query) return;
@@ -38,9 +105,24 @@ function SearchResultsList() {
           `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(query)}.json`
         );
 
+        const allMediaSavedIdsResponse = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + '/getSavedMediaIds?type=moviesandseries');
+        const allMediaSavedIds = await allMediaSavedIdsResponse.json();
+        if (!allMediaSavedIds.success) {
+          toast.error(`Failed to load saved media IDs: ${allMediaSavedIds.message || 'Unknown error'}`);
+        }
+        const movieIds = allMediaSavedIds.data.movies || [];
+        const seriesIds = allMediaSavedIds.data.series || [];
+
         const movieData = await movieRes.json();
         const seriesData = await seriesRes.json();
-
+        for (const movie of movieData.metas) {
+          const isInSaved = isMediaInSaved(movie.id, movieIds);
+          movie.isInSaved = isInSaved;
+        }
+        for (const series of seriesData.metas) {
+          const isInSaved = isMediaInSaved(series.id, seriesIds);
+          series.isInSaved = isInSaved;
+        }
         setMovies(movieData.metas || []);
         setSeries(seriesData.metas || []);
       } catch (e) {
@@ -112,16 +194,20 @@ function SearchResultsList() {
                         // setPageLoading(true);
                         // router.push(`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`);
                       }}
-
+                      onContextMenu={(e) => handleContextMenu(e, movie)}
+                      onPointerDown={handlePointerDown}
                       className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
                     >
-                      <FallbackImage
-                        src={movie.poster}
-                        width={200}
-                        height={300}
-                        alt={movie.name}
-                        className="poster"
-                      />
+                      <div className="relative">
+                        <FallbackImage
+                          src={movie.poster}
+                          width={200}
+                          height={300}
+                          alt={movie.name}
+                          className="poster"
+                        />
+                        <img src="/check.svg" alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
+                      </div>
                     </div>
                     </a>
                     <p className="mt-2">{movie.name}</p>
@@ -174,9 +260,14 @@ function SearchResultsList() {
                         // setPageLoading(true);
                         // router.push(`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`);
                       }}
+                      onContextMenu={(e) => handleContextMenu(e, show)}
+                      onPointerDown={handlePointerDown}
                       className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
-                    >
-                      <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
+                    > 
+                      <div className="relative">
+                        <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
+                        <img src="/check.svg" alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
+                      </div>
                     </div>
                     </a>
                     <p className="mt-2">{show.name}</p>
@@ -194,7 +285,24 @@ function SearchResultsList() {
           </div>
         </section>
       </div>
+      {menu.isOpen && (
+        <CustomContextMenu
+          x={menu.x}
+          y={menu.y}
+          type={menu.type || MediaType.movie}
+          media={menu.media}
+          CloseMenu={() => setMenu({ x: 0, y: 0, media: null, isOpen: false, type: null })}
+          ChangeMediaSavedStatus={(ttid, status, season) => {
+            if (series.filter((s) => s.id === ttid).length > 0) {
+              setSeries((prev) => prev.map((s) => s.id === ttid ? { ...s, isInSaved: status } : s));
+            } else if (movies.filter((m) => m.id === ttid).length > 0) {
+              setMovies((prev) => prev.map((m) => m.id === ttid ? { ...m, isInSaved: status } : m));
+            }
+          }}
+          isInSaved={menu.media.isInSaved}
 
+        />
+      )}
       {pageLoading && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
           <span className="loader"></span>

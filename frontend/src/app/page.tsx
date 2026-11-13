@@ -1,7 +1,10 @@
 "use client";
 import FallbackImage from "./components/fallbackimg";
-import { useRouter } from "next/navigation";
+import ContextMenu from "./components/CustomContextMenu";
 import { useEffect, useState, useRef } from "react";
+import { MediaType } from "../../Props"
+import { getApiUrl } from "./Actions/RestApiConfig";
+import { toast } from "react-hot-toast";
 
 export default function SearchPage() {
   const moviesContainerRef = useRef<HTMLDivElement>(null);
@@ -15,7 +18,52 @@ export default function SearchPage() {
   const [pageLoading, setPageLoading] = useState(false);
   const [showMovies, setShowMovies] = useState(true);
   const [showSeries, setShowSeries] = useState(true);
-  const router = useRouter();
+  const [menu, setMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    media: any | null;
+    type: MediaType | null;
+  }>({
+    isOpen: false,  
+    x: 0,
+    y: 0,
+    media: null,
+    type: null
+  });
+  const pointerTypeRef = useRef<string | null>(null);
+
+  const handleSavedMediaDeleted = (event: Event) => {
+    const { ttid } = (event as CustomEvent<{ ttid?: string }>).detail ?? {};
+    if (!ttid) return;
+
+    setSeries((prev) =>
+      prev.map((item) =>
+        item.id === ttid ? { ...item, isInSaved: false } : item
+      )
+    );
+
+    setMovies((prev) =>
+      prev.map((item) =>
+        item.id === ttid ? { ...item, isInSaved: false } : item
+      )
+    );
+  };
+
+  const handleSavedMediaDeletedAll = () => {
+    setSeries((prev) => prev.map((s) => ({ ...s, isInSaved: false })));
+    setMovies((prev) => prev.map((m) => ({ ...m, isInSaved: false })));
+  };
+
+  useEffect(() => {
+    window.addEventListener("saved-media-deleted", handleSavedMediaDeleted);
+    window.addEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+    return () => {
+      window.removeEventListener("saved-media-deleted", handleSavedMediaDeleted);
+      window.removeEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+    };
+  }, []);
+
 
   useEffect(() => {
 
@@ -33,8 +81,23 @@ export default function SearchPage() {
           `https://v3-cinemeta.strem.io/catalog/series/top.json`
         );
 
+        const allSavedMediaResponse = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getSavedMediaIds?type=moviesandseries`);
+        const allSavedMediaData = await allSavedMediaResponse.json();
+        if (!allSavedMediaData.success) {
+          toast.error(`Failed to load saved media IDs: ${allSavedMediaData.message || 'Unknown error'}`);
+        }
+        const moviesIds = allSavedMediaData.data.movies || [];
+        const seriesIds = allSavedMediaData.data.series || [];
         const movieData = await movieRes.json();
         const seriesData = await seriesRes.json();
+        for (const movie of movieData.metas) {
+          const isInSaved = isMediaInSaved(movie.id, moviesIds);
+          movie.isInSaved = isInSaved;
+        }
+        for (const series of seriesData.metas) {
+          const isInSaved = isMediaInSaved(series.id, seriesIds);
+          series.isInSaved = isInSaved;
+        }
         setMovies(movieData.metas);
         setSeries(seriesData.metas);
       } catch (e) {
@@ -44,6 +107,11 @@ export default function SearchPage() {
         setLoading(false);
       }
     }
+
+    const isMediaInSaved = (ttid: string, ids: string[]) => {
+      return ids.includes(ttid);
+    };
+
     const loadOpenTabsFromSessionStorage = () => {
       const storedShowMovies = sessionStorage.getItem("showMovies");
       const storedShowSeries = sessionStorage.getItem("showSeries");
@@ -59,6 +127,23 @@ export default function SearchPage() {
     load();
     loadOpenTabsFromSessionStorage();
   }, [movies, series]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    pointerTypeRef.current = e.pointerType;
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, media: any) => {
+    if (pointerTypeRef.current !== 'mouse') return; // Only trigger for mouse events
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      media: media,
+      type: media.type === "movie" ? MediaType.movie : MediaType.series
+    });
+  };
 
   return (
     <main className="p-8 bg-zinc-950 min-h-screen text-white">
@@ -92,15 +177,20 @@ export default function SearchPage() {
                         // setPageLoading(true);
                         // router.push(`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`);
                       }}
+                      onContextMenu={(e) => handleContextMenu(e, movie)}
+                      onPointerDown={handlePointerDown}
                       className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
                     >
-                      <FallbackImage
-                        src={movie.poster}
-                        width={200}
-                        height={300}
-                        alt={movie.name}
-                        className="poster"
-                      />
+                      <div className="relative">
+                        <FallbackImage
+                          src={movie.poster}
+                          width={200}
+                          height={300}
+                          alt={movie.name}
+                          className="poster"
+                        />
+                        <img src="/check.svg" alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
+                      </div>
                     </div>
                     </a>
                     <p className="mt-2">{movie.name}</p>
@@ -146,9 +236,14 @@ export default function SearchPage() {
                         // setPageLoading(true);
                         // router.push(`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`);
                       }}
+                      onContextMenu={(e) => handleContextMenu(e, show)}
+                      onPointerDown={handlePointerDown}
                       className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
-                    >
-                      <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
+                    > 
+                      <div className="relative">
+                        <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
+                        <img src="/check.svg" alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
+                      </div>
                     </div>
                     </a>
                     <p className="mt-2">{show.name}</p>
@@ -166,6 +261,15 @@ export default function SearchPage() {
           </div>
         </section>
       </div>
+      {menu.isOpen && (
+        <ContextMenu x={menu.x} y={menu.y} media={menu.media} type={menu.type || MediaType.movie} CloseMenu={() => setMenu({x: 0, y: 0, media: null, isOpen: false, type: null})} isInSaved={menu.media.isInSaved} ChangeMediaSavedStatus={(ttid, status, season) => {
+          if (series.filter((s) => s.id === ttid).length > 0) {
+            setSeries((prev) => prev.map((s) => s.id === ttid ? { ...s, isInSaved: status } : s));
+          } else if (movies.filter((m) => m.id === ttid).length > 0) {
+            setMovies((prev) => prev.map((m) => m.id === ttid ? { ...m, isInSaved: status } : m));
+          }
+        }} />
+      )}
       {pageLoading && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
           <span className="loader"></span>

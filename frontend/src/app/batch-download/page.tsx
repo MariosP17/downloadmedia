@@ -753,20 +753,23 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   className="object-cover w-12 h-18 rounded-lg border border-zinc-800 flex-shrink-0"
                 />
                 <div className="flex flex-col gap-1 min-w-0">
-                  <a 
-                    className={`${applyBreak(seriesItem.displayName)} text-base w-fit font-bold text-white text-ellipsis hover:cursor-pointer hover:text-blue-400`} 
-                    title={seriesItem.displayName} 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                    }}
-                    href={`/series/${encodeURIComponent(seriesItem.ttid.split(':')[0])}/${encodeURIComponent(seriesItem.displayName)}`}
+                {/* Wrap the link so the div handles the flex sizing, letting the anchor act as true inline text */}
+                <div>
+                    <a 
+                        className={`${applyBreak(seriesItem.displayName)} text-base font-bold text-white hover:cursor-pointer hover:text-blue-400`} 
+                        title={seriesItem.displayName}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                        }}
+                        href={`/series/${encodeURIComponent(seriesItem.ttid.split(':')[0])}/${encodeURIComponent(seriesItem.displayName)}`}
                     >
-                      {seriesItem.displayName}
+                        {seriesItem.displayName}
                     </a>
-                  <p className="text-xs text-zinc-500 font-medium mt-0.5">
-                    <span className="text-white "> {Array.from(checkedItems).filter((item) => item.split("-")[2].split(":")[0] === seriesItem.ttid).length} </span> /{seriesEpisodes.length} {seriesEpisodes.length === 1 ? "Episode" : "Episodes"} queued
-                  </p>
                 </div>
+                <p className="text-xs text-zinc-500 font-medium mt-0.5">
+                    <span className="text-white"> {Array.from(checkedItems).filter((item) => item.split("-")[2].split(":")[0] === seriesItem.ttid).length} </span> /{seriesEpisodes.length} {seriesEpisodes.length === 1 ? "Episode" : "Episodes"} queued
+                </p>
+            </div>
                 </div>
                 <div className="flex items-center gap-2 sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0">
                   <button
@@ -863,7 +866,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).sort((a,b) => a.number - b.number).map((episodeItem, epIdx) => (
                     <div
                       key={`${episodeItem.infoHash}-${episodeItem.fileIdx}-${epIdx}`}
-                      className={`${epIdx == 0 ? 'mt-3' : 'mt-0'} ${epIdx == seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length - 1 ? 'mb-3' : 'mb-0'} flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between p-3 bg-zinc-950/60 border border-zinc-800/40 rounded-xl gap-4 transition-colors`}
+                      className={`my-2 flex flex-col sm:flex-row items-start sm:items-center px-4 justify-between p-3 bg-zinc-950/60 border border-zinc-800/40 rounded-xl gap-4 transition-colors`}
                     >
                       <div className={`w-full flex items-center gap-4 min-w-0`}>
                         {/* Thumbnail Container (Using landscape layout for individual episode clips) */}
@@ -907,7 +910,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                       </div>
 
                       {/* Interaction Row Controls */}
-                      <div className="flex items-center gap-3 w-full sm:w-auto justify-end border-t border-zinc-800/60 sm:border-0 pt-2 sm:pt-0">
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                         <button
                           type="button"
                           onClick={(e) => handleRemoveItem(e, episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)}
@@ -919,7 +922,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                           type="checkbox"
                           checked={checkedItems.has(`${episodeItem.infoHash}-${episodeItem.fileIdx}-${episodeItem.ttid}`)}
                           onChange={(e) => handleCheckboxChange(episodeItem.infoHash, episodeItem.fileIdx, episodeItem.ttid)(e)}
-                          className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
+                          className="appearance-none mr-2 w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
                         />
                       </div>
                     </div>
@@ -939,7 +942,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
             {items.filter(item => item.itemType === "movie").map((item, index) => (
               <div
                 key={`${item.infoHash}-${item.fileIdx}-${index}`}
-                className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 bg-zinc-900 rounded-xl gap-4 hover:bg-zinc-800/60 transition-colors"
+                className="flex flex-row justify-between p-2 mb-3 bg-zinc-900 rounded-xl hover:bg-zinc-800/60 transition-colors"
               >
                 <div className="w-full flex items-center gap-2 flex-1 min-w-0">
                   <div className={`${item.itemType === "movie" ? "w-12 h-18" : "w-18 h-12"} rounded-lg overflow-hidden bg-zinc-950 flex-shrink-0 relative border border-zinc-800`}>
@@ -952,7 +955,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <a className="text-base font-bold break-words text-white truncate hover:cursor-pointer hover:text-blue-400" title={item.displayName} onClick={(e) => {
+                    <a className="text-base font-bold break-words text-white hover:cursor-pointer hover:text-blue-400" title={item.displayName} onClick={(e) => {
                       e.stopPropagation();
                       
                     }}
@@ -980,7 +983,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t border-zinc-800 sm:border-0 pt-3 sm:pt-0">
+                <div className="flex items-center gap-2 sm:w-auto justify-end sm:border-0 pt-3 sm:pt-0">
                   <button
                     onClick={(e) => handleRemoveItem(e,item.infoHash, item.fileIdx, item.ttid)}
                     className="px-3 py-1.5 text-xs font-semibold text-zinc-400 hover:text-red-400 hover:bg-red-950/20 rounded-lg transition-colors cursor-pointer"
@@ -993,9 +996,8 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     onChange={handleCheckboxChange(item.infoHash, item.fileIdx, item.ttid)}
                     className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓']"
                   />
+                  <div className="flex h-4 w-4"></div>
                 </div>
-                  {/* <div className="flex items-center gap-2 w-full sm:w-auto justify-end border-t border-zinc-800 sm:border-0 pt-3 sm:pt-0"> */}
-                  {/* </div> */}
               </div>
             ))}
             </div>

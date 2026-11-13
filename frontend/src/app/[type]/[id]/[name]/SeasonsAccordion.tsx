@@ -5,12 +5,15 @@ import { useRouter } from "next/navigation";
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react'
 import { toast } from "react-hot-toast";
 import { useSyncedLocalStorage } from "../../../Utils/useSyncedLocalStorage";
-import { option } from "framer-motion/client";
+import CustomContextMenu from "../../../components/CustomContextMenu";
+import { MediaType } from "../../../../../Props";
+import { getApiUrl } from "../../../Actions/RestApiConfig";
 
 type Props = {
   seasons: any[];
   type: string;
-  ttid: string; // Optional ttid for future use, currently unused in this component
+  ttid: string;
+  series_name: string;
   options: { [key: string]: any }; // Optional prop for additional options
   config: { [key: string]: any }; // Optional prop for additional configuration
   paramsOpenSeason?: string; // Optional prop to open a specific season initially
@@ -21,7 +24,7 @@ const SvgAddAllIcon = {
  "checked": "M120-320v-80h320v80H120Zm0-160v-80h480v80H120Zm0-160v-80h480v80H120Zm534 440L512-342l56-56 86 84 170-170 56 58-226 226Z"
 };
 
-export default function SeasonsAccordion({ seasons, type, ttid, options, config, paramsOpenSeason }: Props) {
+export default function SeasonsAccordion({ seasons, type, ttid,series_name, options, config, paramsOpenSeason }: Props) {
   const [openSeasonId, setOpenSeasonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [openAddAllModal, setOpenAddAllModal] = useState(false);
@@ -45,8 +48,19 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
     
     return initialPaths;
   });
+  const [menu, setMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    ep: any;
+  }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    ep: null
+  });
   const router = useRouter();
-
+  const pointerTypeRef = useRef('');
 
   // 1. On mount: Hydrate open selection from sessionStorage safely
   useEffect(() => {
@@ -84,7 +98,6 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
       document.body.style.overflow = 'unset';
     };
   }, [openAddAllModal]);
-
 
   const addAllEpisodesToBatch = async (key: string) => {
   const toastId = toast.loading(<span>Adding all episodes to batch...</span>);
@@ -325,6 +338,27 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
     return {hash: stream.infoHash, name: stream.name, provider: provider, Size: "≈" + roundedSize};
   }
 
+  const handleOpenMenu = async (e: React.MouseEvent, ep: any) => {
+    if (pointerTypeRef.current !== 'mouse') return; // Only trigger for mouse events
+      e.preventDefault();
+      e.stopPropagation();
+      
+      setMenu({
+        isOpen: true,
+        x: e.clientX,
+        y: e.clientY,
+        ep: {
+          ...ep,
+          series_name: series_name,
+        }
+      });
+    };
+
+    const handlePointerDown = (e: any) => {
+    // e.pointerType will be 'mouse', 'touch', or 'pen'
+      pointerTypeRef.current = e.pointerType;
+    };
+
   return (
   <div className="space-y-8">
     {/* 1. THE SEASONS LOOP (Clean & Free of Modal DOM Bloat) */}
@@ -367,7 +401,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
                   const eid = ep.id ?? ep._id ?? ep.imdb_id ?? ep.tvdb_id ?? ep.name ?? ep.title;
                   const ename = ep.name ?? ep.title ?? `Episode ${ep.episode ?? ep.number ?? ""}`;
                   return (
-                    <div key={eid}>
+                    <div key={eid} className="flex flex-col items-center">
                       <a href={`/series/${encodeURIComponent(ep.id)}/${encodeURIComponent(ename)}`}>
                       <div
                         onClick={(e) => {
@@ -375,9 +409,14 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
                           // setLoading(true);
                           // router.push(`/series/${encodeURIComponent(ep.id)}/${encodeURIComponent(ename)}`);
                         }}
+                        onPointerDown={handlePointerDown}
+                        onContextMenu={(e) => handleOpenMenu(e, ep)}
                         className="rounded-lg overflow-hidden transition-transform transform hover:scale-105 duration-200 cursor-pointer"
-                      >
-                        <FallbackImage src={ep.thumbnail || ep.poster || ep.cover || "/no-poster-16-9.jpg"} fallback="/no-poster-16-9.jpg" alt={ename} />
+                      > 
+                        <div className="relative">
+                          <FallbackImage src={ep.thumbnail || ep.poster || ep.cover || "/no-poster-16-9.jpg"} fallback="/no-poster-16-9.jpg" alt={ename} />
+                          <img src="/check.svg" className={`absolute bg-white rounded-full top-1 right-1 w-5 h-5 ${ep.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`} />
+                        </div>
                       </div>
                       </a>
                       <p className="mt-2 text-sm font-medium"><span className="text-zinc-500">S{season.number.toString().padStart(2, '0')}E{ep.episode?.toString().padStart(2, '0') ?? ep.number?.toString().padStart(2, '0') ?? ""}</span> {ename}</p>
@@ -505,7 +544,7 @@ export default function SeasonsAccordion({ seasons, type, ttid, options, config,
         </div>
       </div>
     )}
-
+    {menu.isOpen && <CustomContextMenu x={menu.x} y={menu.y} media={menu.ep} type={MediaType.series} CloseMenu={() => setMenu({isOpen: false, x: 0, y: 0, ep: null})} isInSaved={menu.ep.isInSaved} ChangeMediaSavedStatus={(ttid, status, season) => {seasons.filter((s) => s.number == season)[0].episodes.filter((e : any) => e.id === ttid)[0].isInSaved = status;}} />}
     {/* 3. GLOBAL LOADING OVERLAY */}
     {loading && (
       <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">

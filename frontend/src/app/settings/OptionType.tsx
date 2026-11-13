@@ -13,6 +13,7 @@ type OptionType = {
   hidden?: boolean;
   allHidden?: boolean;
   asNumber?: boolean;
+  asPassword?: boolean;
   onChange?: (newValue: any) => void;
   onClick?: () => void;
   iconClassName?: string;
@@ -22,7 +23,7 @@ type OptionType = {
 import { OptionsNames } from "../../../Props";
 import FolderPicker  from "../components/FolderPicker";
 
-export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber, onChange,onClick, icon,iconClassName, options}: OptionType) {
+export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber,asPassword, onChange,onClick, icon,iconClassName, options}: OptionType) {
 
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
@@ -112,7 +113,7 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
         <div hidden={allHidden} className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>{OptionsNames[typeKey]}</p>
           <input 
-            type="text" 
+            type={asPassword ? "password" : "text"}
             disabled={disabled}
             style={{
               minWidth: minWidth ? `min(100%, ${minWidth})` : undefined,
@@ -164,7 +165,7 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
             title={OptionsNames[typeKey]}
             disabled={disabled}
             onClick={onClick}
-            className="bg-blue-700 cursor-pointer enabled:hover:bg-blue-900 text-white font-bold p-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-blue-700 flex justify-center cursor-pointer enabled:hover:bg-blue-900 text-white font-bold p-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {icon && <img src={icon} alt="icon" className={iconClassName || " " + " inline-block"} />}
           </button>

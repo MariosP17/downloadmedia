@@ -58,8 +58,15 @@ def is_path_within_configured_roots(path):
     return absolute_path == movies_root or absolute_path == tvshows_root or movies_root in absolute_path.parents or tvshows_root in absolute_path.parents
 
 def refresh_all_libraries():
-    refresh_jellyfin_libraries()
-    refresh_plex_libraries()
+    if not getJellyfinUrl():
+        print("Jellyfin not configured. Skipping Jellyfin library refresh.")
+    else:
+        refresh_jellyfin_libraries()
+
+    if not get_plex_url():
+        print("Plex not configured. Skipping Plex library refresh.")
+    else:
+        refresh_plex_libraries()
 
 def refresh_all_environment_variables():
     global OPEN_SUBTITLES_API_KEY
@@ -1670,6 +1677,19 @@ def check_plex_endpoint():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/checkPlexApiKey', methods=['POST'])
+def check_plex_api_key_endpoint():
+    try:
+        data = request.get_json() or {}
+        api_key = data.get('apiKey')
+        if not api_key:
+            return jsonify({"error": "API Key is required"}), 400
+
+        is_valid = check_plex_api_key(api_key)
+        return jsonify({"valid": is_valid}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/getJellyfinUser/<user_id>', methods=['GET'])
 def get_jellyfin_user_endpoint(user_id):
     try:
@@ -1696,15 +1716,32 @@ def add_jellyfin_user_endpoint():
 @app.route('/updateJellyfinUser/<user_id>', methods=['PUT'])
 def update_jellyfin_user_endpoint(user_id):
     data = request.get_json() or {}
-    username = data.get('username')
-    password = data.get('password')
+    name = data.get('name')
 
-    if not username and not password:
-        return jsonify({"error": "At least one of 'username' or 'password' is required"}), 400
+    if not name:
+        return jsonify({"error": "Field 'name' is required"}), 400
 
     try:
-        update_jellyfin_user(user_id, {"username": username, "password": password})
+        user_data = get_jellyfin_user_by_id(user_id)
+        if not user_data:
+            return jsonify({"error": "User not found"}), 404
+        user_data['Name'] = name if name else user_data['Name']
+        update_jellyfin_user(user_id, user_data)
         return jsonify({"message": "User updated successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/updateJellyfinUserPassword/<user_id>', methods=['PUT'])
+def update_jellyfin_user_password_endpoint(user_id):
+    data = request.get_json() or {}
+    password = data.get('password')
+
+    if not password :
+        return jsonify({"error": "Field 'password' is required"}), 400
+
+    try:
+        update_jellyfin_user_password(user_id, {"NewPw": password})
+        return jsonify({"message": "User password updated successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1739,6 +1776,19 @@ def check_jellyfin_endpoint():
 
         status = check_jellyfin(url)
         return jsonify({"status": status}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/checkJellyfinApiKey', methods=['POST'])
+def check_jellyfin_api_key_endpoint():
+    try:
+        data = request.get_json() or {}
+        api_key = data.get('apiKey')
+        if not api_key:
+            return jsonify({"error": "API Key is required"}), 400
+
+        is_valid = check_jellyfin_api_key(api_key)
+        return jsonify({"valid": is_valid}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -2123,6 +2173,10 @@ def write_refresh_libraries_log(initiator):
 def get_all_saved_media():
     return performAction(smut.get_all_saved_media_util)
 
+@app.route('/getSavedMediaIds', methods=['GET'])
+def get_saved_media_ids():
+    media_type = request.args.get("type", None)
+    return performAction(smut.get_all_saved_media_ids_util, media_type=media_type)
 
 @app.route('/getSavedMedia', methods=['GET'])
 def get_saved_media():

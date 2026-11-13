@@ -28,6 +28,37 @@ def get_all_saved_media(conn):
     finally:
         close_connection(conn)
 
+def get_all_saved_media_ids(conn, media_type: str = None):
+    try:
+        match (media_type) :
+            case "series":
+                result = fetch_query(conn, "SELECT ttid FROM saved_media WHERE type = 2 AND episode_info IS NULL")
+            case "movies":
+                result = fetch_query(conn, "SELECT ttid FROM saved_media WHERE type = 1")
+            case "episodes":
+                result = fetch_query(conn, "SELECT ttid FROM saved_media WHERE type = 2 AND episode_info IS NOT NULL")
+            case "moviesandseries":
+                result1 = fetch_query(conn, "SELECT ttid FROM saved_media WHERE episode_info IS NULL")
+                result2 = fetch_query(conn, "SELECT ttid FROM saved_media WHERE type = 1")
+                list1 = [row[0] for row in result1] if result1 else []
+                list2 = [row[0] for row in result2] if result2 else []
+                combined_media_ids_object = {"series": list1, "movies": list2}
+                return combined_media_ids_object
+            case None:
+                result = fetch_query(conn, "SELECT ttid FROM saved_media")
+            case _:
+                result = fetch_query(conn, "SELECT ttid FROM saved_media")
+        saved_media_ids: list[str] = []
+        if result:
+            for row in result:
+                saved_media_ids.append(row[0])
+        return saved_media_ids
+    except Exception as e:
+        print(f"Failed to get saved media ids: {e}")
+        raise e
+    finally:
+        close_connection(conn)
+
 def get_saved_media(conn, ttid):
     try:
         result = fetch_query(conn, "SELECT * FROM saved_media WHERE ttid = %s", (ttid,))

@@ -15,6 +15,17 @@ def get_all_saved_media_util(db_connection_string: str) -> List[SavedMedia]:
     finally:
         close_connection(conn)
 
+def get_all_saved_media_ids_util(db_connection_string: str, media_type: str = None) -> List[str]:
+    conn = get_connection(db_connection_string)
+    try:
+        result = smdb.get_all_saved_media_ids(conn, media_type=media_type)
+        return result
+    except Exception as e:
+        print(f"Failed to get saved media ids: {e}")
+        raise e
+    finally:
+        close_connection(conn)
+
 def get_saved_media_util(db_connection_string: str,ttid: str) -> SavedMedia:
     conn = get_connection(db_connection_string)
     try:
