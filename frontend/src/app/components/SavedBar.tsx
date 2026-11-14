@@ -156,9 +156,18 @@ export default function SavedBar({
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
 
   useEffect(() => {
+    let animationTimer: ReturnType<typeof setTimeout> | undefined;
+
+    if (open) {
+      setRender(true);
+      setVisible(false);
+      setLoading(true);
+
+      animationTimer = setTimeout(() => setVisible(true), 100);
+    }
+
     const fetchSavedMedia = async () => {
       try {
-        setLoading(true);
         const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getAllSavedMedia");
         const data = await response.json();
         if (!data.success) {
@@ -167,10 +176,6 @@ export default function SavedBar({
           throw new Error(data.message || "Failed to fetch saved media");
         }
         setSavedMedia(data.data);
-        setRender(true);
-        // Trigger enter transition on the next macro-task tick
-        const id = setTimeout(() => setVisible(true), 200);
-        return () => clearTimeout(id);
       } catch (error) {
         console.error("Failed to open saved bar:", error);
       } finally {
@@ -180,6 +185,11 @@ export default function SavedBar({
 
     if (open) {
       fetchSavedMedia();
+      return () => {
+        if (animationTimer !== undefined) {
+          clearTimeout(animationTimer);
+        }
+      };
     } else {
       // 1. Start the exit transition immediately
       setVisible(false);
@@ -277,10 +287,9 @@ export default function SavedBar({
         </div>
         )}
     <nav className="mt-6">
-    {savedMedia.length === 0 && !loading && (
-        <p className="text-zinc-400 text-sm">No saved media.</p>
-    )}
-    {savedMedia.length > 0 && (
+  
+    {loading ? <div className="relative"><Loader /></div> :
+    savedMedia.length > 0 ? (
       <AnimatePresence initial={false}>
         {savedMedia.map((media) => (
           <SavedMediaCard
@@ -290,9 +299,10 @@ export default function SavedBar({
           />
         ))}
       </AnimatePresence>
+    ) : (
+      <p className="text-zinc-400 text-sm">No saved media found.</p>
     )}
 </nav>
-{loading && <Loader />}
       </aside>
     {confirmDeleteAll && (
       <div onClick={() => {setConfirmDeleteAll(false);}} className="fixed inset-0 bg-black/70 z-60 flex items-center justify-center p-4 backdrop-blur-sm">
