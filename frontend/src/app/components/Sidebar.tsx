@@ -17,14 +17,14 @@ export default function Sidebar({
     if (open) {
       setRender(true);
       // Trigger enter transition on the next macro-task tick
-      const id = setTimeout(() => setVisible(true), 200);
+      const id = setTimeout(() => setVisible(true), 100);
       return () => clearTimeout(id);
     } else {
       // 1. Start the exit transition immediately
       setVisible(false);
       
-      // 2. Wait for the CSS duration (200ms) before unmounting from DOM
-      const id = setTimeout(() => setRender(false), 200);
+      // 2. Wait for the CSS duration (100ms) before unmounting from DOM
+      const id = setTimeout(() => setRender(false), 100);
       return () => clearTimeout(id);
     }
   }, [open]);
