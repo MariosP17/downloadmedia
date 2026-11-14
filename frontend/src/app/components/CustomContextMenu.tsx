@@ -16,7 +16,6 @@ interface MenuState {
 export default function CustomContextMenu({x, y, media, isInSaved, type, CloseMenu, ChangeMediaSavedStatus: ChangeMediaSavedStatus}: MenuState) {
 
   const handleAddToSaved = async (media : any) => {
-    console.log('Adding to saved:', media, "with type:", type);
     const toastId = toast.loading(`Adding ${media.name || (type === MediaType.movie ? "movie" : media.id.split(':').length > 1 ? "episode" : "series")} to saved...`);
     try{
       const response = await fetch(await getApiUrl(window.location.hostname,window.location.protocol)+'/addSavedMedia', {

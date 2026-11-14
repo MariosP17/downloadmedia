@@ -971,7 +971,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
               </button>
             </div>
             <div className="mb-4"></div>
-              <ArtPlayer videopath={itemPath} name={type === "movie" ? itemPath.split("/")[itemPath.split("/").length - 2] : itemPath.split("/")[itemPath.split("/").length - 3]} type={type} episodeInfo={episodeInfo} />
+              <ArtPlayer videopath={itemPath} name={type === "movie" ? itemPath.split("/")[itemPath.split("/").length - 2] : itemPath.split("/")[itemPath.split("/").length - 3]} type={type} episodeInfo={episodeInfo} opts={options} />
             </div>
           </div>
       )}

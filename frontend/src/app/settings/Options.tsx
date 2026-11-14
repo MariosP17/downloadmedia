@@ -85,8 +85,9 @@ export default function Options() {
             <OptionType typeKey="subtitle_languages" value={languages || []} type="<languages>" />
             <OptionType typeKey="batchSizeThreshold" value={options["batchSizeThreshold"] || 50} type="<number>" min={1} onChange={(newValue) => setOptions((prev) => ({ ...prev, batchSizeThreshold: newValue }))} />
             <OptionType typeKey="BatchSize" value={options["batchSize"] || 5} type="<number>" min={1} onChange={(newValue) => setOptions((prev) => ({ ...prev, batchSize: newValue }))} />
+            <OptionType decimalPoints={1} typeKey="subtitleDelayStep" value={options["subtitleDelayStep"] || 0.1  } type="<number>" min={0.1} max={10} onChange={(newValue) => setOptions((prev) => ({ ...prev, subtitleDelayStep: newValue }))} />
             
-            <div className="flex justify-end">
+            <div className="flex justify-end">  
                 <button onClick={saveOptions} disabled={disabledSave} className="bg-blue-700 cursor-pointer enabled:hover:bg-blue-900 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
             </div>
             {loading && <ComponentLoader name="Options" />}

@@ -14,6 +14,7 @@ type OptionType = {
   allHidden?: boolean;
   asNumber?: boolean;
   asPassword?: boolean;
+  decimalPoints?: number;
   onChange?: (newValue: any) => void;
   onClick?: () => void;
   iconClassName?: string;
@@ -23,7 +24,7 @@ type OptionType = {
 import { OptionsNames } from "../../../Props";
 import FolderPicker  from "../components/FolderPicker";
 
-export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber,asPassword, onChange,onClick, icon,iconClassName, options}: OptionType) {
+export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber,asPassword,decimalPoints, onChange,onClick, icon,iconClassName, options}: OptionType) {
 
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
@@ -56,9 +57,11 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
             type="number" 
             value={value}
             hidden={hidden}
+            step={decimalPoints ? 10**(-(decimalPoints)) : 1}
             onChange={(event) => {
               if (onChange) {
-                onChange(Number(event.target.value) === 0 ? 1 : Number(event.target.value));
+                // onChange(Number(event.target.value) === 0 ? 1 : Number(event.target.value));
+                onChange(Number(event.target.value));
               }
             }}
             min={min}

@@ -56,7 +56,8 @@ export const OptionsNames : Record<string, string> =
     "jellyfin_installed" : "Jellyfin Installed",
     "manage_jellyfin_users" : "Manage Jellyfin Users",
     "jellyfin_api_key" : "Jellyfin API Key",
-    "plex_api_key" : "Plex API Key"
+    "plex_api_key" : "Plex API Key",
+    "subtitleDelayStep" : "Subtitle Delay Step (seconds)"
 
 };
 

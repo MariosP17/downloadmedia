@@ -11,6 +11,7 @@ interface ArtPlayerProps {
     name: string;
     type: string;
     episodeInfo?: { season: number; episode: number };
+    opts: Record<string, any>
 }
 
 type Subtitle = {
@@ -26,10 +27,12 @@ type SubtitleResponse = {
     index?: number;
 };
 
-export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo }: ArtPlayerProps) {
+
+export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo,opts }: ArtPlayerProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const isPhone = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const playerRef = useRef<Artplayer | null>(null);
+    const subtitleDelayRef = useRef(0);
     const [loading, setLoading] = useState(true);
 
      async function getName(cleanName: string, path: string) : Promise<string | undefined> {
@@ -274,13 +277,31 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo }: 
                             controls.style.gap = "3px";
                             controls.style.marginLeft = "6px";
 
+                            const cueTimes = new WeakMap<VTTCue, { start: number; end: number }>();
                             const updateDelay = (delay: number) => {
                                 const nextDelay = Number(delay.toFixed(1));
-                                if (nextDelay < -10 || nextDelay > 10) return; // Limit delay between -10s and +10s
-                                player.subtitleOffset = nextDelay;
-                                const appliedDelay = player.subtitleOffset;
+                                if (!Number.isFinite(nextDelay)) return;
+                                const duration = player.duration;
+                                for (const cue of player.subtitle.cues) {
+                                    const originalTimes = cueTimes.get(cue) ?? {
+                                        start: cue.startTime,
+                                        end: cue.endTime,
+                                    };
+                                    cueTimes.set(cue, originalTimes);
+                                    cue.startTime = Math.max(
+                                        0,
+                                        Math.min(originalTimes.start + nextDelay, duration),
+                                    );
+                                    cue.endTime = Math.max(
+                                        0,
+                                        Math.min(originalTimes.end + nextDelay, duration),
+                                    );
+                                }
+                                subtitleDelayRef.current = nextDelay;
+                                player.subtitle.update({});
+                                player.notice.show = `${player.i18n.get("Subtitle Offset")}: ${nextDelay}s`;
                                 const value = item.$tooltip?.querySelector("[data-delay-value]");
-                                if (value) value.textContent = `${appliedDelay.toFixed(1)}s`;
+                                if (value) value.textContent = `${nextDelay.toFixed(1)}s`;
                             };
 
                             const createButton = (label: string, delay: number, ariaLabel: string) => {
@@ -301,12 +322,12 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo }: 
                                 return label;
                             };
 
-                            const decrease = createButton("-", -0.5, "Decrease subtitle delay");
+                            const decrease = createButton("-", -(opts["subtitleDelayStep"] || 0.5), "Decrease subtitle delay");
                             const label = createLabel(
-                                `${player.subtitleOffset.toFixed(1)}s`,
+                                `${subtitleDelayRef.current.toFixed(1)}s`,
                                 "Current subtitle delay",
                             );
-                            const increase = createButton("+", 0.5, "Increase subtitle delay");
+                            const increase = createButton("+", opts["subtitleDelayStep"] || 0.5, "Increase subtitle delay");
                             const reset = createButton("Reset", 0, "Reset subtitle delay");
                             reset.dataset.delay = "reset";
                             controls.append(decrease);
@@ -322,7 +343,7 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo }: 
                                 if (!button) return;
                                 updateDelay(button.dataset.delay === "reset"
                                     ? 0
-                                    : player.subtitleOffset + Number(button.dataset.delay));
+                                    : subtitleDelayRef.current + Number(button.dataset.delay));
                             }, true);
                         },
                     },
