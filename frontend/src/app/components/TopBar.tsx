@@ -7,6 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import SearchDropdown from "./SearchDropdown";
 import { getApiUrl } from "../Actions/RestApiConfig";
 import { toast } from "react-hot-toast";
+import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../Utils/savedMediaEvents";
 
 type SavedMedia = {
   ttid: string;
@@ -63,20 +64,23 @@ export default function TopBar({
       }
     };
 
-    const handleSavedMediaDeleted = (event: Event) => {
-      const { ttid } = (event as CustomEvent<{ ttid?: string }>).detail ?? {};
+    const handleSavedMediaEvent = (event: MessageEvent<SavedMediaEvent>) => {
+      const { action } = event.data;
+      if (action === "saved-media-deleted-all") {
+        setSavedMedia([]);
+        return;
+      }
+      const { ttid } = event.data;
       if (!ttid) return;
-      setSavedMedia((current) => current.filter((media) => media.ttid !== ttid));
-    };
-
-    const handleSavedMediaAdded = (event: Event) => {
-      const { ttid } = (event as CustomEvent<SavedMedia>).detail ?? {};
-      if (!ttid) return;
-      setSavedMedia((current) => (
-        current.some((media) => media.ttid === ttid)
-          ? current
-          : [...current, { ttid }]
-      ));
+      if (action === "saved-media-deleted") {
+        setSavedMedia((current) => current.filter((media) => media.ttid !== ttid));
+      } else {
+        setSavedMedia((current) => (
+          current.some((media) => media.ttid === ttid)
+            ? current
+            : [...current, { ttid }]
+        ));
+      }
     };
 
     const handleSavedMediaAllFetched = async (event: Event) => {
@@ -86,17 +90,11 @@ export default function TopBar({
 
     void fetchSavedMedia();
     window.addEventListener("saved-media-all-fetched", handleSavedMediaAllFetched);
-    window.addEventListener("saved-media-deleted", handleSavedMediaDeleted);
-    window.addEventListener("saved-media-added", handleSavedMediaAdded);
-    window.addEventListener("saved-media-deleted-all", () => {
-      setSavedMedia([]);
-    });
+    const channel = new BroadcastChannel(SAVED_MEDIA_CHANNEL_NAME);
+    channel.addEventListener("message", handleSavedMediaEvent);
     return () => {
-      window.removeEventListener("saved-media-deleted", handleSavedMediaDeleted);
-      window.removeEventListener("saved-media-added", handleSavedMediaAdded);
-      window.removeEventListener("saved-media-deleted-all", () => {
-        setSavedMedia([]);
-      })
+      channel.removeEventListener("message", handleSavedMediaEvent);
+      channel.close();
     };
   }, [router]);
 

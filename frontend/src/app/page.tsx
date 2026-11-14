@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from "react";
 import { MediaType } from "../../Props"
 import { getApiUrl } from "./Actions/RestApiConfig";
 import { toast } from "react-hot-toast";
+import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "./Utils/savedMediaEvents";
 
 export default function SearchPage() {
   const moviesContainerRef = useRef<HTMLDivElement>(null);
@@ -33,8 +34,9 @@ export default function SearchPage() {
   });
   const pointerTypeRef = useRef<string | null>(null);
 
-  const handleSavedMediaDeleted = (event: Event) => {
-    const { ttid } = (event as CustomEvent<{ ttid?: string }>).detail ?? {};
+  const handleSavedMediaDeleted = (event: MessageEvent<SavedMediaEvent>) => {
+    if (event.data.action !== "saved-media-deleted") return;
+    const { ttid } = event.data;
     if (!ttid) return;
 
     setSeries((prev) =>
@@ -56,11 +58,18 @@ export default function SearchPage() {
   };
 
   useEffect(() => {
-    window.addEventListener("saved-media-deleted", handleSavedMediaDeleted);
-    window.addEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+    const channel = new BroadcastChannel(SAVED_MEDIA_CHANNEL_NAME);
+    const handleSavedMediaEvent = (event: MessageEvent<SavedMediaEvent>) => {
+      if (event.data.action === "saved-media-deleted-all") {
+        handleSavedMediaDeletedAll();
+      } else if (event.data.action === "saved-media-deleted") {
+        handleSavedMediaDeleted(event);
+      }
+    };
+    channel.addEventListener("message", handleSavedMediaEvent);
     return () => {
-      window.removeEventListener("saved-media-deleted", handleSavedMediaDeleted);
-      window.removeEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+      channel.removeEventListener("message", handleSavedMediaEvent);
+      channel.close();
     };
   }, []);
 

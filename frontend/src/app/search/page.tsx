@@ -6,6 +6,7 @@ import { getApiUrl } from "../Actions/RestApiConfig";
 import { toast } from "react-hot-toast";
 import CustomContextMenu from "../components/CustomContextMenu";
 import { MediaType } from "../../../Props";
+import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../Utils/savedMediaEvents";
 
 
 // 1. Child Component: Performs data fetching and hooks into search parameters safely
@@ -32,8 +33,9 @@ function SearchResultsList() {
   });
 
   
- const handleSavedMediaDeleted = (event: Event) => {
-  const { ttid } = (event as CustomEvent<{ ttid?: string }>).detail ?? {};
+ const handleSavedMediaDeleted = (event: MessageEvent<SavedMediaEvent>) => {
+  if (event.data.action !== "saved-media-deleted") return;
+  const { ttid } = event.data;
   if (!ttid) return;
 
   setSeries((prev) =>
@@ -83,11 +85,18 @@ function SearchResultsList() {
   }
 
   useEffect(() => {
-    window.addEventListener("saved-media-deleted", handleSavedMediaDeleted);
-    window.addEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+    const channel = new BroadcastChannel(SAVED_MEDIA_CHANNEL_NAME);
+    const handleSavedMediaEvent = (event: MessageEvent<SavedMediaEvent>) => {
+      if (event.data.action === "saved-media-deleted-all") {
+        handleSavedMediaDeletedAll();
+      } else if (event.data.action === "saved-media-deleted") {
+        handleSavedMediaDeleted(event);
+      }
+    };
+    channel.addEventListener("message", handleSavedMediaEvent);
     return () => {
-      window.removeEventListener("saved-media-deleted", handleSavedMediaDeleted);
-      window.removeEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+      channel.removeEventListener("message", handleSavedMediaEvent);
+      channel.close();
     };
   }, []);
 

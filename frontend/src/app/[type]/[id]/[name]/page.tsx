@@ -21,9 +21,8 @@ type Props = {
   };
 };
 
-const getAllSavedMediaIds = async (): Promise<Set<string>> => {
+const getAllSavedMediaIds = async (headersList: any): Promise<Set<string>> => {
   try {
-    const headersList = await headers();
     const host = headersList.get("host")?.split(":")[0] || "localhost";
     const protocol = headersList.get("x-forwarded-proto") || "http";
     const res = await fetch(`${await getApiUrl(host, protocol)}/getSavedMediaIds?type=episodes`);
@@ -45,23 +44,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const allSavedMediaIdsCache: Set<string> = await getAllSavedMediaIds(); // Cache to store all saved media IDs
+const fetchAllSavedMediaIds = async () => {
+  const headersList = await headers();
+  const savedMediaIds = await getAllSavedMediaIds(headersList);
+  return savedMediaIds;
+}
 
 
-const isMediaInSaved = (ttid: string): boolean => {
-  return allSavedMediaIdsCache.has(ttid);
+
+const isMediaInSaved = (ttid: string, ids: Set<string>): boolean => {
+  return ids.has(ttid);
 };
 
 const normalizeSeasons = async (data: any) => {
   let normalized: any[] = [];
 
   if (!data) return normalized;
-
+  const allSavedMediaIds = await fetchAllSavedMediaIds(); // Fetch and cache all saved media IDs
   // Cinemeta meta endpoint provides a `videos` array with episode info
   if (Array.isArray(data.videos) && data.videos.length > 0) {
     const bySeason: Record<string, any[]> = {};
     for (const ep of data.videos) {
-      const isInSavedMedia = isMediaInSaved(ep.id);
+      const isInSavedMedia = isMediaInSaved(ep.id, allSavedMediaIds);
       const sn = ep.season ?? ep.seasonNumber ?? String(ep.season || 0);
       bySeason[sn] = bySeason[sn] || [];
       const episodeWithSavedStatus = { ...ep, isInSaved: isInSavedMedia };

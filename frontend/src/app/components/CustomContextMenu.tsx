@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { getApiUrl } from '../Actions/RestApiConfig';
 import { MediaType } from '../../../Props';
+import { publishSavedMediaEvent } from '../Utils/savedMediaEvents';
 
 interface MenuState {
   x: number;
@@ -10,7 +11,7 @@ interface MenuState {
   type: MediaType;
   media: any; // Replace 'any' with the actual type of your episode object if available
   CloseMenu: () => void;
-  ChangeMediaSavedStatus: (ttid: string, status: boolean, season: string) => void;
+  ChangeMediaSavedStatus: (ttid: string, status: boolean, season: number) => void;
 }
 
 export default function CustomContextMenu({x, y, media, isInSaved, type, CloseMenu, ChangeMediaSavedStatus: ChangeMediaSavedStatus}: MenuState) {
@@ -23,14 +24,14 @@ export default function CustomContextMenu({x, y, media, isInSaved, type, CloseMe
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ ttid: media.id, type: type, name: media.name, poster_url: media.thumbnail || media.poster, year: media.released ? new Date(media.released).getFullYear() || 0 : parseInt(media.releaseInfo || '0'), series_name: media.series_name || null, episode_info: (media.season && media.episode) ? `S${media.season.toString().padStart(2, '0')}E${media.episode.toString().padStart(2, '0')}` : null })
+        body: JSON.stringify({ ttid: media.id, type: type, name: media.name, poster_url: media.thumbnail || media.poster, year: media.released ? new Date(media.released).getFullYear() || 0 : parseInt(media.releaseInfo || '0'), series_name: media.series_name || null, episode_info: (media.season != null && media.season != undefined && media.episode != null && media.episode != undefined) ? `S${media.season.toString().padStart(2, '0')}E${media.episode.toString().padStart(2, '0')}` : null })
       });
       if (!response.ok) {
         throw new Error((await response.json()).message || 'Failed to add to saved');
       }
       toast.success(`Added ${media.name || (type === MediaType.movie ? "movie" : media.id.split(':').length > 1 ? "episode" : "series")} to saved`, { id: toastId });
-      window.dispatchEvent(new CustomEvent("saved-media-added", { detail: { ttid: media.id } }));
-      ChangeMediaSavedStatus(media.id, true, media.season || -1);
+      publishSavedMediaEvent({ action: "saved-media-added", ttid: media.id });
+      ChangeMediaSavedStatus(media.id, true, (media.season == null || media.season == undefined) ? -1 : media.season);
     } catch (error) {
       console.error('Error adding to saved:', error);
       toast.error(`Failed to add ${media.name || (type === MediaType.movie ? "movie" : media.id.split(':').length > 1 ? "episode" : "series")} to saved: ${error instanceof Error ? error.message : 'Unknown error'}`, { id: toastId });
@@ -49,7 +50,7 @@ export default function CustomContextMenu({x, y, media, isInSaved, type, CloseMe
         throw new Error((await response.json()).message || 'Failed to remove from saved');
       }
       toast.success(`Removed ${media.name || (type === MediaType.movie ? "movie" : media.id.split(':').length > 1 ? "episode" : "series")} from saved`, { id: toastId });
-      window.dispatchEvent(new CustomEvent("saved-media-deleted", { detail: { ttid: ttid } }));
+      publishSavedMediaEvent({ action: "saved-media-deleted", ttid });
       ChangeMediaSavedStatus(ttid, false, media.season || -1);
     } catch (error) {
       console.error('Error removing from saved:', error);

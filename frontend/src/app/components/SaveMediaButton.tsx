@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { MediaType } from "../../../Props";
 import Loader from "../loader";
 import { getApiUrl } from "../Actions/RestApiConfig";
+import { publishSavedMediaEvent, SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../Utils/savedMediaEvents";
 
 type SaveMediaButtonProps = {
   ttid: string,
@@ -21,23 +22,24 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
     const [saved, setSaved] = useState(initiallySaved);
 
     useEffect(() => {
-        const handleSavedMediaAdded = (event: Event) => {
-            const { ttid: addedTtid } = (event as CustomEvent<{ ttid?: string }>).detail ?? {};
+        const channel = new BroadcastChannel(SAVED_MEDIA_CHANNEL_NAME);
+        const handleSavedMediaEvent = (event: MessageEvent<SavedMediaEvent>) => {
+            const { action } = event.data;
+            if (action === "saved-media-deleted-all") {
+                setSaved(false);
+                return;
+            }
+            const eventTtid = event.data.ttid;
+            const addedTtid = action === "saved-media-added" ? eventTtid : undefined;
+            const deletedTtid = action === "saved-media-deleted" ? eventTtid : undefined;
             if (addedTtid === ttid) setSaved(true);
-        };
-        const handleSavedMediaDeleted = (event: Event) => {
-            const { ttid: deletedTtid } = (event as CustomEvent<{ ttid?: string }>).detail ?? {};
             if (deletedTtid === ttid) setSaved(false);
         };
-        const handleSavedMediaDeletedAll = () => setSaved(false);
 
-        window.addEventListener("saved-media-added", handleSavedMediaAdded);
-        window.addEventListener("saved-media-deleted", handleSavedMediaDeleted);
-        window.addEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+        channel.addEventListener("message", handleSavedMediaEvent);
         return () => {
-            window.removeEventListener("saved-media-added", handleSavedMediaAdded);
-            window.removeEventListener("saved-media-deleted", handleSavedMediaDeleted);
-            window.removeEventListener("saved-media-deleted-all", handleSavedMediaDeletedAll);
+            channel.removeEventListener("message", handleSavedMediaEvent);
+            channel.close();
         };
     }, [ttid]);
 
@@ -54,7 +56,7 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
             const result = await res.json();
             if (!result.success) throw new Error(result.message || "");
             setSaved(true);
-            window.dispatchEvent(new CustomEvent("saved-media-added", { detail: { ttid: ttid } }));
+            publishSavedMediaEvent({ action: "saved-media-added", ttid });
             toast.success("Media saved successfully!");
         } catch (e) {
             toast.error("Failed to save media. " + (e instanceof Error ? e.message : ""));
@@ -73,7 +75,7 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
             const result = await res.json();
             if (!result.success) throw new Error(result.message || "");
             setSaved(false);
-            window.dispatchEvent(new CustomEvent("saved-media-deleted", { detail: { ttid } }));
+            publishSavedMediaEvent({ action: "saved-media-deleted", ttid });
             toast.success("Saved media deleted successfully");
         } catch (e) {
             toast.error("Failed to delete saved media. " + (e instanceof Error ? e.message : ""));

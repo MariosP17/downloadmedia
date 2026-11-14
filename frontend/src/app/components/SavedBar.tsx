@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import FallbackImage from "./fallbackimg";
 import { MediaType } from "../../../Props";
 import { getApiUrl } from "../Actions/RestApiConfig";
+import { publishSavedMediaEvent } from "../Utils/savedMediaEvents";
 
 interface SavedMediaItem {
     ttid: string;
@@ -205,7 +206,7 @@ export default function SavedBar({
         throw new Error(data.message || "Failed to delete saved media");
       }
       setSavedMedia((prev) => prev.filter((item) => item.ttid !== media.ttid));
-      window.dispatchEvent(new CustomEvent("saved-media-deleted", { detail: { ttid: media.ttid } }));
+      publishSavedMediaEvent({ action: "saved-media-deleted", ttid: media.ttid });
       toast.success("Saved media deleted successfully");
       return true;
     } catch (error) {
@@ -230,7 +231,7 @@ export default function SavedBar({
         throw new Error(data.message || "Failed to delete all saved media");
       }
       setSavedMedia([]);
-      window.dispatchEvent(new CustomEvent("saved-media-deleted-all"));
+      publishSavedMediaEvent({ action: "saved-media-deleted-all" });
       toast.success("All saved media deleted successfully");
     } catch (error) {
       console.error("Failed to delete all saved media:", error);

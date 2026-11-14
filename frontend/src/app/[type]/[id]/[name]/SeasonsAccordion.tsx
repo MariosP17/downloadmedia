@@ -8,6 +8,7 @@ import { useSyncedLocalStorage } from "../../../Utils/useSyncedLocalStorage";
 import CustomContextMenu from "../../../components/CustomContextMenu";
 import { MediaType } from "../../../../../Props";
 import { getApiUrl } from "../../../Actions/RestApiConfig";
+import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../../../Utils/savedMediaEvents";
 
 type Props = {
   seasons: any[];
@@ -25,6 +26,7 @@ const SvgAddAllIcon = {
 };
 
 export default function SeasonsAccordion({ seasons, type, ttid,series_name, options, config, paramsOpenSeason }: Props) {
+  const [seasonsList, setSeasons] = useState<any[]>(seasons || []);
   const [openSeasonId, setOpenSeasonId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [openAddAllModal, setOpenAddAllModal] = useState(false);
@@ -37,8 +39,8 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
     const initialPaths: { [key: string]: string } = {};
     
     // Guard clause in case seasons data hasn't arrived yet during initial mount
-    if (seasons && Array.isArray(seasons)) {
-      seasons.forEach((season) => {
+    if (seasonsList && Array.isArray(seasonsList)) {
+      seasonsList.forEach((season) => {
         // SvgAddAllIcon.default can sometimes be a string (base64/url) 
         // or a React Component depending on your bundler config.
         // We string-coerce it just in case to match your type definition.
@@ -62,6 +64,59 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
   const router = useRouter();
   const pointerTypeRef = useRef('');
 
+  const handleSavedMediaAdded = (event: MessageEvent<SavedMediaEvent>) => {
+    console.log("Saved media added event received:", event);
+    if (event.data.action !== "saved-media-added") return;
+    const { ttid } = event.data;
+    if (!ttid) return;
+    setSeasons((prevSeasons => prevSeasons.map((s:any) => {
+      if (s.number == ttid.split(':')[1]) {
+        return {
+          ...s,
+          episodes: s.episodes.map((e:any) => {
+            if (e.id === ttid) {
+              return { ...e, isInSaved: true };
+            }
+            return e;
+          })
+        };
+      }
+      return s;
+    })));
+  };
+
+  const handleSavedMediaDeleted = (event: MessageEvent<SavedMediaEvent>) => {
+  if (event.data.action !== "saved-media-deleted") return;
+  const { ttid } = event.data;
+  if (!ttid) return;
+    setSeasons((prevSeasons => prevSeasons.map((s:any) => {
+      if (s.number == ttid.split(':')[1]) {
+        return {
+          ...s,
+          episodes: s.episodes.map((e:any) => {
+            if (e.id === ttid) {
+              return { ...e, isInSaved: false };
+            }
+            return e;
+          })
+        };
+      }
+      return s;
+    })));
+
+  };
+
+  const handleSavedMediaDeletedAll = () => {
+    seasonsList.forEach((s) => {
+      s.episodes.forEach((e: any) => {
+        if (e.isInSaved) {
+          e.isInSaved = false;
+        }
+      });
+    });
+  };
+
+
   // 1. On mount: Hydrate open selection from sessionStorage safely
   useEffect(() => {
     // Generate a unique storage key tied to this show's type / first season ID if available
@@ -70,7 +125,23 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
     if (savedId) {
       setOpenSeasonId(savedId);
     }
-  }, [seasons, type]);
+    const channel = new BroadcastChannel(SAVED_MEDIA_CHANNEL_NAME);
+    const handleSavedMediaEvent = (event: MessageEvent<SavedMediaEvent>) => {
+      if (event.data.action === "saved-media-added") {
+        handleSavedMediaAdded(event);
+      } else if (event.data.action === "saved-media-deleted") {
+        handleSavedMediaDeleted(event);
+      } else {
+        handleSavedMediaDeletedAll();
+      }
+    };
+    channel.addEventListener('message', handleSavedMediaEvent);
+
+    return () => {
+      channel.removeEventListener('message', handleSavedMediaEvent);
+      channel.close();
+    };
+  }, [seasonsList, type]);
 
   useEffect(() => {
     if (paramsOpenSeason) {
@@ -362,7 +433,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
   return (
   <div className="space-y-8">
     {/* 1. THE SEASONS LOOP (Clean & Free of Modal DOM Bloat) */}
-    {seasons.map((season, idx) => {
+    {seasonsList.map((season, idx) => {
       const isOpen = openSeasonId === String(season.id);
       return (
         <section id={`season-content-${season.id}`}
@@ -444,7 +515,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
           
           {/* Header */}
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3 mb-4">
-            <h3 className="text-base font-bold text-white">Select Stream Target ({seasons.find((s) => s.id === activeSeasonForModal.id)?.name})</h3>
+            <h3 className="text-base font-bold text-white">Select Stream Target ({seasonsList.find((s) => s.id === activeSeasonForModal.id)?.name})</h3>
             <button 
               onClick={() => { setOpenAddAllModal(false); setActiveSeasonForModal(null); }} 
               className="text-zinc-400 hover:text-white font-bold cursor-pointer text-sm"
@@ -533,7 +604,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
               Cancel
             </button>
             <button
-              onClick={() =>addAllEpisodesToBatch((selectedHash || "")+","+ttid+","+seasons.find((s) => s.id === activeSeasonForModal.id)?.episodes.length)}
+              onClick={() =>addAllEpisodesToBatch((selectedHash || "")+","+ttid+","+seasonsList.find((s) => s.id === activeSeasonForModal.id)?.episodes.length)}
               disabled={selectedHash === "" || selectedHash === null || selectedHash.split(",")[0] != activeSeasonForModal.id || selectedHash.split(",")[1] === undefined}
               className="px-4 py-2 bg-green-600 hover:bg-green-700 hover:cursor-pointer disabled:bg-zinc-800 text-white disabled:text-zinc-600 font-bold text-xs rounded-lg disabled:cursor-not-allowed transition-colors"
             >
@@ -544,7 +615,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
         </div>
       </div>
     )}
-    {menu.isOpen && <CustomContextMenu x={menu.x} y={menu.y} media={menu.ep} type={MediaType.series} CloseMenu={() => setMenu({isOpen: false, x: 0, y: 0, ep: null})} isInSaved={menu.ep.isInSaved} ChangeMediaSavedStatus={(ttid, status, season) => {seasons.filter((s) => s.number == season)[0].episodes.filter((e : any) => e.id === ttid)[0].isInSaved = status;}} />}
+    {menu.isOpen && <CustomContextMenu x={menu.x} y={menu.y} media={menu.ep} type={MediaType.series} CloseMenu={() => setMenu({isOpen: false, x: 0, y: 0, ep: null})} isInSaved={menu.ep.isInSaved} ChangeMediaSavedStatus={(ttid, status, season) => { setSeasons((prev:any) => prev.map((s:any) => s.number == season ? {...s, episodes: s.episodes.map((e:any) => e.id === ttid ? {...e, isInSaved: status} : e)} : s)) }} />}
     {/* 3. GLOBAL LOADING OVERLAY */}
     {loading && (
       <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
