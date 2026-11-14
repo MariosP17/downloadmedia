@@ -65,7 +65,6 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
   const pointerTypeRef = useRef('');
 
   const handleSavedMediaAdded = (event: MessageEvent<SavedMediaEvent>) => {
-    console.log("Saved media added event received:", event);
     if (event.data.action !== "saved-media-added") return;
     const { ttid } = event.data;
     if (!ttid) return;

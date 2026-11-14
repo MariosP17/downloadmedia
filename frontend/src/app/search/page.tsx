@@ -51,6 +51,24 @@ function SearchResultsList() {
   );
 };
 
+ const handleSavedMediaAdded = (event: MessageEvent<SavedMediaEvent>) => {
+  if (event.data.action !== "saved-media-added") return;
+  const { ttid } = event.data;
+  if (!ttid) return;
+
+  setSeries((prev) =>
+    prev.map((item) =>
+      item.id === ttid ? { ...item, isInSaved: true } : item
+    )
+  );
+
+  setMovies((prev) =>
+    prev.map((item) =>
+      item.id === ttid ? { ...item, isInSaved: true } : item
+    )
+  );
+};
+
   const handleSavedMediaDeletedAll = () => {
     setSeries((prev) => prev.map((s) => ({ ...s, isInSaved: false })));
     setMovies((prev) => prev.map((m) => ({ ...m, isInSaved: false })));
@@ -89,6 +107,8 @@ function SearchResultsList() {
     const handleSavedMediaEvent = (event: MessageEvent<SavedMediaEvent>) => {
       if (event.data.action === "saved-media-deleted-all") {
         handleSavedMediaDeletedAll();
+      } else if (event.data.action === "saved-media-added") {
+        handleSavedMediaAdded(event);
       } else if (event.data.action === "saved-media-deleted") {
         handleSavedMediaDeleted(event);
       }
