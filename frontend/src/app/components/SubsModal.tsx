@@ -27,12 +27,12 @@ type SubsModalProps = {
 	onClose: () => void;
 	onChanged?: () => void;
     isEpisode?: boolean;
-	isEpisodeInFolderOrFolder?: boolean;
+	isEpisodeInFolderOrFile?: boolean;
     options: Record<string, any>
 	config: Record<string, any>
 };
 
-export default function SubsModal({ pathname, replacedPath, ttid, onClose, onChanged, isEpisode =false,isEpisodeInFolderOrFolder =false,options,config }: SubsModalProps) {
+export default function SubsModal({ pathname, replacedPath, ttid, onClose, onChanged, isEpisode =false,isEpisodeInFolderOrFile =false,options,config }: SubsModalProps) {
 	const [existingSubs, setExistingSubs] = useState<ExistingSubtitle[]>([]);
 	const [results, setResults] = useState<SubtitleResult[]>([]);
 	const [language, setLanguage] = useState("en");
@@ -48,6 +48,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 	const [subtitleInfo, setSubtitleInfo] = useState<any>({});
 	const [embeddedSubs, setEmbeddedSubs] = useState<string[]>([]);
 
+	const isFile = isVideoExtension(pathname.split("/").pop() || "");
 
 
 	useEffect(() => {
@@ -79,7 +80,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 			const filename = pathname.split("/").pop() || "";
 			const cleanedPathname = filename.split(".").slice(0, -1).join(".") || "";
 			setExistingSubs(
-				(data.items || []).filter((item: ExistingSubtitle) => !isEpisodeInFolderOrFolder ? item.name.includes(cleanedPathname) : true)
+				(data.items || []).filter((item: ExistingSubtitle) => !isEpisodeInFolderOrFile ? item.name.includes(cleanedPathname) : true)
 			);
 		} catch (error) {
 			setLoadingSubtitlesError(true);
@@ -215,17 +216,17 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
             return;
         }
         let videoItem = null;
-        if (!isEpisode){
+        if (!isEpisode && !isFile ){
             const items = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + `/getItems?folder=${encodeURIComponent(pathname)}`).then(res => res.json());
             videoItem = (items.items ?? []).filter((item: any) => isVideoExtension(item.name))[0];
         }
-        if (!videoItem && !isEpisode) {
+        if (!videoItem && !isEpisode && !isFile) {
             toast.error("No video file found for the subtitle");
             return;
         }
 
-        const mediaName = isEpisode ? `${pathname.split("/").pop()}-${language}.srt` : `${cleanExtension(videoItem.name)}-${language}.srt`;
-        const filePath = isEpisode ? `${pathname.split("/").slice(0, -1).join("/")}/${mediaName}` : `${pathname}/${mediaName}`;
+        const mediaName = isEpisode || isFile ? `${pathname.split("/").pop()}-${language}.srt` : `${cleanExtension(videoItem.name)}-${language}.srt`;
+        const filePath = isEpisode || isFile ? `${pathname.split("/").slice(0, -1).join("/")}/${mediaName}` : `${pathname}/${mediaName}`;
         try {
             const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/downloadSubtitle", {
                 method: "POST",

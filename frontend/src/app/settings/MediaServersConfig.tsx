@@ -433,12 +433,12 @@ export default function RestApiConfiguration() {
     return (
     <div className="flex flex-col gap-4">
         <div className="relative">
-            <div className="flex justify-between items-center mt-4">
+            <div className="flex justify-between items-center mt-4 mb-4">
                 <h2 className="text-l font-bold text-zinc-100">Jellyfin Configuration</h2>
-                <OptionType typeKey="jellyfin_installed" value={jellyfinConfig?.jellyfin_installed || false} type="<boolean>" onChange={(newValue) => setJellyfinConfig((prev) => ({ ...prev, "jellyfin_installed": newValue }))} />
+                <OptionType mb4={false} typeKey="jellyfin_installed" value={jellyfinConfig?.jellyfin_installed || false} type="<boolean>" onChange={(newValue) => setJellyfinConfig((prev) => ({ ...prev, "jellyfin_installed": newValue }))} />
             </div>
             {jellyfinConfig?.jellyfin_installed && (
-            <div className="relative mt-4 pl-8 flex flex-col">
+            <div className="relative pl-8 flex flex-col">
                 <OptionType typeKey="jellyfin_selection" value={jellyfinConfig?.jellyfin_selection || "local"} type="<dropdown>" options={[{key: "local", value: "Local"}, {key: "remote", value: "Remote" }] } onChange={async (newValue) => {await onUpdateJellyfinConfig(newValue); setJellyfinConfig((prev) => ({ ...prev, "jellyfin_selection": newValue } ))}} />
                 <OptionType asNumber={true} allHidden={jellyfinConfig["jellyfin_selection"] === "remote"} typeKey="jellyfin_url_port" value={jellyfinConfig["jellyfin_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdateJellyfinPort(newValue); setJellyfinConfig((prev) => ({ ...prev, "jellyfin_url_port": parseInt(newValue) }))}} />
                 <OptionType disabled={jellyfinConfig["jellyfin_selection"] !== "remote"} typeKey="jellyfin_url" value={jellyfinConfig["jellyfin_url"] || ""} type="<string>" onChange={(newValue) => setJellyfinConfig((prev) => ({ ...prev, "jellyfin_url": newValue }))} />
@@ -481,12 +481,12 @@ export default function RestApiConfiguration() {
         </div>
 
         <div className="relative">
-            <div className="flex justify-between items-center mt-4">
+            <div className="flex justify-between items-center mt-4 mb-4">
                 <h2 className="text-l font-bold text-zinc-100">Plex Configuration</h2>
-                <OptionType typeKey="plex_installed" value={plexConfig?.plex_installed || false} type="<boolean>" onChange={(newValue) => setPlexConfig((prev) => ({ ...prev, "plex_installed": newValue }))} />
+                <OptionType mb4={false} typeKey="plex_installed" value={plexConfig?.plex_installed || false} type="<boolean>" onChange={(newValue) => setPlexConfig((prev) => ({ ...prev, "plex_installed": newValue }))} />
             </div>
             {plexConfig?.plex_installed && (
-            <div className="relative mt-4 pl-8 flex flex-col">
+            <div className="relative pl-8 flex flex-col">
                 <OptionType typeKey="plex_selection" value={plexConfig?.plex_selection || "local"} type="<dropdown>" options={[{key: "local", value: "Local"}, {key: "remote", value: "Remote" }] } onChange={async (newValue) => {await onUpdatePlexConfig(newValue); setPlexConfig((prev) => ({ ...prev, "plex_selection": newValue } ))}} />
                 <OptionType asNumber={true} allHidden={plexConfig["plex_selection"] === "remote"} typeKey="plex_url_port" value={plexConfig["plex_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdatePlexPort(newValue); setPlexConfig((prev) => ({ ...prev, "plex_url_port": parseInt(newValue) }))}} />
                 <OptionType disabled={plexConfig["plex_selection"] !== "remote"} typeKey="plex_url" value={plexConfig["plex_url"] || ""} type="<string>" onChange={(newValue) => setPlexConfig((prev) => ({ ...prev, "plex_url": newValue }))} />

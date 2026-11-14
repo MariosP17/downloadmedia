@@ -936,7 +936,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           ttid={ttid}
           onClose={() => setSubsModalOpen(false)}
           onChanged={() => {
-            if (isEpisodeItem) {
+            if (isEpisodeItem || isVideoExtension(cleanName)) {
               void onRefreshParent?.();
             } else {
               void fetchDirectoryContents(false);
@@ -945,7 +945,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
             refreshStats();
           }}
           isEpisode={isEpisodeItem}
-          isEpisodeInFolderOrFolder={isEpisodeLength4 || isEpisodeFolder}
+          isEpisodeInFolderOrFile={isEpisodeLength4 || isEpisodeFolder}
           options={options}
           config={configuration}
         />

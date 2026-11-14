@@ -15,6 +15,7 @@ type OptionType = {
   asNumber?: boolean;
   asPassword?: boolean;
   decimalPoints?: number;
+  mb4?: boolean;
   onChange?: (newValue: any) => void;
   onClick?: () => void;
   iconClassName?: string;
@@ -24,7 +25,7 @@ type OptionType = {
 import { OptionsNames } from "../../../Props";
 import FolderPicker  from "../components/FolderPicker";
 
-export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber,asPassword,decimalPoints, onChange,onClick, icon,iconClassName, options}: OptionType) {
+export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber,asPassword,decimalPoints,mb4=true, onChange,onClick, icon,iconClassName, options}: OptionType) {
 
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
@@ -35,7 +36,7 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
   switch (type) {
     case "<boolean>":
     return (
-      <div className="mb-4 flex min-w-0 items-center justify-between gap-4">
+      <div className={`${mb4 ? "mb-4" : ""} flex min-w-0 items-center justify-between gap-4`}>
         <p className="min-w-0 flex-1">{OptionsNames[typeKey]}</p>
         <label className="switch">
           {/* Hidden checkbox that holds the actual state */}
