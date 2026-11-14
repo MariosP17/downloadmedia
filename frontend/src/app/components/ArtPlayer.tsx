@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Artplayer from "artplayer";
 import { getApiUrl } from "../Actions/RestApiConfig";
-import Loader from "../loader";
+import ComponentLoader from "../componentLoader";
 import { toast } from "react-hot-toast";
 
 interface ArtPlayerProps {
@@ -178,7 +178,10 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo,opt
             try {
                 const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
                 await createPlayer(apiUrl);
-
+                
+                const player = playerRef.current;
+                if (!player) return;
+                player.notice.show = "Loading subtitles...";
                 const response = await fetch(
                     `${apiUrl}/subtitles?filePath=${encodeURIComponent(videopath)}`,
                     { signal: abortController.signal },
@@ -194,8 +197,8 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo,opt
                     lang: sub.lang,
                     label: sub.label,
                 }));
-                const player = playerRef.current;
-                if (!player || cancelled || videoSubs.length === 0) return;
+                player.notice.destroy();
+                if (cancelled || videoSubs.length === 0) return;
 
                 await player.subtitle.switch(videoSubs[0].url, {
                     name: videoSubs[0].label,
@@ -407,9 +410,9 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo,opt
     }, [videopath]);
 
     return (
-        <div className="relative w-full">
-            {loading && <Loader />}
+        <div className="relative">
             <div ref={containerRef} className="aspect-video w-full" />
+            {loading && <ComponentLoader name="Video Player" />}
         </div>
     );
 }
