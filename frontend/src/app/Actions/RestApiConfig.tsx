@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 
-export async function saveRestApiConfig(selection: string, url: string | null, port: number | null, protocol: string | null) {
+export async function saveRestApiConfig(selection: string, url: string | null, port: number | null, protocol: string | null, serviceName: string | null) {
   try {
     if (!selection || (selection === "remote" && (!url || url.trim() === "")) || (selection === "local" && port === null && protocol === null)) {
       throw new Error("Invalid selection or URL or port or protocol");
@@ -28,6 +28,8 @@ export async function saveRestApiConfig(selection: string, url: string | null, p
         REST_API_SECTION.REST_API_URL_PORT = port;
     if (protocol !== null)
         REST_API_SECTION.REST_API_HTTP_PROTOCOL = protocol;
+    if (serviceName !== null)
+        REST_API_SECTION.REST_API_SERVICE_NAME = serviceName;
     // Write directly to the local server disk
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
     
@@ -43,11 +45,11 @@ export async function getRestApiConfig() {
     const configPath = path.join(process.cwd(), 'config.json');
     
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).REST_API_SECTION;
-      return { REST_API_SELECTION: config.REST_API_SELECTION || null, REST_API_URL: config.REST_API_URL || null, REST_API_URL_PORT: config.REST_API_URL_PORT || 7000, REST_API_HTTP_PROTOCOL: config.REST_API_HTTP_PROTOCOL || "http" };
+      return { REST_API_SELECTION: config.REST_API_SELECTION || null, REST_API_URL: config.REST_API_URL || null, REST_API_URL_PORT: config.REST_API_URL_PORT || 7000, REST_API_HTTP_PROTOCOL: config.REST_API_HTTP_PROTOCOL || "http", REST_API_SERVICE_NAME: config.REST_API_SERVICE_NAME };
   }
   catch (error) {
     console.error("Failed to read config file:", error);
-    return {  REST_API_SELECTION: null, REST_API_URL: null, REST_API_URL_PORT: 7000, REST_API_HTTP_PROTOCOL: "http" };
+    return {  REST_API_SELECTION: null, REST_API_URL: null, REST_API_URL_PORT: 7000, REST_API_HTTP_PROTOCOL: "http", REST_API_SERVICE_NAME: null };
   }
 }
 
@@ -73,18 +75,35 @@ export async function getApiUrlForLocalSelection(hostname: string, port: number 
   return `${protocol || "http"}://${hostname}:${port || 7000}`;
 }
 
+export async function getApiServiceName() {
+  try {
+    const configPath = path.join(process.cwd(), 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).REST_API_SECTION;
+    if (!config.REST_API_SERVICE_NAME || config.REST_API_SERVICE_NAME.trim() === "") {
+      return "stremio-downloader-api";
+    }
+    return (config.REST_API_SERVICE_NAME).endsWith(".service") ? config.REST_API_SERVICE_NAME : `${(config.REST_API_SERVICE_NAME.endsWith(".") ? config.REST_API_SERVICE_NAME.slice(0, -1) : config.REST_API_SERVICE_NAME)}.service`;
+  } catch (error) {
+    console.error("Failed to read config file:", error);
+    return "stremio-downloader-api";
+  }
+}
+
     
 
 export async function restartApi() : Promise<{ success: boolean; error?: string }> {
   return new Promise(async (resolve) => {
-    const config = await getRestApiConfig();
-    if (config.REST_API_SELECTION === "remote") {
-      console.error("Cannot restart API when using remote configuration");
-      resolve({ success: false, error: "Cannot restart API when using remote configuration" });
-      return;
-    }
+
+    const service = await getApiServiceName();
+
+    exec(`sudo -n systemctl status ${service}`, (error, stdout, stderr) => {
+      if (stderr && stderr.includes(`Unit ${service} could not be found`)) {
+        resolve({ success: false, error: `API service ${service} not found.` });
+        return;
+      }
+    });
     // Added 'restart' to the command string
-    exec('sudo -n systemctl restart stremio-downloader-api.service', (error, stdout, stderr) => {
+    exec(`sudo -n systemctl restart ${service}`, (error, stdout, stderr) => {
       if (error) {
         console.error(`Error restarting API: ${error.message}`);
         // Use resolve() instead of return to pass the data back out of the Promise

@@ -45,6 +45,7 @@ export const OptionsNames : Record<string, string> =
     "rest_api_url" : "Rest API URL",
     "rest_api_url_port" : "Local Rest API Port",
     "rest_api_http_protocol" : "Local Rest API Protocol",
+    "rest_api_service_name" : "Rest API Service Name",
     "batchSizeThreshold" : "Batch Size Threshold for batch bookmarking",
     "BatchSize" : "Batch Size for batch bookmarking",
     "plex_selection" : "Plex location",

@@ -26,17 +26,17 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
     const getRestApi = async () => {
         const response = await getRestApiConfig();
         if (response.REST_API_SELECTION === "remote" && response.REST_API_URL && response.REST_API_URL.trim() !== "") {
-            return { "rest_api_selection": response.REST_API_SELECTION, "rest_api_url": response.REST_API_URL, "rest_api_url_port": response.REST_API_URL_PORT || 7000, "rest_api_http_protocol": response.REST_API_HTTP_PROTOCOL || "http" };
+            return { "rest_api_selection": response.REST_API_SELECTION, "rest_api_url": response.REST_API_URL, "rest_api_url_port": response.REST_API_URL_PORT || 7000, "rest_api_http_protocol": response.REST_API_HTTP_PROTOCOL || "http", "rest_api_service_name": response.REST_API_SERVICE_NAME || null };
         }
         else{
-            return { "rest_api_selection": "local", "rest_api_url": `${await getApiUrl(window.location.hostname)}`, "rest_api_url_port": response.REST_API_URL_PORT || 7000, "rest_api_http_protocol": response.REST_API_HTTP_PROTOCOL || "http" };
+            return { "rest_api_selection": "local", "rest_api_url": `${await getApiUrl(window.location.hostname)}`, "rest_api_url_port": response.REST_API_URL_PORT || 7000, "rest_api_http_protocol": response.REST_API_HTTP_PROTOCOL || "http", "rest_api_service_name": response.REST_API_SERVICE_NAME || null };
         }
     };
 
     const saveRestApi = async () => {
         try{
         setLoading(true);
-        const { rest_api_selection: restapioption, rest_api_url: restapiurl, rest_api_url_port: restapiurlport, rest_api_http_protocol: restapihttpprotocol } = restApiConfig;
+        const { rest_api_selection: restapioption, rest_api_url: restapiurl, rest_api_url_port: restapiurlport, rest_api_http_protocol: restapihttpprotocol, rest_api_service_name: restapiservicename } = restApiConfig;
         const apiUrl = restapioption === "remote" && restapiurl && restapiurl.trim() !== ""
             ? restapiurl.trim().replace(/\/+$/, "")
             : `${restapihttpprotocol}://${window.location.hostname}:${restapiurlport || 7000}`;
@@ -58,13 +58,13 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
         }
 
         if(restapioption === "remote" && restapiurl && restapiurl.trim() !== ""){
-            const respone = await saveRestApiConfig(restapioption, restapiurl, null, null);
+            const respone = await saveRestApiConfig(restapioption, restapiurl, null, null, restapiservicename);
             if (!respone.success) {
                 throw new Error(respone.error || "Failed to save REST API configuration");
             }
         }
         else{
-            const respone = await saveRestApiConfig(restapioption, null, restapiurlport, restapihttpprotocol);
+            const respone = await saveRestApiConfig(restapioption, null, restapiurlport, restapihttpprotocol, restapiservicename);
             if (!respone.success) {
                 throw new Error(respone.error || "Failed to save REST API configuration");
             }
@@ -86,11 +86,11 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
                 const respone = await getRestApiConfig();
                 if (newValue == "remote"){
 
-                    setRestApiConfig({"rest_api_selection": newValue, "rest_api_url": respone.REST_API_URL, "rest_api_url_port": restApiConfig["rest_api_url_port"], "rest_api_http_protocol": restApiConfig["rest_api_http_protocol"] });
+                    setRestApiConfig({"rest_api_selection": newValue, "rest_api_url": respone.REST_API_URL, "rest_api_url_port": restApiConfig["rest_api_url_port"], "rest_api_http_protocol": restApiConfig["rest_api_http_protocol"], "rest_api_service_name": restApiConfig["rest_api_service_name"] });
                 }
                 else{
                     console.log("Updating REST API configuration to local with protocol:", restApiConfig["rest_api_http_protocol"], "and port:", restApiConfig["rest_api_url_port"], "and final url:", `${await getApiUrlForLocalSelection(window.location.hostname, restApiConfig["rest_api_url_port"], restApiConfig["rest_api_http_protocol"])}`);
-                    setRestApiConfig({"rest_api_selection": newValue, "rest_api_url": `${await getApiUrlForLocalSelection(window.location.hostname, restApiConfig["rest_api_url_port"], restApiConfig["rest_api_http_protocol"])}`, "rest_api_url_port": restApiConfig["rest_api_url_port"], "rest_api_http_protocol": restApiConfig["rest_api_http_protocol"] });
+                    setRestApiConfig({"rest_api_selection": newValue, "rest_api_url": `${await getApiUrlForLocalSelection(window.location.hostname, restApiConfig["rest_api_url_port"], restApiConfig["rest_api_http_protocol"])}`, "rest_api_url_port": restApiConfig["rest_api_url_port"], "rest_api_http_protocol": restApiConfig["rest_api_http_protocol"], "rest_api_service_name": restApiConfig["rest_api_service_name"] });
                 }
             }
             catch(error){
@@ -106,7 +106,7 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
             try{
                 setLoading(true);
                 if (restApiConfig["rest_api_selection"] == "remote") return;
-                setRestApiConfig({"rest_api_selection": restApiConfig["rest_api_selection"], "rest_api_url": `${await getApiUrlForLocalSelection(window.location.hostname,restApiConfig["rest_api_url_port"], newValue)}`, "rest_api_url_port": restApiConfig["rest_api_url_port"], "rest_api_http_protocol": newValue });
+                setRestApiConfig({"rest_api_selection": restApiConfig["rest_api_selection"], "rest_api_url": `${await getApiUrlForLocalSelection(window.location.hostname,restApiConfig["rest_api_url_port"], newValue)}`, "rest_api_url_port": restApiConfig["rest_api_url_port"], "rest_api_http_protocol": newValue, "rest_api_service_name": restApiConfig["rest_api_service_name"] });
             }
             catch(error){
                 console.error("Error updating REST API configuration:", error);
@@ -119,7 +119,7 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
 
     const onUpdateRestApiConfigPort = async (newValue : number) => {
         try{
-            setRestApiConfig({"rest_api_selection": "local", "rest_api_url": `${await getApiUrlForLocalSelection(window.location.hostname, newValue, restApiConfig["rest_api_http_protocol"])}`, "rest_api_url_port": newValue, "rest_api_http_protocol": restApiConfig["rest_api_http_protocol"] });
+            setRestApiConfig({"rest_api_selection": "local", "rest_api_url": `${await getApiUrlForLocalSelection(window.location.hostname, newValue, restApiConfig["rest_api_http_protocol"])}`, "rest_api_url_port": newValue, "rest_api_http_protocol": restApiConfig["rest_api_http_protocol"], "rest_api_service_name": restApiConfig["rest_api_service_name"] });
         }
         catch(error){
             console.error("Error updating REST API configuration port:", error);
@@ -156,7 +156,8 @@ export default function RestApiConfiguration({ onApiReady }: RestApiConfiguratio
                 </>
             )}
             <OptionType disabled={restApiConfig["rest_api_selection"] !== "remote"} typeKey="rest_api_url" value={restApiConfig["rest_api_url"] || ""} type="<string>" onChange={(newValue) => setRestApiConfig((prev) => ({ ...prev, "rest_api_url": newValue }))} />
-        <div className="flex justify-end">
+            <OptionType typeKey="rest_api_service_name" value={restApiConfig["rest_api_service_name"] || ""} type="<string>" onChange={(newValue) => setRestApiConfig((prev) => ({ ...prev, "rest_api_service_name": newValue }))} />
+            <div className="flex justify-end">
                 <button onClick={saveRestApi} disabled={disabledSave} className="bg-blue-700 cursor-pointer enabled:hover:bg-blue-900 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed">Save</button>
             </div>
         {loading && (
