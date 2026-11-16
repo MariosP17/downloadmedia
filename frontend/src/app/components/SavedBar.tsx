@@ -168,7 +168,7 @@ export default function SavedBar({
 
     const fetchSavedMedia = async () => {
       try {
-        const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getAllSavedMedia");
+        const response = await fetch(await getApiUrl(window.location.hostname) + "/getAllSavedMedia");
         const data = await response.json();
         if (!data.success) {
           toast.error(data.message || "Failed to fetch saved media");
@@ -206,7 +206,7 @@ export default function SavedBar({
   const deleteSavedMedia = async (media: SavedMediaItem): Promise<boolean> => {
     try {
       setLoading(true);
-      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + `/deleteSavedMedia`, {
+      const response = await fetch(await getApiUrl(window.location.hostname) + `/deleteSavedMedia`, {
         method: "DELETE",
         body: new URLSearchParams({ ttid: media.ttid })
       });
@@ -232,7 +232,7 @@ export default function SavedBar({
   const deleteAllSavedMedia = async () => {
     try {
       setLoading(true);
-      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/clearSavedMedia", {
+      const response = await fetch(await getApiUrl(window.location.hostname) + "/clearSavedMedia", {
         method: "DELETE"
       });
       const data = await response.json();

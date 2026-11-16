@@ -54,54 +54,56 @@ export default function RestApiConfiguration() {
     const getPlex = async () => {
         const response = await MediaServersConfig.getPlexConfig();
         if (response.PLEX_SELECTION === "remote" && response.PLEX_URL && response.PLEX_URL.trim() !== "") {
-            return { "plex_installed": response.PLEX_INSTALLED, "plex_selection": response.PLEX_SELECTION, "plex_url": response.PLEX_URL, "plex_url_port": response.PLEX_PORT || 32400 };
+            return { "plex_installed": response.PLEX_INSTALLED, "plex_selection": response.PLEX_SELECTION, "plex_url": response.PLEX_URL, "plex_url_port": response.PLEX_PORT || 32400, "plex_http_protocol": response.PLEX_HTTP_PROTOCOL || "http" };
         }
         else{
-            return { "plex_installed": response.PLEX_INSTALLED, "plex_selection": "local", "plex_url": `${await MediaServersConfig.getPlexUrl(window.location.hostname, window.location.protocol)}`, "plex_url_port": response.PLEX_PORT || 32400 };
+            return { "plex_installed": response.PLEX_INSTALLED, "plex_selection": "local", "plex_url": `${await MediaServersConfig.getPlexUrl(window.location.hostname)}`, "plex_url_port": response.PLEX_PORT || 32400, "plex_http_protocol": response.PLEX_HTTP_PROTOCOL || "http" };
         }
     };
 
     const getJellyfin = async () => {
         const response = await MediaServersConfig.getJellyfinConfig();
         if (response.JELLYFIN_SELECTION === "remote" && response.JELLYFIN_URL && response.JELLYFIN_URL.trim() !== "") {
-            return { "jellyfin_installed": response.JELLYFIN_INSTALLED, "jellyfin_selection": response.JELLYFIN_SELECTION, "jellyfin_url": response.JELLYFIN_URL, "jellyfin_url_port": response.JELLYFIN_PORT || 8096 };
+            return { "jellyfin_installed": response.JELLYFIN_INSTALLED, "jellyfin_selection": response.JELLYFIN_SELECTION, "jellyfin_url": response.JELLYFIN_URL, "jellyfin_url_port": response.JELLYFIN_PORT || 8096, "jellyfin_http_protocol": response.JELLYFIN_HTTP_PROTOCOL || "http" };
         }
         else{
-            return { "jellyfin_installed": response.JELLYFIN_INSTALLED, "jellyfin_selection": "local", "jellyfin_url": `${await MediaServersConfig.getJellyfinUrl(window.location.hostname, window.location.protocol)}`, "jellyfin_url_port": response.JELLYFIN_PORT || 8096 };
+            return { "jellyfin_installed": response.JELLYFIN_INSTALLED, "jellyfin_selection": "local", "jellyfin_url": `${await MediaServersConfig.getJellyfinUrl(window.location.hostname)}`, "jellyfin_url_port": response.JELLYFIN_PORT || 8096, "jellyfin_http_protocol": response.JELLYFIN_HTTP_PROTOCOL || "http" };
         }
     };
 
     const savePlex = async () => {
         try{
         setPlexLoading(true);
-        const { plex_installed: plexinstalled, plex_selection: plexoption, plex_url: plexurl, plex_url_port: plexurlport } = plexConfig;
-        const plexUrl = plexoption === "remote" && plexurl && plexurl.trim() !== ""
-            ? plexurl.trim().replace(/\/+$/, "")
-            : `${window.location.protocol.replace(":", "")}://${window.location.hostname}:${plexurlport || 32400}`;
-        const healthController = new AbortController();
-        const healthTimeout = setTimeout(() => {
-            healthController.abort();
-        }, 2000);
-        try {
-            const healthResponse = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/checkPlex?url=${encodeURIComponent(plexUrl)}`, {
-                signal: healthController.signal,
-            });
-            if (!healthResponse.ok) {
-                throw new Error(`Plex check failed with status ${healthResponse.status}`);
+        const { plex_installed: plexinstalled, plex_selection: plexoption, plex_url: plexurl, plex_url_port: plexurlport, plex_http_protocol: plexhttpprotocol } = plexConfig;
+        if (plexinstalled == true)
+        {
+            const plexUrl = plexoption === "remote" && plexurl && plexurl.trim() !== ""
+                ? plexurl.trim().replace(/\/+$/, "")
+                : `${plexhttpprotocol}://${window.location.hostname}:${plexurlport || 32400}`;
+            const healthController = new AbortController();
+            const healthTimeout = setTimeout(() => {
+                healthController.abort();
+            }, 2000);
+            try {
+                const healthResponse = await fetch(`${await getApiUrl(window.location.hostname)}/checkPlex?url=${encodeURIComponent(plexUrl)}`, {
+                    signal: healthController.signal,
+                });
+                if (!healthResponse.ok) {
+                    throw new Error(`Plex check failed with status ${healthResponse.status}`);
+                }
+            }
+            finally {
+                clearTimeout(healthTimeout);
             }
         }
-        finally {
-            clearTimeout(healthTimeout);
-        }
-
         if(plexoption === "remote" && plexurl && plexurl.trim() !== ""){
-            const respone = await MediaServersConfig.savePlexConfig(plexoption, plexurl, null , plexinstalled);
+            const respone = await MediaServersConfig.savePlexConfig(plexoption, plexurl, null , null, plexinstalled);
             if (!respone.success) {
                 throw new Error(respone.error || "Failed to save Plex configuration");
             }
         }
         else{
-            const respone = await MediaServersConfig.savePlexConfig(plexoption, null, plexurlport, plexinstalled);
+            const respone = await MediaServersConfig.savePlexConfig(plexoption, null, plexurlport, plexhttpprotocol, plexinstalled);
             if (!respone.success) {
                 throw new Error(respone.error || "Failed to save Plex configuration");
             }
@@ -140,7 +142,7 @@ export default function RestApiConfiguration() {
 
     const checkPlexApiKey = async (apiKey: string): Promise<boolean> => {
      try {
-            const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/checkPlexApiKey`, {
+            const response = await fetch(`${await getApiUrl(window.location.hostname)}/checkPlexApiKey`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -150,7 +152,7 @@ export default function RestApiConfiguration() {
             const data = await response.json();
             return data.valid || false;
         } catch (error) {
-            console.error("Error checking Jellyfin API Key:", error);
+            console.error("Error checking Plex API Key:", error);
             return false;
         }
     };
@@ -158,34 +160,36 @@ export default function RestApiConfiguration() {
     const saveJellyfin = async () => {
         try{
         setJellyfinLoading(true);
-        const { jellyfin_installed: jellyfininstalled, jellyfin_selection: jellyfinoption, jellyfin_url: jellyfinurl, jellyfin_url_port: jellyfinurlport} = jellyfinConfig;
-        const jellyfinUrl = jellyfinoption === "remote" && jellyfinurl && jellyfinurl.trim() !== ""
-            ? jellyfinurl.trim().replace(/\/+$/, "")
-            : `${window.location.protocol.replace(":", "")}://${window.location.hostname}:${jellyfinurlport || 8096}`;
-        const healthController = new AbortController();
-        const healthTimeout = setTimeout(() => {
-            healthController.abort();
-        }, 2000);
-        try {
-            const healthResponse = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/checkJellyfin?url=${encodeURIComponent(jellyfinUrl)}`, {
-                signal: healthController.signal,
-            });
-            if (!healthResponse.ok) {
-                throw new Error(`Jellyfin check failed with status ${healthResponse.status}`);
+        const { jellyfin_installed: jellyfininstalled, jellyfin_selection: jellyfinoption, jellyfin_url: jellyfinurl, jellyfin_url_port: jellyfinurlport, jellyfin_http_protocol: jellyfinhttpprotocol } = jellyfinConfig;
+        if (jellyfininstalled == true)
+        {
+            const jellyfinUrl = jellyfinoption === "remote" && jellyfinurl && jellyfinurl.trim() !== ""
+                ? jellyfinurl.trim().replace(/\/+$/, "")
+                : `${jellyfinhttpprotocol}://${window.location.hostname}:${jellyfinurlport || 8096}`;
+            const healthController = new AbortController();
+            const healthTimeout = setTimeout(() => {
+                healthController.abort();
+            }, 2000);
+            try {
+                const healthResponse = await fetch(`${await getApiUrl(window.location.hostname)}/checkJellyfin?url=${encodeURIComponent(jellyfinUrl)}`, {
+                    signal: healthController.signal,
+                });
+                if (!healthResponse.ok) {
+                    throw new Error(`Jellyfin check failed with status ${healthResponse.status}`);
+                }
+            }
+            finally {
+                clearTimeout(healthTimeout);
             }
         }
-        finally {
-            clearTimeout(healthTimeout);
-        }
-
         if(jellyfinoption === "remote" && jellyfinurl && jellyfinurl.trim() !== ""){
-            const respone = await MediaServersConfig.saveJellyfinConfig(jellyfinoption, jellyfinurl, null , jellyfininstalled);
+            const respone = await MediaServersConfig.saveJellyfinConfig(jellyfinoption, jellyfinurl, null , null, jellyfininstalled);
             if (!respone.success) {
                 throw new Error(respone.error || "Failed to save Jellyfin configuration");
             }
         }
         else{
-            const respone = await MediaServersConfig.saveJellyfinConfig(jellyfinoption, null, jellyfinurlport, jellyfininstalled);
+            const respone = await MediaServersConfig.saveJellyfinConfig(jellyfinoption, null, jellyfinurlport, jellyfinhttpprotocol, jellyfininstalled);
             if (!respone.success) {
                 throw new Error(respone.error || "Failed to save Jellyfin configuration");
             }
@@ -223,7 +227,7 @@ export default function RestApiConfiguration() {
 
     const checkJellyfinApiKey = async (apiKey: string): Promise<boolean> => {
         try {
-            const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/checkJellyfinApiKey`, {
+            const response = await fetch(`${await getApiUrl(window.location.hostname)}/checkJellyfinApiKey`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -244,10 +248,10 @@ export default function RestApiConfiguration() {
                 const respone = await MediaServersConfig.getPlexConfig();
                 if (newValue == "remote"){
 
-                    setPlexConfig({"plex_installed": plexConfig["plex_installed"], "plex_selection": newValue, "plex_url": respone.PLEX_URL, "plex_url_port": plexConfig["plex_url_port"] });
+                    setPlexConfig({"plex_installed": plexConfig["plex_installed"], "plex_selection": newValue, "plex_url": respone.PLEX_URL, "plex_url_port": plexConfig["plex_url_port"], "plex_http_protocol": plexConfig["plex_http_protocol"] });
                 }
                 else{
-                    setPlexConfig({"plex_installed": plexConfig["plex_installed"], "plex_selection": newValue, "plex_url": `${await MediaServersConfig.getPlexUrl(window.location.hostname, window.location.protocol, plexConfig["plex_url_port"])}`, "plex_url_port": plexConfig["plex_url_port"] });
+                    setPlexConfig({"plex_installed": plexConfig["plex_installed"], "plex_selection": newValue, "plex_url": `${await MediaServersConfig.getPlexUrlForLocalSelection(window.location.hostname, plexConfig["plex_url_port"], plexConfig["plex_http_protocol"])}`, "plex_url_port": plexConfig["plex_url_port"], "plex_http_protocol": plexConfig["plex_http_protocol"] });
                 }
             }
             catch(error){
@@ -265,10 +269,10 @@ export default function RestApiConfiguration() {
                 const respone = await MediaServersConfig.getJellyfinConfig();
                 if (newValue == "remote"){
 
-                    setJellyfinConfig({"jellyfin_installed": jellyfinConfig["jellyfin_installed"], "jellyfin_selection": newValue, "jellyfin_url": respone.JELLYFIN_URL, "jellyfin_url_port": jellyfinConfig["jellyfin_url_port"] });
+                    setJellyfinConfig({"jellyfin_installed": jellyfinConfig["jellyfin_installed"], "jellyfin_selection": newValue, "jellyfin_url": respone.JELLYFIN_URL, "jellyfin_url_port": jellyfinConfig["jellyfin_url_port"], "jellyfin_http_protocol": jellyfinConfig["jellyfin_http_protocol"] });
                 }
                 else{
-                    setJellyfinConfig({"jellyfin_installed": jellyfinConfig["jellyfin_installed"], "jellyfin_selection": newValue, "jellyfin_url": `${await MediaServersConfig.getJellyfinUrl(window.location.hostname, window.location.protocol, jellyfinConfig["jellyfin_url_port"])}`, "jellyfin_url_port": jellyfinConfig["jellyfin_url_port"] });
+                    setJellyfinConfig({"jellyfin_installed": jellyfinConfig["jellyfin_installed"], "jellyfin_selection": newValue, "jellyfin_url": `${await MediaServersConfig.getJellyfinUrlForLocalSelection(window.location.hostname, jellyfinConfig["jellyfin_url_port"], jellyfinConfig["jellyfin_http_protocol"])}`, "jellyfin_url_port": jellyfinConfig["jellyfin_url_port"], "jellyfin_http_protocol": jellyfinConfig["jellyfin_http_protocol"] });
                 }
             }
             catch(error){
@@ -282,8 +286,7 @@ export default function RestApiConfiguration() {
 
     const onUpdatePlexPort = async (newValue : number) => {
         try{
-            const respone = await MediaServersConfig.getPlexConfig();
-            setPlexConfig({"plex_installed": respone.PLEX_INSTALLED, "plex_selection": "local", "plex_url": `${await MediaServersConfig.getPlexUrl(window.location.hostname, window.location.protocol, newValue)}`, "plex_url_port": newValue.toString() });
+            setPlexConfig({"plex_installed": plexConfig["plex_installed"], "plex_selection": "local", "plex_url": `${await MediaServersConfig.getPlexUrlForLocalSelection(window.location.hostname, newValue, plexConfig["plex_http_protocol"])}`, "plex_url_port": newValue.toString(), "plex_http_protocol": plexConfig["plex_http_protocol"] });
         }
         catch(error){
             console.error("Error updating Plex configuration port:", error);
@@ -293,12 +296,43 @@ export default function RestApiConfiguration() {
 
     const onUpdateJellyfinPort = async (newValue : number) => {
         try{
-            const respone = await MediaServersConfig.getJellyfinConfig();
-            setJellyfinConfig({"jellyfin_installed": respone.JELLYFIN_INSTALLED, "jellyfin_selection": "local", "jellyfin_url": `${await MediaServersConfig.getJellyfinUrl(window.location.hostname, window.location.protocol, newValue)}`, "jellyfin_url_port": newValue.toString() });
+            setJellyfinConfig({"jellyfin_installed": jellyfinConfig["jellyfin_installed"], "jellyfin_selection": "local", "jellyfin_url": `${await MediaServersConfig.getJellyfinUrlForLocalSelection(window.location.hostname, newValue, jellyfinConfig["jellyfin_http_protocol"])}`, "jellyfin_url_port": newValue.toString(), "jellyfin_http_protocol": jellyfinConfig["jellyfin_http_protocol"] });
         }
         catch(error){
             console.error("Error updating Jellyfin configuration port:", error);
             toast.error("Error updating Jellyfin configuration port: " + (error instanceof Error ? error.message : ""));
+        }
+    }
+
+    const onUpdatePlexProtocol= async (newValue : string) => 
+    {
+        try{
+            setPlexLoading(true);
+            if (plexConfig["plex_selection"] == "remote") return;
+            setPlexConfig({"plex_installed": plexConfig["plex_installed"], "plex_selection": plexConfig["plex_selection"], "plex_url": `${await MediaServersConfig.getPlexUrlForLocalSelection(window.location.hostname,plexConfig["plex_url_port"], newValue)}`, "plex_url_port": plexConfig["plex_url_port"], "plex_http_protocol": newValue });
+        }
+        catch(error){
+            console.error("Error updating Plex configuration:", error);
+            toast.error("Error updating Plex configuration: " + (error instanceof Error ? error.message : ""));
+        }
+        finally{
+            setPlexLoading(false);
+        }
+    }
+
+    const onUpdateJellyfinProtocol= async (newValue : string) => 
+    {
+        try{
+            setJellyfinLoading(true);
+            if (jellyfinConfig["jellyfin_selection"] == "remote") return;
+            setJellyfinConfig({"jellyfin_installed": jellyfinConfig["jellyfin_installed"], "jellyfin_selection": jellyfinConfig["jellyfin_selection"], "jellyfin_url": `${await MediaServersConfig.getJellyfinUrlForLocalSelection(window.location.hostname,jellyfinConfig["jellyfin_url_port"], newValue)}`, "jellyfin_url_port": jellyfinConfig["jellyfin_url_port"], "jellyfin_http_protocol": newValue });
+        }
+        catch(error){
+            console.error("Error updating Jellyfin configuration:", error);
+            toast.error("Error updating Jellyfin configuration: " + (error instanceof Error ? error.message : ""));
+        }
+        finally{
+            setJellyfinLoading(false);
         }
     }
 
@@ -339,7 +373,7 @@ export default function RestApiConfiguration() {
 
     const getJellyfinUsers : () => Promise<User[]> = async () => {
         try {
-            const response = await `${await getApiUrl(window.location.hostname, window.location.protocol)}/getJellyfinUsers`;
+            const response = await `${await getApiUrl(window.location.hostname)}/getJellyfinUsers`;
             const users = await fetch(response);
             if (!users.ok) {
                 throw new Error((await users.json()).error || "Failed to fetch Jellyfin users");
@@ -364,7 +398,7 @@ export default function RestApiConfiguration() {
 
     const AddJellyfinUser : (username: string, password: string) => Promise<void> = async (username, password) => {
         try {
-            const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/addJellyfinUser`, {
+            const response = await fetch(`${await getApiUrl(window.location.hostname)}/addJellyfinUser`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -383,7 +417,7 @@ export default function RestApiConfiguration() {
 
     const DeleteJellyfinUser : (id: string) => Promise<void> = async (id) => {
         try {
-            const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteJellyfinUser/${id}`, {
+            const response = await fetch(`${await getApiUrl(window.location.hostname)}/deleteJellyfinUser/${id}`, {
                 method: "DELETE",
                 headers: {
                     "Content-Type": "application/json",
@@ -401,7 +435,7 @@ export default function RestApiConfiguration() {
 
     const EditJellyfinUser : (id: string, name: string, password: string) => Promise<void> = async (id, name, password) => {
         try {
-            const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/updateJellyfinUser/${id}`, {
+            const response = await fetch(`${await getApiUrl(window.location.hostname)}/updateJellyfinUser/${id}`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -412,7 +446,7 @@ export default function RestApiConfiguration() {
                 throw new Error(`Failed to edit Jellyfin user: ${response.statusText}`);
             }
             if (password && password.trim() !== "") {
-                const passwordResponse = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/updateJellyfinUserPassword/${id}`, {
+                const passwordResponse = await fetch(`${await getApiUrl(window.location.hostname)}/updateJellyfinUserPassword/${id}`, {
                     method: "PUT",
                     headers: {
                         "Content-Type": "application/json",
@@ -440,7 +474,12 @@ export default function RestApiConfiguration() {
             {jellyfinConfig?.jellyfin_installed && (
             <div className="relative pl-8 flex flex-col">
                 <OptionType typeKey="jellyfin_selection" value={jellyfinConfig?.jellyfin_selection || "local"} type="<dropdown>" options={[{key: "local", value: "Local"}, {key: "remote", value: "Remote" }] } onChange={async (newValue) => {await onUpdateJellyfinConfig(newValue); setJellyfinConfig((prev) => ({ ...prev, "jellyfin_selection": newValue } ))}} />
-                <OptionType asNumber={true} allHidden={jellyfinConfig["jellyfin_selection"] === "remote"} typeKey="jellyfin_url_port" value={jellyfinConfig["jellyfin_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdateJellyfinPort(newValue); setJellyfinConfig((prev) => ({ ...prev, "jellyfin_url_port": parseInt(newValue) }))}} />
+                {jellyfinConfig["jellyfin_selection"] === "local" && (
+                    <>
+                    <OptionType typeKey="jellyfin_http_protocol" value={jellyfinConfig["jellyfin_http_protocol"] || ""} type="<dropdown>" options={[{key: "http", value: "HTTP"}, {key: "https", value: "HTTPS" }] } onChange={(newValue) => {onUpdateJellyfinProtocol(newValue); setJellyfinConfig((prev) => ({ ...prev, "jellyfin_http_protocol": newValue }))}} />
+                    <OptionType asNumber={true} typeKey="jellyfin_url_port" value={jellyfinConfig["jellyfin_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdateJellyfinPort(newValue); setJellyfinConfig((prev) => ({ ...prev, "jellyfin_url_port": parseInt(newValue) }))}} />
+                    </>
+                )}
                 <OptionType disabled={jellyfinConfig["jellyfin_selection"] !== "remote"} typeKey="jellyfin_url" value={jellyfinConfig["jellyfin_url"] || ""} type="<string>" onChange={(newValue) => setJellyfinConfig((prev) => ({ ...prev, "jellyfin_url": newValue }))} />
                 {loadedJellyfinConfig["jellyfin_installed"] && (
                 <OptionType typeKey="manage_jellyfin_users" type="<button>" value={null} onClick={async () => {setManageJellyfinUsers(true);}} icon="/manager-users.svg" iconClassName="w-5 h-5 ml-0.5" />
@@ -488,7 +527,12 @@ export default function RestApiConfiguration() {
             {plexConfig?.plex_installed && (
             <div className="relative pl-8 flex flex-col">
                 <OptionType typeKey="plex_selection" value={plexConfig?.plex_selection || "local"} type="<dropdown>" options={[{key: "local", value: "Local"}, {key: "remote", value: "Remote" }] } onChange={async (newValue) => {await onUpdatePlexConfig(newValue); setPlexConfig((prev) => ({ ...prev, "plex_selection": newValue } ))}} />
-                <OptionType asNumber={true} allHidden={plexConfig["plex_selection"] === "remote"} typeKey="plex_url_port" value={plexConfig["plex_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdatePlexPort(newValue); setPlexConfig((prev) => ({ ...prev, "plex_url_port": parseInt(newValue) }))}} />
+                {plexConfig["plex_selection"] === "local" && (
+                <>
+                    <OptionType typeKey="plex_http_protocol" value={plexConfig["plex_http_protocol"] || ""} type="<dropdown>" options={[{key: "http", value: "HTTP"}, {key: "https", value: "HTTPS" }] } onChange={(newValue) => {onUpdatePlexProtocol(newValue); setPlexConfig((prev) => ({ ...prev, "plex_http_protocol": newValue }))}} />
+                    <OptionType asNumber={true} typeKey="plex_url_port" value={plexConfig["plex_url_port"] || ""} type="<string>" onChange={async (newValue) => {await onUpdatePlexPort(newValue); setPlexConfig((prev) => ({ ...prev, "plex_url_port": parseInt(newValue) }))}} />
+                </>
+                )}
                 <OptionType disabled={plexConfig["plex_selection"] !== "remote"} typeKey="plex_url" value={plexConfig["plex_url"] || ""} type="<string>" onChange={(newValue) => setPlexConfig((prev) => ({ ...prev, "plex_url": newValue }))} />
                 <OptionType typeKey="plex_api_key" asPassword value={plexApiKey || ""} type="<string>" onChange={(newValue) => setPlexApiKey(newValue)} />
                 {(plexApiKey.trim() != "" || plexHasApiKey) && (

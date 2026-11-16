@@ -70,7 +70,7 @@ export default function LogComponent() {
       let newChunk: string[] = [];
 
       do {
-        const url = new URL(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getLogs`);
+        const url = new URL(`${await getApiUrl(window.location.hostname)}/getLogs`);
         if (nextCursor) url.searchParams.set("cursor", nextCursor);
         if (effectiveDate) url.searchParams.set("date", effectiveDate);
         if (searchParam) url.searchParams.set("search", searchParam);

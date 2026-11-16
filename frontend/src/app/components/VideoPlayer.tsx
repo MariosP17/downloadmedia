@@ -51,7 +51,7 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
 
         const fetchVideoUrl = async () => {
             try {
-                const videoUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/stream?filePath=${encodeURIComponent(videopath)}`;
+                const videoUrl = `${await getApiUrl(window.location.hostname)}/stream?filePath=${encodeURIComponent(videopath)}`;
                 if (cancelled) return;
                 setVideourl(videoUrl);
             } catch (error) {
@@ -64,13 +64,13 @@ export default function VideoPlayer({ videopath }: VideoPlayerProps) {
         };
         const fetchVideoSubs = async () => {
             try {
-                const subsUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/subtitles?filePath=${encodeURIComponent(videopath)}`;
+                const subsUrl = `${await getApiUrl(window.location.hostname)}/subtitles?filePath=${encodeURIComponent(videopath)}`;
                 const response = await fetch(subsUrl, { signal: abortController.signal });
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const data: SubtitleResponse[] = await response.json();
-                const baseUrl = await getApiUrl(window.location.hostname, window.location.protocol);
+                const baseUrl = await getApiUrl(window.location.hostname);
                 if (cancelled) return;
                 const subsData: Subtitle[] = await Promise.all(data.map(async (sub) => ({
                     url: sub.index != undefined ? baseUrl + `/subtitle/embedded?videoPath=${encodeURIComponent(videopath)}&trackIndex=${sub.index}` : baseUrl + `/subtitle?filePath=${encodeURIComponent(sub.filepath)}`,

@@ -134,7 +134,7 @@ function SearchResultsList() {
           `https://v3-cinemeta.strem.io/catalog/series/top/search=${encodeURIComponent(query)}.json`
         );
 
-        const allMediaSavedIdsResponse = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + '/getSavedMediaIds?type=moviesandseries');
+        const allMediaSavedIdsResponse = await fetch(await getApiUrl(window.location.hostname) + '/getSavedMediaIds?type=moviesandseries');
         const allMediaSavedIds = await allMediaSavedIdsResponse.json();
         if (!allMediaSavedIds.success) {
           toast.error(`Failed to load saved media IDs: ${allMediaSavedIds.message || 'Unknown error'}`);

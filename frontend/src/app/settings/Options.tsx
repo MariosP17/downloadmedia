@@ -19,7 +19,7 @@ export default function Options() {
         if (disabledSave) return;
         if (!options || Object.keys(options).length === 0) return;
         setLoading(true);
-        await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/updateOptions", {
+        await fetch(await getApiUrl(window.location.hostname) + "/updateOptions", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
@@ -33,7 +33,7 @@ export default function Options() {
     const fetchLanguages = async () => {
         try {
         setLoading(true);
-            const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getLanguages`);
+            const res = await fetch(`${await getApiUrl(window.location.hostname)}/getLanguages`);
             const data = await res.json();
             if (data.success === false) throw new Error(data.message || "Failed to fetch languages");
             const array = data.data.map((lang: { name: string; code: string }) => ({ name: lang.name, code: lang.code }));
@@ -59,7 +59,7 @@ export default function Options() {
         const fetchOptions = async () => {
             try{
                 setLoading(true);
-                const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getOptions");
+                const res = await fetch(await getApiUrl(window.location.hostname) + "/getOptions");
                 const data = await res.json();
                 setLoadedOptions(data);
                 setOptions(data);

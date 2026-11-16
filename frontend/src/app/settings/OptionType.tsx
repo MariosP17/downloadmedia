@@ -11,7 +11,6 @@ type OptionType = {
   minWidth?: string;
   disabled?: boolean;
   hidden?: boolean;
-  allHidden?: boolean;
   asNumber?: boolean;
   asPassword?: boolean;
   decimalPoints?: number;
@@ -25,7 +24,7 @@ type OptionType = {
 import { OptionsNames } from "../../../Props";
 import FolderPicker  from "../components/FolderPicker";
 
-export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,allHidden,asNumber,asPassword,decimalPoints,mb4=true, onChange,onClick, icon,iconClassName, options}: OptionType) {
+export default function OptionType({typeKey, value, type,min,max,maxWidth, minWidth,disabled,hidden,asNumber,asPassword,decimalPoints,mb4=true, onChange,onClick, icon,iconClassName, options}: OptionType) {
 
   const handleToggle = (newValue: boolean) => {
     if (onChange) {
@@ -52,7 +51,7 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
     );
     case "<number>":
       return (
-        <div hidden={allHidden} className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>{OptionsNames[typeKey]}</p>
           <input 
             type="number" 
@@ -114,7 +113,7 @@ export default function OptionType({typeKey, value, type,min,max,maxWidth, minWi
     );
     case "<string>":
       return (
-        <div hidden={allHidden} className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>{OptionsNames[typeKey]}</p>
           <input 
             type={asPassword ? "password" : "text"}

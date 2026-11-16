@@ -66,7 +66,7 @@ export default function SettingsPage() {
         try {
           const abortController = new AbortController();
           const timeoutId = setTimeout(() => abortController.abort(), 2000);
-          const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/health", { signal: abortController.signal });
+          const res = await fetch(await getApiUrl(window.location.hostname) + "/health", { signal: abortController.signal });
           clearTimeout(timeoutId);
           if (res.ok) {
             toast.dismiss(toastmsg);
@@ -88,7 +88,7 @@ export default function SettingsPage() {
   };
 
   const fetchSubtitlesInfo = async () => {
-            const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getOpenSubtitlesInfo");
+            const res = await fetch(await getApiUrl(window.location.hostname) + "/getOpenSubtitlesInfo");
             const data = (await res.json())?.data ?? {};
             setSubtitlesInfo(data);
   };
@@ -96,7 +96,7 @@ export default function SettingsPage() {
   const fetchOMDBCounter = async () => {
     setIsLoadingPage(true);
     try {
-      const res = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getOMDBCounter");
+      const res = await fetch(await getApiUrl(window.location.hostname) + "/getOMDBCounter");
       const data = (await res.json());
       if (!data.success){
         throw new Error(data.message || "Failed to fetch OMDB counter");
@@ -116,9 +116,9 @@ export default function SettingsPage() {
     setIsLoadingPage(true);
     try {
       const [progressResponse, batchProgressResponse, archiveJobsResponse] = await Promise.all([
-        fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getProgressStore"),
-        fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getBatchProgressStore"),
-        fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/archiveJobs"),
+        fetch(await getApiUrl(window.location.hostname) + "/getProgressStore"),
+        fetch(await getApiUrl(window.location.hostname) + "/getBatchProgressStore"),
+        fetch(await getApiUrl(window.location.hostname) + "/archiveJobs"),
       ]);
 
       if (!progressResponse.ok || !batchProgressResponse.ok || !archiveJobsResponse.ok) {
@@ -159,7 +159,7 @@ export default function SettingsPage() {
   const refreshLibraries = async () => {
     setIsRefreshingLibraries(true);
     try {
-      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/refreshLibraries",{ 
+      const response = await fetch(await getApiUrl(window.location.hostname) + "/refreshLibraries",{ 
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -179,7 +179,7 @@ export default function SettingsPage() {
 
   const loadRefreshLibrariesLog = async () => {
     try {
-      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/getRefreshLibrariesLog");
+      const response = await fetch(await getApiUrl(window.location.hostname) + "/getRefreshLibrariesLog");
       if (!response.ok) throw new Error("Failed to load refresh libraries log");
       const data = await response.json();
       setRefreshLibrariesLog(data);
@@ -192,7 +192,7 @@ export default function SettingsPage() {
   const cleanupArchiveJobs = async () => {
     setIsCleaningArchives(true);
     try {
-      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + "/cleanupArchiveJobs", { method: "POST" });
+      const response = await fetch(await getApiUrl(window.location.hostname) + "/cleanupArchiveJobs", { method: "POST" });
       if (!response.ok) throw new Error("Failed to clean archive jobs");
       await loadOperationalState();
       toast.success("Expired archive jobs cleaned up.");
@@ -208,7 +208,7 @@ export default function SettingsPage() {
     setClearingStore(store);
     try {
       const endpoint = store === "progress" ? "/clearProgressStore" : "/clearBatchProgressStore";
-      const response = await fetch(await getApiUrl(window.location.hostname, window.location.protocol) + endpoint, { method: "POST" });
+      const response = await fetch(await getApiUrl(window.location.hostname) + endpoint, { method: "POST" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Failed to clear store");
       await loadOperationalState();

@@ -3,9 +3,9 @@
 import fs from 'fs';
 import path from 'path';
 
-export async function savePlexConfig(selection: string, url: string | null, port: number | null, installed: boolean) {
+export async function savePlexConfig(selection: string, url: string | null, port: number | null, protocol: string | null, installed: boolean) {
   try {
-    if (installed && (!selection || (selection === "remote" && (!url || url.trim() === "")) || (selection === "local" && port === null))) {
+    if (installed && (!selection || (selection === "remote" && (!url || url.trim() === "")) || (selection === "local" && port === null && protocol === null))) {
       throw new Error("Invalid selection or URL or port");
     }
     // Define where to save this rest API configuration (e.g., project root)
@@ -32,6 +32,8 @@ export async function savePlexConfig(selection: string, url: string | null, port
             PLEX_SECTION.PLEX_URL = url;
         if (port !== null)
             PLEX_SECTION.PLEX_PORT = port;
+        if (protocol !== null)
+            PLEX_SECTION.PLEX_HTTP_PROTOCOL = protocol;
     }
     config.PLEX_SECTION = PLEX_SECTION;
 
@@ -50,30 +52,33 @@ export async function getPlexConfig() {
     const configPath = path.join(process.cwd(), 'config.json');
     
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).PLEX_SECTION;
-      return { PLEX_SELECTION: config.PLEX_SELECTION || null, PLEX_URL: config.PLEX_URL || null, PLEX_PORT: config.PLEX_PORT || 32400, PLEX_INSTALLED: config.PLEX_INSTALLED || false };
+      return { PLEX_SELECTION: config.PLEX_SELECTION || null, PLEX_URL: config.PLEX_URL || null, PLEX_PORT: config.PLEX_PORT || 32400, PLEX_INSTALLED: config.PLEX_INSTALLED || false, PLEX_HTTP_PROTOCOL: config.PLEX_HTTP_PROTOCOL || "http" };
   }
   catch (error) {
     console.error("Failed to read config file:", error);
-    return {  PLEX_SELECTION: null, PLEX_URL: null, PLEX_PORT: 32400, PLEX_INSTALLED: false };
+    return {  PLEX_SELECTION: null, PLEX_URL: null, PLEX_PORT: 32400, PLEX_INSTALLED: false, PLEX_HTTP_PROTOCOL: "http" };
   }
 }
 
 
 
-export async function getPlexUrl(hostname: string, protocol: string = "http", port?: number) {
+export async function getPlexUrl(hostname: string) {
   try {
-    protocol = protocol.replace(":", ""); // Remove colon if present
     const configPath = path.join(process.cwd(), 'config.json');
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).PLEX_SECTION;
     if (config.PLEX_SELECTION === "remote" && config.PLEX_URL && config.PLEX_URL.trim() !== "") {
       return config.PLEX_URL;
     } else {
-      return `${protocol}://${hostname}:${port || config.PLEX_PORT || 32400}`;
+      return `${config.PLEX_HTTP_PROTOCOL || "http"}://${hostname}:${config.PLEX_PORT || 32400}`;
     }
   } catch (error) {
     console.error("Failed to read config file:", error);
-    return `${protocol}://${hostname}:${port || 32400}`;
+    return `"http"://${hostname}:32400`;
   }
+}
+
+export async function getPlexUrlForLocalSelection(hostname: string, port: number | null, protocol: string | null) {
+  return `${protocol || "http"}://${hostname}:${port || 32400}`;
 }
 
 export async function savePlexApiKey(apiKey: string) {
@@ -130,9 +135,9 @@ export async function plexApiKeyExists() {
   }
 };
 
-export async function saveJellyfinConfig(selection: string, url: string | null, port: number | null, installed: boolean) {
+export async function saveJellyfinConfig(selection: string, url: string | null, port: number | null, protocol: string | null, installed: boolean) {
   try {
-    if (installed && (!selection || (selection === "remote" && (!url || url.trim() === "")) || (selection === "local" && port === null))) {
+    if (installed && (!selection || (selection === "remote" && (!url || url.trim() === "")) || (selection === "local" && port === null && protocol === null))) {
       throw new Error("Invalid selection or URL or port");
     }
     // Define where to save this rest API configuration (e.g., project root)
@@ -159,6 +164,8 @@ export async function saveJellyfinConfig(selection: string, url: string | null, 
             JELLYFIN_SECTION.JELLYFIN_URL = url;
         if (port !== null)
             JELLYFIN_SECTION.JELLYFIN_PORT = port;
+        if (protocol !== null)
+            JELLYFIN_SECTION.JELLYFIN_HTTP_PROTOCOL = protocol;
     }
     config.JELLYFIN_SECTION = JELLYFIN_SECTION;
     // Write directly to the local server disk
@@ -176,28 +183,31 @@ export async function getJellyfinConfig() {
     const configPath = path.join(process.cwd(), 'config.json');
     
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).JELLYFIN_SECTION;
-      return { JELLYFIN_SELECTION: config.JELLYFIN_SELECTION || null, JELLYFIN_URL: config.JELLYFIN_URL || null, JELLYFIN_PORT: config.JELLYFIN_PORT || 8096, JELLYFIN_INSTALLED: config.JELLYFIN_INSTALLED || false };
+      return { JELLYFIN_SELECTION: config.JELLYFIN_SELECTION || null, JELLYFIN_URL: config.JELLYFIN_URL || null, JELLYFIN_PORT: config.JELLYFIN_PORT || 8096, JELLYFIN_INSTALLED: config.JELLYFIN_INSTALLED || false, JELLYFIN_HTTP_PROTOCOL: config.JELLYFIN_HTTP_PROTOCOL || "http" };
   }
   catch (error) {
     console.error("Failed to read config file:", error);
-    return {  JELLYFIN_SELECTION: null, JELLYFIN_URL: null, JELLYFIN_PORT: 8096, JELLYFIN_INSTALLED: false };
+    return {  JELLYFIN_SELECTION: null, JELLYFIN_URL: null, JELLYFIN_PORT: 8096, JELLYFIN_INSTALLED: false, JELLYFIN_HTTP_PROTOCOL: "http" };
   }
 }
 
-export async function getJellyfinUrl(hostname: string, protocol: string = "http", port?: number) {
+export async function getJellyfinUrl(hostname: string) {
   try {
-    protocol = protocol.replace(":", ""); // Remove colon if present
     const configPath = path.join(process.cwd(), 'config.json');
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).JELLYFIN_SECTION;
     if (config.JELLYFIN_SELECTION === "remote" && config.JELLYFIN_URL && config.JELLYFIN_URL.trim() !== "") {
       return config.JELLYFIN_URL;
     } else {
-      return `${protocol}://${hostname}:${port || config.JELLYFIN_PORT || 8096}`;
+      return `${config.JELLYFIN_HTTP_PROTOCOL || "http"}://${hostname}:${config.JELLYFIN_PORT || 8096}`;
     }
   } catch (error) {
     console.error("Failed to read config file:", error);
-    return `${protocol}://${hostname}:${port || 8096}`;
+    return `${"http"}://${hostname}:$8096`;
   }
+}
+
+export async function getJellyfinUrlForLocalSelection(hostname: string, port: number | null, protocol: string | null) {
+  return `${protocol || "http"}://${hostname}:${port || 8096}`;
 }
 
 export async function saveJellyfinApiKey(apiKey: string) {

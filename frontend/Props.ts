@@ -44,20 +44,23 @@ export const OptionsNames : Record<string, string> =
     "rest_api_selection" : "Rest API location",
     "rest_api_url" : "Rest API URL",
     "rest_api_url_port" : "Local Rest API Port",
+    "rest_api_http_protocol" : "Local Rest API Protocol",
     "batchSizeThreshold" : "Batch Size Threshold for batch bookmarking",
     "BatchSize" : "Batch Size for batch bookmarking",
     "plex_selection" : "Plex location",
     "plex_url" : "Plex URL",
     "plex_url_port" : "Local Plex Port",
     "plex_installed" : "Plex Installed",
+    "plex_http_protocol" : "Local Plex Protocol",
     "jellyfin_selection" : "Jellyfin location",
     "jellyfin_url" : "Jellyfin URL",
     "jellyfin_url_port" : "Local Jellyfin Port",
     "jellyfin_installed" : "Jellyfin Installed",
+    "jellyfin_http_protocol" : "Local Jellyfin Protocol",
     "manage_jellyfin_users" : "Manage Jellyfin Users",
     "jellyfin_api_key" : "Jellyfin API Key",
     "plex_api_key" : "Plex API Key",
-    "subtitleDelayStep" : "Subtitle Delay Step (seconds)"
+    "subtitleDelayStep" : "Subtitle Delay Step (seconds)",
 
 };
 

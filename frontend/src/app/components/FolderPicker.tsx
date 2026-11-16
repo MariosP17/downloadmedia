@@ -72,7 +72,7 @@ export default function FolderPicker({ style,initialFolder, onSelectFolder, fold
   // 2. The function to fetch subfolders from your remote API
   const fetchSubFolders = async (parentKey: string): Promise<TreeNode[]> => {
     try {
-      const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getSuperFolderInfo`,{
+      const response = await fetch(`${await getApiUrl(window.location.hostname)}/getSuperFolderInfo`,{
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -46,7 +46,7 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
     const handleSave = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/addSavedMedia`, {
+            const res = await fetch(`${await getApiUrl(window.location.hostname)}/addSavedMedia`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
@@ -68,7 +68,7 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
     const handleDelete = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteSavedMedia`, {
+            const res = await fetch(`${await getApiUrl(window.location.hostname)}/deleteSavedMedia`, {
                 method: "DELETE",
                 body: new URLSearchParams({ ttid })
             });

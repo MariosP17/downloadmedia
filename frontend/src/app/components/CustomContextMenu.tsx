@@ -19,7 +19,7 @@ export default function CustomContextMenu({x, y, media, isInSaved, type, CloseMe
   const handleAddToSaved = async (media : any) => {
     const toastId = toast.loading(`Adding ${media.name || (type === MediaType.movie ? "movie" : media.id.split(':').length > 1 ? "episode" : "series")} to saved...`);
     try{
-      const response = await fetch(await getApiUrl(window.location.hostname,window.location.protocol)+'/addSavedMedia', {
+      const response = await fetch(await getApiUrl(window.location.hostname)+'/addSavedMedia', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -42,7 +42,7 @@ export default function CustomContextMenu({x, y, media, isInSaved, type, CloseMe
   const handleRemoveFromSaved = async (ttid: string) => {
     const toastId = toast.loading(`Removing ${media.name || (type === MediaType.movie ? "movie" : media.id.split(':').length > 1 ? "episode" : "series")} from saved...`);
     try{
-      const response = await fetch(await getApiUrl(window.location.hostname,window.location.protocol)+'/deleteSavedMedia', {
+      const response = await fetch(await getApiUrl(window.location.hostname)+'/deleteSavedMedia', {
         method: 'DELETE',
         body: new URLSearchParams({ ttid: ttid })
       });

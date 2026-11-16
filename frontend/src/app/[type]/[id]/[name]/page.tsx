@@ -24,8 +24,7 @@ type Props = {
 const getAllSavedMediaIds = async (headersList: any): Promise<Set<string>> => {
   try {
     const host = headersList.get("host")?.split(":")[0] || "localhost";
-    const protocol = headersList.get("x-forwarded-proto") || "http";
-    const res = await fetch(`${await getApiUrl(host, protocol)}/getSavedMediaIds?type=episodes`);
+    const res = await fetch(`${await getApiUrl(host)}/getSavedMediaIds?type=episodes`);
     const data = await res.json();
     if (data.success !== true) {
       throw new Error(data.message || 'Failed to fetch saved media IDs');
@@ -49,8 +48,6 @@ const fetchAllSavedMediaIds = async () => {
   const savedMediaIds = await getAllSavedMediaIds(headersList);
   return savedMediaIds;
 }
-
-
 
 const isMediaInSaved = (ttid: string, ids: Set<string>): boolean => {
   return ids.has(ttid);
@@ -138,8 +135,7 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
   async function getMovieOmdbData() {
     const headersList = await headers();
     const host = headersList.get("host")?.split(":")[0] || "localhost";
-    const protocol = headersList.get("x-forwarded-proto") || "http";
-    const omdbUrl = `${await getApiUrl(host,protocol)}/getOmdbData?t=${encodeURIComponent(data.imdb_id)}`;
+    const omdbUrl = `${await getApiUrl(host)}/getOmdbData?t=${encodeURIComponent(data.imdb_id)}`;
     const omdbData = await fetch(omdbUrl)
     if (!omdbData.ok) {
       throw new Error((await omdbData.json()).error || "Failed to fetch OMDB data");
@@ -149,8 +145,7 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
 
   const headersList = await headers();
   const host = headersList.get("host")?.split(":")[0] || "localhost";
-  const protocol = headersList.get("x-forwarded-proto") || "http";
-  const ret = await fetch(`${await getApiUrl(host,protocol)}/savedMediaExists?ttid=${(id)}`).then(res => res.json()).catch(() => false);
+  const ret = await fetch(`${await getApiUrl(host)}/savedMediaExists?ttid=${(id)}`).then(res => res.json()).catch(() => false);
   const isInSavedMedia = ret.data === true;
   if (!data) return null;
   const decodedId = decodeURIComponent(id);
@@ -159,7 +154,7 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
   let omdbData = null;
   if (episodeData){
     try {
-      const omdbUrl = `${await getApiUrl(host,protocol)}/getOmdbData?t=${data.imdb_id}&season=${episodeData.season}&episode=${episodeData.episode}`;
+      const omdbUrl = `${await getApiUrl(host)}/getOmdbData?t=${data.imdb_id}&season=${episodeData.season}&episode=${episodeData.episode}`;
       const omdbret = await fetch(omdbUrl)
       if (!omdbret.ok) {
         throw new Error((await omdbret.json()).error || "Failed to fetch OMDB data");
@@ -224,7 +219,6 @@ export default async function ItemPage({ params, searchParams }: Props) {
   const { season } = await searchParams;
   const headersList = await headers();
   const host = headersList.get("host")?.split(":")[0] || "localhost";
-  const protocol = headersList.get("x-forwarded-proto") || "http";
   let mediaData: any = null;
   if ((type === "movie" || type === "series")) {
     const metadataUrl = `https://v3-cinemeta.strem.io/meta/${encodeURIComponent(type)}/${encodeURIComponent(decodeURIComponent(id).split(":")[0])}.json`;
@@ -238,8 +232,8 @@ export default async function ItemPage({ params, searchParams }: Props) {
         // ignore and try next
       }
   }
-  const options = await fetch(`${await getApiUrl(host,protocol)}/getOptions`).then(res => res.json());
-  const configuration = await fetch(`${await getApiUrl(host,protocol)}/getConfiguration`).then(res => res.json());
+  const options = await fetch(`${await getApiUrl(host)}/getOptions`).then(res => res.json());
+  const configuration = await fetch(`${await getApiUrl(host)}/getConfiguration`).then(res => res.json());
 
   if (type === "series" && !decodeURIComponent(id).includes(":")) {
     const seasons = await normalizeSeasons(mediaData);
@@ -321,7 +315,7 @@ export default async function ItemPage({ params, searchParams }: Props) {
       const filename = s.behaviorHints?.filename || "";
       const data = s.progressData;
       try {
-        const res = await fetch(`${ await getApiUrl(host,protocol)}/progress/${infoHash}/${s.fileIdx}`);
+        const res = await fetch(`${ await getApiUrl(host)}/progress/${infoHash}/${s.fileIdx}`);
         const progressData = res.ok ? await res.json() : { progress: 0.0, status: "Not started or task not found" };
         return { ...s, progressData };
       } catch {

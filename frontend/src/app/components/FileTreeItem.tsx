@@ -42,6 +42,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
 };
   // Calculate this item's full path parameter for the backend API query
   const itemPath = isRoot ? currentPath : currentPath ? `${currentPath}/${cleanName}` : cleanName;
+  const itemReplacedPath = itemPath.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
   const isSeasonFolder =  itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 2;
   const isMovie = (itemPath.toLowerCase().startsWith(config["MoviesFolder"].toLowerCase())) && (itemPath.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 1 || (itemPath.toLowerCase().replace(config["MoviesFolder"].toLowerCase()+"/", "").split("/").length === 2 && isVideoExtension(cleanName)));
   const isEpisodeLength3 = !isFolder && (itemPath.toLowerCase().startsWith(config["TVShowsFolder"].toLowerCase()) && itemPath.toLowerCase().replace(config["TVShowsFolder"].toLowerCase()+"/", "").split("/").length === 3) && isVideoExtension(cleanName);
@@ -136,13 +137,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     if (setLoadingInternal) setLoading(true);
     try {
       const res = await fetch(
-        `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(itemPath)}`
+        `${await getApiUrl(window.location.hostname)}/getItems?folder=${encodeURIComponent(itemPath)}`
       );
       if (!res.ok) throw new Error("Could not retrieve contents");
       
       const data = await res.json();
       const sizeres = await fetch(
-        `${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderSize?folder=${encodeURIComponent(itemPath)}`
+        `${await getApiUrl(window.location.hostname)}/getFolderSize?folder=${encodeURIComponent(itemPath)}`
       );
       if (!sizeres.ok) throw new Error("Could not retrieve folder size");
       const sizeData = await sizeres.json();
@@ -171,14 +172,14 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const RefreshAllChildren = async () => {
     try {
       // const childrenRes = await fetch(
-      //   `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(itemPath)}`
+      //   `${await getApiUrl(window.location.hostname)}/getItems?folder=${encodeURIComponent(itemPath)}`
       // );
       // if (!childrenRes.ok) throw new Error("Could not retrieve contents");
       // const childrenData = await childrenRes.json();
       // setChildren(childrenData.items || []);
       // 1. Fetch only subfolders for the current folder path
       const res = await fetch(
-        `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`
+        `${await getApiUrl(window.location.hostname)}/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`
       );
       if (!res.ok) throw new Error("Could not retrieve contents");
       
@@ -204,7 +205,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           // B. Crucial: Force the backend API request cascade to dig deeper into this child's subfolders
           try {
             const childRes = await fetch(
-              `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(childPath)}&showFiles=false`
+              `${await getApiUrl(window.location.hostname)}/getItems?folder=${encodeURIComponent(childPath)}&showFiles=false`
             );
             if (childRes.ok) {
               const childData = await childRes.json();
@@ -230,7 +231,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const RefreshNestedSubTree = async (targetPath: string): Promise<void> => {
     try {
       const res = await fetch(
-        `${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(targetPath)}&showFiles=false`
+        `${await getApiUrl(window.location.hostname)}/getItems?folder=${encodeURIComponent(targetPath)}&showFiles=false`
       );
       if (!res.ok) return;
       
@@ -273,13 +274,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     try {
       let res;
       if (!isFolderInternal) {
-        res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteFile`, {
+        res = await fetch(`${await getApiUrl(window.location.hostname)}/deleteFile`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filePath: itemPath })
         });
       } else {
-        res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteFolder`, {
+        res = await fetch(`${await getApiUrl(window.location.hostname)}/deleteFolder`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ folder: itemPath })
@@ -304,13 +305,13 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       try {
         let res;
         if (!isFolderInternal) {
-          res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/renameFile`, {
+          res = await fetch(`${await getApiUrl(window.location.hostname)}/renameFile`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ filePath: itemPath, newName: newItemName.trim() })
           });
         } else {
-          res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/renameFolder`, {
+          res = await fetch(`${await getApiUrl(window.location.hostname)}/renameFolder`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ folder: itemPath, newName: newItemName.trim() })
@@ -332,7 +333,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   const pollArchiveJob = (jobId: string) => {
     const poll = async () => {
       try {
-        const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/folderDownloadProgress/${jobId}`);
+        const response = await fetch(`${await getApiUrl(window.location.hostname)}/folderDownloadProgress/${jobId}`);
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Could not retrieve archive progress");
 
@@ -342,7 +343,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
           archivePollRef.current = null;
           setArchiveJob(null);
           toast.success("Archive ready. Download starting...");
-          window.location.href = `${await getApiUrl(window.location.hostname, window.location.protocol)}/downloadFolderToClient/${jobId}`;
+          window.location.href = `${await getApiUrl(window.location.hostname)}/downloadFolderToClient/${jobId}`;
         } else if (["cancelled", "failed"].includes(data.status)) {
           if (archivePollRef.current) clearInterval(archivePollRef.current);
           archivePollRef.current = null;
@@ -363,7 +364,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     if (!archiveJob) return;
     setArchiveJob((current) => current ? { ...current, status: "cancelling" } : current);
     try {
-      await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancelFolderDownload/${archiveJob.job_id}`, { method: "POST" });
+      await fetch(`${await getApiUrl(window.location.hostname)}/cancelFolderDownload/${archiveJob.job_id}`, { method: "POST" });
     } catch {
       toast.error("Could not cancel archive creation.");
     }
@@ -374,7 +375,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     
     if (isFolderInternal) {
       try {
-        const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/downloadFolderToClient`, {
+        const response = await fetch(`${await getApiUrl(window.location.hostname)}/downloadFolderToClient`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ filePath: itemPath })
@@ -394,7 +395,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         // 1. Create a hidden, throwaway HTML form element
         const form = document.createElement("form");
         form.method = "POST";
-        form.action = `${await getApiUrl(window.location.hostname, window.location.protocol)}/downloadFileToClient`;
+        form.action = `${await getApiUrl(window.location.hostname)}/downloadFileToClient`;
         form.style.display = "none";
 
         // 2. Add the filePath parameter to match application/x-www-form-urlencoded
@@ -503,7 +504,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         const { season, episode, name } = parseSeasonAndEpisodeAndNameFromFolderName(cleanName);
         const { title, year } = parseTitleAndYear(isSeasonFolder || isEpisodeItem ? replacedPath.split("/")[0] : isMovie ? replacedPath.split("/")[0] : isEpisodeFolder ? replacedPath.split("/")[0] : cleanName);
         if (!title) return;
-        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${isEpisodeItem && episodeInfo ? `&season=${episodeInfo.season}&episode=${episodeInfo.episode}` : isEpisodeFolder && season !== null && episode !== null ? `&season=${season}&episode=${episode}` : ""}`;
+        const omdbUrl = `${await getApiUrl(window.location.hostname)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${isEpisodeItem && episodeInfo ? `&season=${episodeInfo.season}&episode=${episodeInfo.episode}` : isEpisodeFolder && season !== null && episode !== null ? `&season=${season}&episode=${episode}` : ""}`;
         const OMDBResponse = await fetch(omdbUrl);
         const OMDBData = await OMDBResponse.json();
         if (!OMDBData || OMDBData.Response === "False") {
@@ -532,7 +533,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
         const { title, year } = parseTitleAndYear(replacedPath.split("/")[0]);
         if (!title) return { targetTtid: "", targetEpisodeName: "" };
-        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${isEpisodeItem && episodeInfo ? `&season=${episodeInfo.season}&episode=${episodeInfo.episode}` : ""}`;
+        const omdbUrl = `${await getApiUrl(window.location.hostname)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${isEpisodeItem && episodeInfo ? `&season=${episodeInfo.season}&episode=${episodeInfo.episode}` : ""}`;
         const OMDBResponse = await fetch(omdbUrl);
         const OMDBData = await OMDBResponse.json();
         if (!OMDBData || OMDBData.Response === "False") {
@@ -562,7 +563,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         const replacedPath = path.replace(config["MoviesFolder"]+"/", "").replace(config["TVShowsFolder"]+"/", "");
         const { title, year } = parseTitleAndYear(replacedPath.split("/")[0]);
         if (!title) return { targetTtid: "", targetEpisodeName: "" };
-        const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${season !== null && episode !== null ? `&season=${season}&episode=${episode}` : ""}`;
+        const omdbUrl = `${await getApiUrl(window.location.hostname)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}${season !== null && episode !== null ? `&season=${season}&episode=${episode}` : ""}`;
         const OMDBResponse = await fetch(omdbUrl);
         const OMDBData = await OMDBResponse.json();
         if (!OMDBData || OMDBData.Response === "False") {
@@ -971,7 +972,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
               </button>
             </div>
             <div className="mb-4"></div>
-              <ArtPlayer videopath={itemPath} name={type === "movie" ? itemPath.split("/")[itemPath.split("/").length - 2] : itemPath.split("/")[itemPath.split("/").length - 3]} type={type} episodeInfo={episodeInfo} opts={options} />
+              <ArtPlayer videopath={itemPath} name={itemReplacedPath.split("/").filter((s) => s.length > 0)[0]} type={type} episodeInfo={episodeInfo} opts={options} />
             </div>
           </div>
       )}

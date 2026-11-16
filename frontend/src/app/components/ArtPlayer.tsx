@@ -39,7 +39,7 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo,opt
         try {
             const { title, year } = parseTitleAndYear(name);
             if (!title) return undefined;
-            const omdbUrl = `${await getApiUrl(window.location.hostname, window.location.protocol)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}&season=${episodeInfo?.season}&episode=${episodeInfo?.episode}`;
+            const omdbUrl = `${await getApiUrl(window.location.hostname)}/getOmdbData?t=${encodeURIComponent(title)}${year ? `&y=${year}` : ""}&type=${type}&season=${episodeInfo?.season}&episode=${episodeInfo?.episode}`;
             const OMDBResponse = await fetch(omdbUrl);
             const OMDBData = await OMDBResponse.json();
             if (!OMDBData || OMDBData.Response === "False") {
@@ -176,7 +176,7 @@ export default function ArtPlayerPlayer({ videopath, name, type, episodeInfo,opt
 
         const initialise = async () => {
             try {
-                const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
+                const apiUrl = await getApiUrl(window.location.hostname);
                 await createPlayer(apiUrl);
                 
                 const player = playerRef.current;

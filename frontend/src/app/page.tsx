@@ -110,7 +110,7 @@ export default function SearchPage() {
           `https://v3-cinemeta.strem.io/catalog/series/top.json`
         );
 
-        const allSavedMediaResponse = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getSavedMediaIds?type=moviesandseries`);
+        const allSavedMediaResponse = await fetch(`${await getApiUrl(window.location.hostname)}/getSavedMediaIds?type=moviesandseries`);
         const allSavedMediaData = await allSavedMediaResponse.json();
         if (!allSavedMediaData.success) {
           toast.error(`Failed to load saved media IDs: ${allSavedMediaData.message || 'Unknown error'}`);

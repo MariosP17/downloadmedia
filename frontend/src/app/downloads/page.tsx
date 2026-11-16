@@ -29,7 +29,7 @@ export default function DownloadsPage() {
     const fetchProgress = async (lastFetch: boolean = false) => {
       try {
         setInitialLoad(true);
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getProgressStore`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname)}/getProgressStore`);
         if (!res.ok) throw new Error("Failed to fetch progress store");
         
         const data: ProgressStoreResponse = await res.json();
@@ -78,7 +78,7 @@ export default function DownloadsPage() {
       try {
         for (const key of keys) {
           const [hash, idx] = key.split("_");
-          const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/progress/${hash}/${idx}`);
+          const res = await fetch(`${await getApiUrl(window.location.hostname)}/progress/${hash}/${idx}`);
           if (!res.ok && res.status !== 500 && res.status !== 404) {
             console.error(`Failed to remove download ${key} from store`);
             return;
@@ -225,7 +225,7 @@ export default function DownloadsPage() {
       const [hash, idx] = storeKey.split("_");
       if (isDownloading) {
         try {
-          const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancel`, {
+          const res = await fetch(`${await getApiUrl(window.location.hostname)}/cancel`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json"
@@ -243,7 +243,7 @@ export default function DownloadsPage() {
       }
 
       try {
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/progress/${hash}/${idx}`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname)}/progress/${hash}/${idx}`);
         if (!res.ok && res.status !== 500 && res.status !== 404) {
           console.error(`Failed to remove download ${storeKey} from store`);
           return;
@@ -257,7 +257,7 @@ export default function DownloadsPage() {
     const handleCancelBatch = async (storeKeys: string[]) => {
       for (const storekey of storeKeys){
         try {
-          const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancel`, {
+          const res = await fetch(`${await getApiUrl(window.location.hostname)}/cancel`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json"

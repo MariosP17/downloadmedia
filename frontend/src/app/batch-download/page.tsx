@@ -68,7 +68,7 @@ export default function BatchDownloadPage() {
   useEffect(() => {
     const fetchConfiguration = async () => {
       try {
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getConfiguration`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname)}/getConfiguration`);
         if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch configuration");
         const configData = await res.json();
         if (!configData["MoviesFolder"] || !configData["TVShowsFolder"]) throw new Error("Invalid configuration data");
@@ -81,7 +81,7 @@ export default function BatchDownloadPage() {
     };
     const fetchOptions = async () => {
       try {
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getOptions`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname)}/getOptions`);
         if (!res.ok) throw new Error((await res.json()).error || "Failed to fetch options");
         const optionsData = await res.json();
         setOptions(optionsData);
@@ -100,10 +100,10 @@ export default function BatchDownloadPage() {
 
   const loadRootFolders = async () => {
     try {
-      const res1 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${configuration["MoviesFolder"]}&showFiles=false`);
+      const res1 = await fetch(`${await getApiUrl(window.location.hostname)}/getItems?folder=${configuration["MoviesFolder"]}&showFiles=false`);
       if (!res1.ok) throw new Error();
       const data1 = await res1.json();
-      const res2 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${configuration["TVShowsFolder"]}&showFiles=false`);
+      const res2 = await fetch(`${await getApiUrl(window.location.hostname)}/getItems?folder=${configuration["TVShowsFolder"]}&showFiles=false`);
       if (!res2.ok) throw new Error();
       const data2 = await res2.json();
       const data = [data1 , data2 ];
@@ -115,7 +115,7 @@ export default function BatchDownloadPage() {
 
   const fetchProgress = async () => {
     try {
-    const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getBatchProgressStore`);
+    const res = await fetch(`${await getApiUrl(window.location.hostname)}/getBatchProgressStore`);
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const data = await res.json();
     if (data && Object.keys(data).length > 0) {
@@ -368,7 +368,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
       return { exists: false, path: "" }; // If we couldn't construct a valid path, return false
     }
     try {
-      const existsRes = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/destinationExists`, {
+      const existsRes = await fetch(`${await getApiUrl(window.location.hostname)}/destinationExists`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ destination: pathToCheck })
@@ -418,12 +418,12 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
   const openModal = async () => {
     setIsModalOpen(true);
     try {
-      const res1 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${configuration["MoviesFolder"]}`);
+      const res1 = await fetch(`${await getApiUrl(window.location.hostname)}/getFolderInfo?folder=${configuration["MoviesFolder"]}`);
       if (!res1.ok) {
         throw new Error((await res1.json()).error || `Failed to get items from server`);
       }
       const data1 = await res1.json();
-      const res2 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${configuration["TVShowsFolder"]}`);
+      const res2 = await fetch(`${await getApiUrl(window.location.hostname)}/getFolderInfo?folder=${configuration["TVShowsFolder"]}`);
       if (!res2.ok) {
         throw new Error((await res2.json()).error || `Failed to get items from server`);
       }
@@ -451,7 +451,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
       if (!configuration || !editableFolderPath.trim()) return;
   
       try {
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/createFolder`, {
+        const res = await fetch(`${await getApiUrl(window.location.hostname)}/createFolder`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ folder: temporarySelectedPath })
@@ -474,7 +474,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     const pathValue = targetPath ? `${targetPath}/${newFolderName.trim()}` : newFolderName.trim();
 
     try {
-      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/createFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname)}/createFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: pathValue })
@@ -508,7 +508,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
       }
 
       try{
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/batchDownload`, {
+        const res = await fetch(`${await getApiUrl(window.location.hostname)}/batchDownload`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -557,7 +557,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
     }
     else if (serverStatus === "Downloading") {
       try{
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancelBatch`, {
+        const res = await fetch(`${await getApiUrl(window.location.hostname)}/cancelBatch`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ task_ids: taskIds })
@@ -573,7 +573,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
 
   const checkBatchProgress = async (taskIds: string[]) => {
     try {
-      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/batchProgress`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname)}/batchProgress`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task_ids: taskIds })

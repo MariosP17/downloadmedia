@@ -40,7 +40,7 @@ export default function EditSubtitlesModal({ cleanName, fullPath, onClose, onCan
     async function fetchSubtitleContent() {
         try {
             setLoading(true);
-            const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
+            const apiUrl = await getApiUrl(window.location.hostname);
             const response = await fetch(`${apiUrl}/getSubtitlesContent?filename=${encodeURIComponent(fullPath)}`);
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || "Could not fetch subtitle info");
@@ -63,7 +63,7 @@ export default function EditSubtitlesModal({ cleanName, fullPath, onClose, onCan
     const saveSubtitleContent = async () => {
         try {
             setSaving(true);
-            const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
+            const apiUrl = await getApiUrl(window.location.hostname);
             const response = await fetch(`${apiUrl}/saveSubtitlesContent`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

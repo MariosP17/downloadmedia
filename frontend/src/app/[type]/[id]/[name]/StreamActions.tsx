@@ -98,11 +98,11 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
 
   const loadRootFolders = async () => {
     try {
-      const res1 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${config["MoviesFolder"]}`);
+      const res1 = await fetch(`${await getApiUrl(window.location.hostname)}/getFolderInfo?folder=${config["MoviesFolder"]}`);
       if (!res1.ok) throw new Error((await res1.json()).error || `Failed to get items from server`);
       const data1 = await res1.json();
 
-      const res2 = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getFolderInfo?folder=${config["TVShowsFolder"]}`);
+      const res2 = await fetch(`${await getApiUrl(window.location.hostname)}/getFolderInfo?folder=${config["TVShowsFolder"]}`);
       if (!res2.ok) throw new Error((await res2.json()).error || `Failed to get items from server`);
       const data2 = await res2.json();
       const data = [data1,data2]
@@ -116,7 +116,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
   const checkServerProgress = async () => {
     const currentLiveState = serverStateRef.current;
     try {
-      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/progress/${hash}/${id}`);
+      const res = await fetch(`${await getApiUrl(window.location.hostname)}/progress/${hash}/${id}`);
       if (!res.ok) throw new Error("Progress unavailable");
       const data = await res.json();
 
@@ -156,7 +156,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     setLoading(true);
     const initialPath = await getInitialPath();
     setTargetPath(initialPath); // Starts with base root directory path selected
-    const existsRes = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/destinationExists`, {
+    const existsRes = await fetch(`${await getApiUrl(window.location.hostname)}/destinationExists`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ destination: initialPath })
@@ -194,7 +194,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     const pathValue = targetPath ? `${targetPath}/${newFolderName.trim()}` : newFolderName.trim();
 
     try {
-      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/createFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname)}/createFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: pathValue })
@@ -222,7 +222,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     if (!editableFolderPath.trim()) return;
 
     try {
-      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/createFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname)}/createFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: targetPath })
@@ -250,7 +250,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
   const triggerCancellationTask = async () => {
     setServerState("cancelling");
     try {
-      const cancelResponse = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/cancel`, {
+      const cancelResponse = await fetch(`${await getApiUrl(window.location.hostname)}/cancel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: hash, idx: String(id) }),
@@ -278,7 +278,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
     const destinationFolder = `${targetPath}`;
 
     try {
-      const response = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/download`, {
+      const response = await fetch(`${await getApiUrl(window.location.hostname)}/download`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

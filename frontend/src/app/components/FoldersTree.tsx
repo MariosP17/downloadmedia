@@ -70,7 +70,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
   const fetchSubfolders = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`);
+      const res = await fetch(`${await getApiUrl(window.location.hostname)}/getItems?folder=${encodeURIComponent(itemPath)}&showFiles=false`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setSubFolders(data.items || []);
@@ -98,7 +98,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
     e.stopPropagation();
 
     try {
-      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/deleteFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname)}/deleteFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: itemPath })
@@ -117,7 +117,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
     e.stopPropagation();
     if (newName && newName.trim()) {
       try {
-      const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/renameFolder`, {
+      const res = await fetch(`${await getApiUrl(window.location.hostname)}/renameFolder`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ folder: itemPath, newName: newName.trim() })

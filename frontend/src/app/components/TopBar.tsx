@@ -27,7 +27,7 @@ export default function TopBar({
 
   useEffect(() => {
     const fetchSavedMedia = async () => {
-      const apiUrl = await getApiUrl(window.location.hostname, window.location.protocol);
+      const apiUrl = await getApiUrl(window.location.hostname);
       try {
         const healthController = new AbortController();
         const healthTimeout = window.setTimeout(() => healthController.abort(), 2000);

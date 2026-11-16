@@ -14,7 +14,7 @@ export function LanguagesDropdown({ value, onChange }: LanguagesDropdownProps) {
   useEffect(() => {
     const fetchLanguages = async () => {
       try {
-        const res = await fetch(`${await getApiUrl(window.location.hostname, window.location.protocol)}/getLanguages`);
+        const res = await fetch(`${await getApiUrl(window.location.hostname)}/getLanguages`);
         const data = await res.json();
         if (data.success === false) throw new Error(data.message || "Failed to fetch languages");
         setLanguages(data.data || []);

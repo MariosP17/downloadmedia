@@ -4,10 +4,10 @@ import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
 
-export async function saveRestApiConfig(selection: string, url: string | null, port: number | null) {
+export async function saveRestApiConfig(selection: string, url: string | null, port: number | null, protocol: string | null) {
   try {
-    if (!selection || (selection === "remote" && (!url || url.trim() === "")) || (selection === "local" && port === null)) {
-      throw new Error("Invalid selection or URL or port");
+    if (!selection || (selection === "remote" && (!url || url.trim() === "")) || (selection === "local" && port === null && protocol === null)) {
+      throw new Error("Invalid selection or URL or port or protocol");
     }
     // Define where to save this rest API configuration (e.g., project root)
     const configPath = path.join(process.cwd(), 'config.json');
@@ -26,7 +26,8 @@ export async function saveRestApiConfig(selection: string, url: string | null, p
         REST_API_SECTION.REST_API_URL = url;
     if (port !== null)
         REST_API_SECTION.REST_API_URL_PORT = port;
-
+    if (protocol !== null)
+        REST_API_SECTION.REST_API_HTTP_PROTOCOL = protocol;
     // Write directly to the local server disk
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8');
     
@@ -42,31 +43,37 @@ export async function getRestApiConfig() {
     const configPath = path.join(process.cwd(), 'config.json');
     
       const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).REST_API_SECTION;
-      return { REST_API_SELECTION: config.REST_API_SELECTION || null, REST_API_URL: config.REST_API_URL || null, REST_API_URL_PORT: config.REST_API_URL_PORT || 7000 };
+      return { REST_API_SELECTION: config.REST_API_SELECTION || null, REST_API_URL: config.REST_API_URL || null, REST_API_URL_PORT: config.REST_API_URL_PORT || 7000, REST_API_HTTP_PROTOCOL: config.REST_API_HTTP_PROTOCOL || "http" };
   }
   catch (error) {
     console.error("Failed to read config file:", error);
-    return {  REST_API_SELECTION: null, REST_API_URL: null, REST_API_URL_PORT: 7000 };
+    return {  REST_API_SELECTION: null, REST_API_URL: null, REST_API_URL_PORT: 7000, REST_API_HTTP_PROTOCOL: "http" };
   }
 }
 
 
 
-export async function getApiUrl(hostname: string, protocol: string = "http", port?: number) {
+
+export async function getApiUrl(hostname: string) {
   try {
-    protocol = protocol.replace(":", ""); // Remove colon if present
     const configPath = path.join(process.cwd(), 'config.json');
     const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).REST_API_SECTION;
     if (config.REST_API_SELECTION === "remote" && config.REST_API_URL && config.REST_API_URL.trim() !== "") {
       return config.REST_API_URL;
     } else {
-      return `${protocol}://${hostname}:${port || config.REST_API_URL_PORT || 7000}`;
+      return `${config.REST_API_HTTP_PROTOCOL || "http"}://${hostname}:${config.REST_API_URL_PORT || 7000}`;
     }
   } catch (error) {
     console.error("Failed to read config file:", error);
-    return `${protocol}://${hostname}:${port || 7000}`;
-  }
+    return `"http"://${hostname}:7000`;
+  } 
 }
+
+export async function getApiUrlForLocalSelection(hostname: string, port: number | null, protocol: string | null) {
+  return `${protocol || "http"}://${hostname}:${port || 7000}`;
+}
+
+    
 
 export async function restartApi() : Promise<{ success: boolean; error?: string }> {
   return new Promise(async (resolve) => {
