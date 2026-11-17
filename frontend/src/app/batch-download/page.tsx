@@ -8,6 +8,7 @@ import Loader from "../loader";
 import FolderTree from "../components/FoldersTree";
 import { getApiUrl } from "../Actions/RestApiConfig";
 import Link from "next/link";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 type StorageItem = {
   infoHash: string;
@@ -804,7 +805,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   // 2. CSS updates: Added 'indeterminate:bg-zinc-700' and 'indeterminate:after:content-["-"]'
                   className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
                 />
-                <img src="/downloader/arrow-down.svg" alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seriesItem.ttid) ? "rotate-180" : ""}`} />
+                <img src={ `${basepath}/arrow-down.svg` } alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seriesItem.ttid) ? "rotate-180" : ""}`} />
                   </div>
               </div>
 
@@ -858,7 +859,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   // 2. CSS updates: Added 'indeterminate:bg-zinc-700' and 'indeterminate:after:content-["-"]'
                   className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
                 />
-                <img src="/downloader/arrow-down.svg" alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "rotate-180" : ""}`} />
+                <img src={ `${basepath}/arrow-down.svg` } alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "rotate-180" : ""}`} />
                 </div>
                 </div>
                 <div className={` grid transition-[grid-template-rows] duration-300 ease-in-out ${isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
@@ -1093,7 +1094,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   temporarySelectedPath === "" ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-200"
                 }`}
               >
-                <img src="/downloader/folder.png" alt="" className="w-4 h-4 object-contain" />
+                <img src={ `${basepath}/folder.png` } alt="" className="w-4 h-4 object-contain" />
                 <span className="text-sm">Libraries</span>
               </div>
               

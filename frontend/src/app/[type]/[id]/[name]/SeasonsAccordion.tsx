@@ -10,6 +10,7 @@ import { MediaType } from "../../../../../Props";
 import { getApiUrl } from "../../../Actions/RestApiConfig";
 import Link from "next/link";
 import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../../../Utils/savedMediaEvents";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 type Props = {
   seasons: any[];
@@ -486,7 +487,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
                       > 
                         <div className="relative">
                           <FallbackImage src={ep.thumbnail || ep.poster || ep.cover || "/no-poster-16-9.jpg"} fallback="/no-poster-16-9.jpg" alt={ename} />
-                          <img src="/downloader/check.svg" className={`absolute bg-white rounded-full top-1 right-1 w-5 h-5 ${ep.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`} />
+                          <img src={ `${basepath}/check.svg` } className={`absolute bg-white rounded-full top-1 right-1 w-5 h-5 ${ep.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`} />
                         </div>
                       </div>
                       </Link>

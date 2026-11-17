@@ -10,6 +10,7 @@ import { MediaType, qualityPriority } from "../../../../../Props";
 import SaveMediaButton from "../../../components/SaveMediaButton";
 import{ getApiUrl } from "../../../Actions/RestApiConfig";
 import Link from "next/link";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 type Props = {
   params: {
@@ -207,7 +208,7 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
       </div>
       <div className="mt-2 flex flex-col flex-wrap gap-y-1 text-sm text-zinc-300">
         {cast.length > 0 && <span> <b>Cast:</b> {cast.join(", ")}</span>}
-        {((rating && rating >0) || duration) && <span className="flex">{rating && rating !=0 && <span className="flex"><Link href={link} target="_blank" rel="noopener noreferrer"><img src='/downloader/imdb.png' alt='IMDb' className={`w-10 h-5 mr-2 ${link ? 'cursor-pointer' : ''}`} /></Link> {rating}</span>}{rating && duration &&<>&nbsp; • &nbsp;</>}{duration && <> <b>Duration:</b> &nbsp;{duration}</>}</span>}
+        {((rating && rating >0) || duration) && <span className="flex">{rating && rating !=0 && <span className="flex"><Link href={link} target="_blank" rel="noopener noreferrer"><img src={`${basepath}/imdb.png`} alt='IMDb' className={`w-10 h-5 mr-2 ${link ? 'cursor-pointer' : ''}`} /></Link> {rating}</span>}{rating && duration &&<>&nbsp; • &nbsp;</>}{duration && <> <b>Duration:</b> &nbsp;{duration}</>}</span>}
         {description && <p className="mt-2 text-sm text-zinc-300">{description}</p>}
       </div>
       </div>

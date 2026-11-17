@@ -3,6 +3,7 @@
 import { toast } from "react-hot-toast";
 import { useState, useEffect } from "react";
 import { useSyncedLocalStorage } from "../../../Utils/useSyncedLocalStorage";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 type BookmarkProps = {
   infoHash: string;
@@ -59,7 +60,7 @@ export default function BookmarkButton({ infoHash, fileIdx, ttid, type, filename
   };
 
   // 3. Conditionally swap image paths based natively on local state
-  const currentIconSrc = isBookmarked ? "/downloader/bookmark_check.png" : "/downloader/bookmark_add.png";
+  const currentIconSrc = isBookmarked ? `${basepath}/bookmark_check.png` : `${basepath}/bookmark_add.png`;
 
   return (
     <button

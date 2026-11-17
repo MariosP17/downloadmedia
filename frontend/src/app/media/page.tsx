@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import FileTreeItem from "../components/FileTreeItem";
 import { AnimatedNumber } from "../components/AnimatedNumber";
 import { getApiUrl } from "../Actions/RestApiConfig";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 const parseSizeToBytes = (value: string) => {
   const match = value.trim().match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
@@ -173,7 +174,7 @@ export default function MediaExplorerPage() {
             className={`flex items-center gap-3 py-2 px-3 rounded-lg ${loading || loadingConfig ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-800'} transition-colors text-zinc-100 font-semibold`}
           >
             <img
-              src={isMediaOpen ? "/downloader/open-folder.png" : "/downloader/folder.png"}
+              src={isMediaOpen ? `${basepath}/open-folder.png` : `${basepath}/folder.png`}
               alt="Root Directory"
               className="w-6 h-6 object-contain flex-shrink-0"
             />

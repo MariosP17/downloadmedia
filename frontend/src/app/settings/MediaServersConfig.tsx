@@ -8,10 +8,7 @@ import * as MediaServersConfig from "../Actions/MediaServersConfig";
 import { getApiUrl } from "../Actions/RestApiConfig";
 import UsersComponent from "../components/UsersComponent";
 import { User, UsersOrigin } from "../../../Props";
-
-// You then access the exports as properties of that alias:
-// MediaServersConfig.loadServers();
-// MediaServersConfig.saveConfig();
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export type Configuration = {
   [key: string]: any;
@@ -484,7 +481,7 @@ export default function RestApiConfiguration() {
                 )}
                 <OptionType disabled={jellyfinConfig["jellyfin_selection"] !== "remote"} typeKey="jellyfin_url" value={jellyfinConfig["jellyfin_url"] || ""} type="<string>" onChange={(newValue) => setJellyfinConfig((prev) => ({ ...prev, "jellyfin_url": newValue }))} />
                 {loadedJellyfinConfig["jellyfin_installed"] && (
-                <OptionType typeKey="manage_jellyfin_users" type="<button>" value={null} onClick={async () => {setManageJellyfinUsers(true);}} icon="/downloader/manager-users.svg" iconClassName="w-5 h-5 ml-0.5" />
+                <OptionType typeKey="manage_jellyfin_users" type="<button>" value={null} onClick={async () => {setManageJellyfinUsers(true);}} icon={ `${basepath}/manager-users.svg` } iconClassName="w-5 h-5 ml-0.5" />
                 )}
                 <OptionType typeKey="jellyfin_api_key" asPassword value={jellyfinApiKey || ""} type="<string>" onChange={(newValue) => setJellyfinApiKey(newValue)} />
                     <div className="mb-4 flex min-w-0 items-center justify-end gap-4">
@@ -498,7 +495,7 @@ export default function RestApiConfiguration() {
                                 <span className="text-sm text-green-600">
                                 API Key set
                                 </span>
-                                <img src="/downloader/check.svg" className="w-4 h-4 ml-1" alt="API Key Set" />
+                                <img src={ `${basepath}/check.svg` } className="w-4 h-4 ml-1" alt="API Key Set" />
                             </div>
                         )
                         :
@@ -506,7 +503,7 @@ export default function RestApiConfiguration() {
                                 <span className="text-sm text-red-500">
                                 No API Key set
                                 </span>
-                                <img src="/downloader/cross.svg" className="w-4 h-4 ml-1" alt="No API Key Set" />
+                                <img src={ `${basepath}/cross.svg` } className="w-4 h-4 ml-1" alt="No API Key Set" />
                             </div>
                         }
                     </div>
@@ -549,7 +546,7 @@ export default function RestApiConfiguration() {
                             <span className="text-sm text-green-600">
                             API Key set
                             </span>
-                            <img src="/downloader/check.svg" className="w-4 h-4 ml-1" alt="API Key Set" />
+                            <img src={ `${basepath}/check.svg` } className="w-4 h-4 ml-1" alt="API Key Set" />
                         </div>
                         )}
                     </div>

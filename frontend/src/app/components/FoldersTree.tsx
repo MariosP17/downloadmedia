@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { toast } from "react-hot-toast";
 import { getApiUrl } from "../Actions/RestApiConfig";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 // Inner Helper Component: Recursive Folder Selection Row
 type FolderTreeItemProps = {
@@ -219,7 +220,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
         )}
         <div className="flex items-center gap-2 overflow-x-auto truncate min-w-0 flex-1">
           <img
-            src={isOpen ? "/downloader/open-folder.png" : "/downloader/folder.png"}
+            src={isOpen ? `${basepath}/open-folder.png` : `${basepath}/folder.png`}
             alt=""
             className="w-4 h-4 object-contain flex-shrink-0"
           />
@@ -274,7 +275,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <img src="/downloader/edit.png" alt="Rename" className="w-4 h-4" />
+                <img src={ `${basepath}/edit.png` } alt="Rename" className="w-4 h-4" />
                 Rename
               </button>
             }
@@ -286,7 +287,7 @@ export default function FolderTree({ name, size, numberOfItems, numberOfFolders,
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <img src="/downloader/delete.png" alt="Delete" className="w-4 h-4" />
+                <img src={ `${basepath}/delete.png` } alt="Delete" className="w-4 h-4" />
                 Delete
               </button>
             </div>

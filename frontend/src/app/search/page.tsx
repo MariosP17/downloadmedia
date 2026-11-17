@@ -8,7 +8,7 @@ import CustomContextMenu from "../components/CustomContextMenu";
 import { MediaType } from "../../../Props";
 import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../Utils/savedMediaEvents";
 import Link from "next/dist/client/link";
-
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 // 1. Child Component: Performs data fetching and hooks into search parameters safely
 function SearchResultsList() {
@@ -236,7 +236,7 @@ function SearchResultsList() {
                           alt={movie.name}
                           className="poster"
                         />
-                        <img src="/downloader/check.svg" alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
+                        <img src={ `${basepath}/check.svg` } alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
                       </div>
                     </div>
                     </Link>
@@ -296,7 +296,7 @@ function SearchResultsList() {
                     > 
                       <div className="relative">
                         <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
-                        <img src="/downloader/check.svg" alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
+                        <img src={ `${basepath}/check.svg` } alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
                       </div>
                     </div>
                     </Link>

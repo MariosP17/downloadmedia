@@ -7,6 +7,7 @@ import { MediaType } from "../../Props"
 import { getApiUrl } from "./Actions/RestApiConfig";
 import { toast } from "react-hot-toast";
 import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "./Utils/savedMediaEvents";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export default function SearchPage() {
   const moviesContainerRef = useRef<HTMLDivElement>(null);
@@ -219,7 +220,7 @@ export default function SearchPage() {
                           alt={movie.name}
                           className="poster"
                         />
-                        <img src="/downloader/check.svg" alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
+                        <img src={ `${basepath}/check.svg` } alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
                       </div>
                     </div>
                     </Link>
@@ -272,7 +273,7 @@ export default function SearchPage() {
                     > 
                       <div className="relative">
                         <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
-                        <img src="/downloader/check.svg" alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
+                        <img src={ `${basepath}/check.svg` } alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
                       </div>
                     </div>
                     </Link>

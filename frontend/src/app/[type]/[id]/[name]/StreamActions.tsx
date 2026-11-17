@@ -4,6 +4,7 @@ import { toast } from "react-hot-toast";
 import Loader from "../../../loader";
 import FolderTree from "../../../components/FoldersTree";
 import { getApiUrl } from "../../../Actions/RestApiConfig";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 type Props = {
   hash: string;
@@ -486,7 +487,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
                   targetPath === "" ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-200"
                 }`}
               >
-                <img src="/downloader/folder.png" alt="" className="w-4 h-4 object-contain" />
+                <img src={ `${basepath}/folder.png` } alt="" className="w-4 h-4 object-contain" />
                 <span className="text-sm">Libraries</span>
               </div>
               

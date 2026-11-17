@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export default function Sidebar({
   open,
@@ -70,7 +71,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/downloader/home.png"
+          src={ `${basepath}/home.png` }
           alt="Home"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />
@@ -86,7 +87,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/downloader/media.png"
+          src={ `${basepath}/media.png` }
           alt="Media"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />
@@ -101,7 +102,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/downloader/downloads.png"
+          src={ `${basepath}/downloads.png` } 
           alt="Batch Download"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />
@@ -116,7 +117,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/downloader/downloading.png"
+          src={ `${basepath}/downloading.png` }
           alt="Downloads"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />
@@ -130,7 +131,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/downloader/settings.svg"
+          src={ `${basepath}/settings.svg` }
           alt="Settings"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 type Props = {
     streamsnames: string[];
@@ -122,7 +122,7 @@ export default function StreamScroller({ streamsnames, counts, opts,config }: Pr
                 ))}
             </div>
             <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-[600ms] ${expanded ? "pointer-events-none opacity-0" : "opacity-100"}`}>
-                {" "} <img src="/downloader/expand.svg" height="25px" width="25px" alt="scroller" /> {" "}
+                {" "} <img src={ `${basepath}/expand.svg` } height="25px" width="25px" alt="scroller" /> {" "}
             </div>
         </nav>
     );

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Loader from "../loader";
 import toast from "react-hot-toast";
 import { getApiUrl } from "../Actions/RestApiConfig";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 type LanguagesEditorProps = {
   languages: { name: string; code: string,id: number }[];
@@ -145,7 +146,7 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
                         }}
                     className="flex h-6 w-6 shrink-0 items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-green-500 hover:opacity-80"
                 >
-                    <img src="/downloader/save.svg" alt="Save" className="h-5 w-5" />
+                    <img src={ `${basepath}/save.svg` } alt="Save" className="h-5 w-5" />
                 </button>
             </div>
                 </div>
@@ -162,7 +163,7 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
                     }}
                     className="cursor-pointer text-blue-500 hover:opacity-80"
                 >
-                    <img src="/downloader/edit.png" alt="Edit" className="w-5 h-5" />
+                    <img src={ `${basepath}/edit.png` } alt="Edit" className="w-5 h-5" />
                 </button>
                 <button
                     onClick={() => {
@@ -170,7 +171,7 @@ function LanguageEntry({ language, add = false, cancelAdd, afterAdd, afterDelete
                     }}
                     className="cursor-pointer text-red-500 hover:opacity-80"
                 >
-                    <img src="/downloader/delete.png" alt="Remove" className="w-5 h-5" />
+                    <img src={ `${basepath}/delete.png` } alt="Remove" className="w-5 h-5" />
                 </button>
             </div>
         </div>

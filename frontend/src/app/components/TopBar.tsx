@@ -8,6 +8,7 @@ import SearchDropdown from "./SearchDropdown";
 import { getApiUrl } from "../Actions/RestApiConfig";
 import { toast } from "react-hot-toast";
 import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../Utils/savedMediaEvents";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 type SavedMedia = {
   ttid: string;
@@ -107,7 +108,7 @@ export default function TopBar({
     <div className="flex items-center gap-2 flex-shrink-0">
       <div>
         <Link href="/" className="flex items-center">
-          <img src="/downloader/stremio.png" alt="Stremio" className="h-8 w-8 object-contain" />
+          <img src={ `${basepath}/stremio.png` } alt="Stremio" className="h-8 w-8 object-contain" />
         </Link>
       </div>
       <button
@@ -156,7 +157,7 @@ export default function TopBar({
         className="p-1 rounded-md hover:bg-zinc-800 hover:cursor-pointer text-zinc-200"
       >
         <span className="relative inline-flex">
-          <img src="/downloader/bookmarks.svg" alt="Bookmarks" className="h-7 w-7 object-contain" />
+          <img src={ `${basepath}/bookmarks.svg` } alt="Bookmarks" className="h-7 w-7 object-contain" />
           <AnimatePresence>
             {savedMedia.length > 0 && (
               <motion.span

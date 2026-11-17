@@ -10,6 +10,8 @@ import { getApiUrl } from "../Actions/RestApiConfig";
 import { publishSavedMediaEvent } from "../Utils/savedMediaEvents";
 import Link from "next/dist/client/link";
 
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
+
 interface SavedMediaItem {
     ttid: string;
     name: string;
@@ -75,7 +77,7 @@ function SavedMediaCard({
         aria-hidden
       >
         <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
-          <img src="/downloader/delete.png" alt="" className="h-6 w-6 brightness-0 invert" />
+          <img src={ `${basepath}/delete.png` } alt="" className="h-6 w-6 brightness-0 invert" />
           Remove
         </span>
       </motion.div>
@@ -135,7 +137,7 @@ function SavedMediaCard({
               });
             }}
           >
-            <img src="/downloader/delete.png" alt="" className="h-5 w-5" />
+            <img src={ `${basepath}/delete.png` } alt="" className="h-5 w-5" />
           </button>
         </div>
       </motion.div>

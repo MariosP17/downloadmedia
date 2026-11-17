@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import ComponentLoader from "../componentLoader";
 import { User, UsersOrigin } from "../../../Props";
+const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 interface UsersComponentProps {
     GetUsers: () => Promise<User[]>;
@@ -125,14 +126,14 @@ export default function UsersComponent({ GetUsers, DeleteUser, AddUser, EditUser
                                         className="bg-blue-700/90 hover:bg-blue-900 text-white font-bold py-2 px-3 rounded cursor-pointer transition-colors"
                                         aria-label="Edit user"
                                     >
-                                        <img src="/downloader/edit.png" alt="Edit" className="w-4 h-4" />
+                                        <img src={ `${basepath}/edit.png` } alt="Edit" className="w-4 h-4" />
                                     </button>
                                     <button
                                         onClick={() => { setUserToDelete(user); setDeleteModalOpen(true); }}
                                         className="bg-black hover:bg-black/35 text-white font-bold py-2 px-3 rounded cursor-pointer transition-colors"
                                         aria-label="Delete user"
                                     >
-                                        <img src="/downloader/delete.png" alt="Delete" className="w-4 h-4" />
+                                        <img src={ `${basepath}/delete.png` } alt="Delete" className="w-4 h-4" />
                                     </button>
                                 </div>
                             </div>
