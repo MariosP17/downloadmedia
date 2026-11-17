@@ -2,6 +2,7 @@
 import FallbackImage from "./components/fallbackimg";
 import ContextMenu from "./components/CustomContextMenu";
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { MediaType } from "../../Props"
 import { getApiUrl } from "./Actions/RestApiConfig";
 import { toast } from "react-hot-toast";
@@ -199,7 +200,7 @@ export default function SearchPage() {
               ) : (
                 movies.length > 0 ? movies.map((movie: any) => (
                   <div key={movie.id}>
-                    <a href={`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`}>
+                    <Link href={`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`}>
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
@@ -218,10 +219,10 @@ export default function SearchPage() {
                           alt={movie.name}
                           className="poster"
                         />
-                        <img src="/check.svg" alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
+                        <img src="/downloader/check.svg" alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
                       </div>
                     </div>
-                    </a>
+                    </Link>
                     <p className="mt-2">{movie.name}</p>
                   </div>
                 )) : (
@@ -258,7 +259,7 @@ export default function SearchPage() {
               ) : (
                 series.length > 0 ? series.map((show: any) => (
                   <div key={show.id}>
-                    <a href={`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`}>
+                    <Link href={`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`}>
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
@@ -271,10 +272,10 @@ export default function SearchPage() {
                     > 
                       <div className="relative">
                         <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
-                        <img src="/check.svg" alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
+                        <img src="/downloader/check.svg" alt="Context Menu" className={`rounded-full bg-white absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity` } />
                       </div>
                     </div>
-                    </a>
+                    </Link>
                     <p className="mt-2">{show.name}</p>
                   </div>
                 )) : (

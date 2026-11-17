@@ -8,6 +8,7 @@ import FallbackImage from "./fallbackimg";
 import { MediaType } from "../../../Props";
 import { getApiUrl } from "../Actions/RestApiConfig";
 import { publishSavedMediaEvent } from "../Utils/savedMediaEvents";
+import Link from "next/dist/client/link";
 
 interface SavedMediaItem {
     ttid: string;
@@ -74,7 +75,7 @@ function SavedMediaCard({
         aria-hidden
       >
         <span className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide">
-          <img src="/delete.png" alt="" className="h-6 w-6 brightness-0 invert" />
+          <img src="/downloader/delete.png" alt="" className="h-6 w-6 brightness-0 invert" />
           Remove
         </span>
       </motion.div>
@@ -91,7 +92,7 @@ function SavedMediaCard({
           }}
           onDragEnd={handleDragEnd}
         >
-        <a
+        <Link
           href={getMediaUrl(media)}
           onPointerDown={() => {
             cancelClick.current = false;
@@ -118,7 +119,7 @@ function SavedMediaCard({
           <div className="flex flex-col items-center">
             <FallbackImage className="max-h-62 w-auto" src={media.poster_url} alt={media.name} />
           </div>
-        </a>
+        </Link>
         <div className="mt-2 flex justify-end">
           <button
             type="button"
@@ -134,7 +135,7 @@ function SavedMediaCard({
               });
             }}
           >
-            <img src="/delete.png" alt="" className="h-5 w-5" />
+            <img src="/downloader/delete.png" alt="" className="h-5 w-5" />
           </button>
         </div>
       </motion.div>

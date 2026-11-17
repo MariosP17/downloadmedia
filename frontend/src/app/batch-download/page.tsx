@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import Loader from "../loader";
 import FolderTree from "../components/FoldersTree";
 import { getApiUrl } from "../Actions/RestApiConfig";
+import Link from "next/link";
 
 type StorageItem = {
   infoHash: string;
@@ -755,7 +756,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                 <div className="flex flex-col gap-1 min-w-0">
                 {/* Wrap the link so the div handles the flex sizing, letting the anchor act as true inline text */}
                 <div>
-                    <a 
+                    <Link 
                         className={`${applyBreak(seriesItem.displayName)} text-base font-bold text-white hover:cursor-pointer hover:text-blue-400`} 
                         title={seriesItem.displayName}
                         onClick={(e) => {
@@ -764,7 +765,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                         href={`/series/${encodeURIComponent(seriesItem.ttid.split(':')[0])}/${encodeURIComponent(seriesItem.displayName)}`}
                     >
                         {seriesItem.displayName}
-                    </a>
+                    </Link>
                 </div>
                 <p className="text-xs text-zinc-500 font-medium mt-0.5">
                     <span className="text-white"> {Array.from(checkedItems).filter((item) => item.split("-")[2].split(":")[0] === seriesItem.ttid).length} </span> /{seriesEpisodes.length} {seriesEpisodes.length === 1 ? "Episode" : "Episodes"} queued
@@ -803,7 +804,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   // 2. CSS updates: Added 'indeterminate:bg-zinc-700' and 'indeterminate:after:content-["-"]'
                   className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
                 />
-                <img src="/arrow-down.svg" alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seriesItem.ttid) ? "rotate-180" : ""}`} />
+                <img src="/downloader/arrow-down.svg" alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seriesItem.ttid) ? "rotate-180" : ""}`} />
                   </div>
               </div>
 
@@ -816,11 +817,11 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                     <div className={`flex p-2 items-center justify-between sm:gap-4 gap-2 ${!isCollapsed(seasonOrTorrent, seriesItem.ttid) && 'rounded-b-none'} rounded-lg border-zinc-800 hover:bg-zinc-800/60 transition-colors cursor-pointer`}
                     onClick={() => expandOrCollapse(seasonOrTorrent, seriesItem.ttid)}>
                     <div className="flex flex-col mb-2 gap-1 min-w-0">
-                    <a className={`text-sm w-fit font-semibold text-zinc-300 mt-2  ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} 
-                    href={!isOn ? `/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}` : undefined}
+                    <Link className={`text-sm w-fit font-semibold text-zinc-300 mt-2  ${!isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} 
+                    href={!isOn ? `/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}` : ''}
                     onClick={(e) => !isOn && e.stopPropagation()} >{!isOn ? (parseInt(seasonOrTorrent.toString()) > 0 ? `Season ${seasonOrTorrent}` : 'Specials') : (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null
                         ? seasonOrTorrent.provider + ` (${seasonOrTorrent.hash.slice(0, 8)}...)`
-                        : 'Unknown Provider')}</a>
+                        : 'Unknown Provider')}</Link>
                      <p className="text-xs text-zinc-500 font-medium mt-0.5">
                     <span className="text-white">{Array.from(checkedItems).filter((item) => !isOn ?  item.split("-")[2].split(":").slice(0,-1).join("/") === seriesItem.ttid+"/"+seasonOrTorrent   : item.split("-")[0] === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length}</span> / {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length} {seriesEpisodes.filter(ep => !isOn ? ep.ttid.split(':')[1] === seasonOrTorrent : ep.infoHash === (typeof seasonOrTorrent === 'object' && seasonOrTorrent !== null ? seasonOrTorrent.hash : "Hash")).length === 1 ? "Episode" : "Episodes"} queued
                   </p>
@@ -857,7 +858,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   // 2. CSS updates: Added 'indeterminate:bg-zinc-700' and 'indeterminate:after:content-["-"]'
                   className="appearance-none w-5 h-5 flex-shrink-0 bg-zinc-800 border border-zinc-700 rounded focus:ring-green-500 focus:ring-2 hover:cursor-pointer transition-all relative checked:bg-green-600 indeterminate:bg-yellow-500 flex items-center justify-center after:text-white after:text-xs after:font-bold checked:after:content-['✓'] indeterminate:after:content-['-'] after:leading-none"
                 />
-                <img src="/arrow-down.svg" alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "rotate-180" : ""}`} />
+                <img src="/downloader/arrow-down.svg" alt="Expand/Collapse" className={`w-4 h-4 transition-transform duration-300 ease-in-out ${!isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "rotate-180" : ""}`} />
                 </div>
                 </div>
                 <div className={` grid transition-[grid-template-rows] duration-300 ease-in-out ${isCollapsed(seasonOrTorrent, seriesItem.ttid) ? "grid-rows-[0fr]" : "grid-rows-[1fr]"}`}>
@@ -880,14 +881,14 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                         </div>
                           
                         <div className="flex flex-col min-w-0">
-                          <a className={`text-xs text-zinc-400 truncate ${isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} title={episodeItem.filename || episodeItem.title} 
-                            href={isOn ? `/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}` : undefined}
+                          <Link className={`text-xs text-zinc-400 truncate ${isOn ? 'hover:cursor-pointer hover:text-blue-400' : ''}`} title={episodeItem.filename || episodeItem.title} 
+                            href={isOn ? `/series/${seriesItem.ttid}/${encodeURIComponent(seriesItem.displayName)}?season=${seasonOrTorrent}` : ''}
                             >
                             { !isOn ? `⚙️ ${episodeItem.provider || "Unknown Provider"}` : parseInt(episodeItem.ttid.split(':')[1]) > 0 ? `Season ${episodeItem.ttid.split(':')[1]}` : `Specials`}
-                          </a>
+                          </Link>
                           
                           {episodeItem.episodeTitle && (
-                            <a 
+                            <Link 
                               className={`${applyBreak(episodeItem.episodeTitle)} text-sm w-fit font-semibold text-zinc-200 mt-0.5 hover:cursor-pointer hover:text-blue-400`} 
                               title={episodeItem.episodeTitle} 
                               href={`/series/${encodeURIComponent(episodeItem.ttid)}/${encodeURIComponent(seriesItem.displayName)}`}
@@ -897,7 +898,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                               // }}
                             >
                               {episodeItem.episodeTitle}
-                            </a>
+                            </Link>
                           )}
                           
                           <p className="text-xs text-zinc-500 truncate mt-0.5" title={episodeItem.filename || episodeItem.title}>
@@ -955,24 +956,24 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    <a className="text-base font-bold break-words text-white hover:cursor-pointer hover:text-blue-400" title={item.displayName} onClick={(e) => {
+                    <Link className="text-base font-bold break-words text-white hover:cursor-pointer hover:text-blue-400" title={item.displayName} onClick={(e) => {
                       e.stopPropagation();
                       
                     }}
                     href={`/${item.itemType}/${encodeURIComponent(item.ttid.split(':')[0])}/${encodeURIComponent(item.displayName)}`}>
                       {item.displayName}
-                    </a>
+                    </Link>
                     <p className="text-xs text-zinc-400 truncate mt-0.5" title={item.filename || item.title}>
                       <span className="text-zinc-600 font-mono"></span>⚙️ {item.provider}
                     </p>
                     {item.itemType == "series" && (
-                      <a className="text-xs break-all text-zinc-400 truncate mt-0.5 hover:cursor-pointer hover:text-blue-400" title={item.episodeTitle} onClick={(e) => {
+                      <Link className="text-xs break-all text-zinc-400 truncate mt-0.5 hover:cursor-pointer hover:text-blue-400" title={item.episodeTitle} onClick={(e) => {
                         e.stopPropagation();
                       }}
                       href={`/${item.itemType}/${encodeURIComponent(item.ttid.split(':')[0])}/${encodeURIComponent(item.episodeTitle)}`}
                     >
                         <span className="text-zinc-600 font-mono"></span> {item.episodeTitle}
-                      </a>
+                      </Link>
                     )}
                     <p className="text-xs text-zinc-400 truncate mt-0.5" title={item.filename || item.title}>
                       <span className="text-zinc-600 break-all font-mono">File:</span> {item.filename || item.title || "Raw Stream Index Output"}
@@ -1092,7 +1093,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                   temporarySelectedPath === "" ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-200"
                 }`}
               >
-                <img src="/folder.png" alt="" className="w-4 h-4 object-contain" />
+                <img src="/downloader/folder.png" alt="" className="w-4 h-4 object-contain" />
                 <span className="text-sm">Libraries</span>
               </div>
               

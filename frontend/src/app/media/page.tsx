@@ -173,7 +173,7 @@ export default function MediaExplorerPage() {
             className={`flex items-center gap-3 py-2 px-3 rounded-lg ${loading || loadingConfig ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-zinc-800'} transition-colors text-zinc-100 font-semibold`}
           >
             <img
-              src={isMediaOpen ? "/open-folder.png" : "/folder.png"}
+              src={isMediaOpen ? "/downloader/open-folder.png" : "/downloader/folder.png"}
               alt="Root Directory"
               className="w-6 h-6 object-contain flex-shrink-0"
             />

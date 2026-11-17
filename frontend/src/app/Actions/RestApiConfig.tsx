@@ -71,6 +71,17 @@ export async function getApiUrl(hostname: string) {
   } 
 }
 
+export async function getLocalPort() {
+  try {
+    const configPath = path.join(process.cwd(), 'config.json');
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8')).REST_API_SECTION;
+    return config.REST_API_URL_PORT || 7000;
+  } catch (error) {
+    console.error("Failed to read config file:", error);
+    return 7000;
+  }
+}
+
 export async function getApiUrlForLocalSelection(hostname: string, port: number | null, protocol: string | null) {
   return `${protocol || "http"}://${hostname}:${port || 7000}`;
 }

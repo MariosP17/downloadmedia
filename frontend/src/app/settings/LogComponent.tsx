@@ -257,31 +257,31 @@ export default function LogComponent() {
             onClick={refreshLogs}
             className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1 rounded cursor-pointer"
           >
-            <img src="/refresh.svg" alt="Refresh" /> Refresh
+            <img src="/downloader/refresh.svg" alt="Refresh" /> Refresh
           </button>
           <button
             onClick={() => scrollToBottom()}
             className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1 rounded cursor-pointer"
           >
-            <img src="/down-arrow.svg" alt="Scroll Down" /> Scroll Down
+            <img src="/downloader/down-arrow.svg" alt="Scroll Down" /> Scroll Down
           </button>
         </div>
         <details ref={actionsRef} className="relative sm:hidden">
           <summary className="cursor-pointer list-none text-zinc-300 p-1 bg-zinc-800 rounded-full hover:bg-zinc-700">
-            <img src="/more.svg" alt="Actions" />
+            <img src="/downloader/more.svg" alt="Actions" />
           </summary>
           <div className="absolute right-0 z-10 mt-1 flex min-w-max flex-col gap-1 rounded border border-zinc-700 bg-zinc-900 p-1 shadow-lg">
             <button
               onClick={refreshLogs}
               className="flex items-center gap-2 rounded px-3 py-1 text-left text-zinc-300 hover:bg-zinc-800"
             >
-              <img src="/refresh.svg" alt="Refresh" /> Refresh
+              <img src="/downloader/refresh.svg" alt="Refresh" /> Refresh
             </button>
             <button
               onClick={scrollToBottom}
               className="flex items-center gap-2 rounded px-3 py-1 text-left text-zinc-300 hover:bg-zinc-800"
             >
-              <img src="/down-arrow.svg" alt="Scroll Down" /> Scroll Down
+              <img src="/downloader/down-arrow.svg" alt="Scroll Down" /> Scroll Down
             </button>
           </div>
         </details>

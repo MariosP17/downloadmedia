@@ -8,6 +8,7 @@ import { useSyncedLocalStorage } from "../../../Utils/useSyncedLocalStorage";
 import CustomContextMenu from "../../../components/CustomContextMenu";
 import { MediaType } from "../../../../../Props";
 import { getApiUrl } from "../../../Actions/RestApiConfig";
+import Link from "next/link";
 import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../../../Utils/savedMediaEvents";
 
 type Props = {
@@ -204,7 +205,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
       }
     }
     if (episodesadded == parseInt(episodesNum)) {
-      toast.success(<div>{episodesadded} episodes added to batch!<br/><a className="text-blue-500 hover:underline cursor-pointer" href="/batch-download" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</a></div>, { id: toastId });
+      toast.success(<div>{episodesadded} episodes added to batch!<br/><Link href="/batch-download" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</Link></div>, { id: toastId });
       setSvgPaths((prev) => ({
         ...prev,
         [seasonid]: SvgAddAllIcon.checked
@@ -212,7 +213,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
     }
     else 
     {
-        toast(<div>{episodesadded} episodes added to batch.{infoMessage}<br/><a className="text-blue-500 hover:underline cursor-pointer" href="/batch-download" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</a></div>, {
+        toast(<div>{episodesadded} episodes added to batch.{infoMessage}<br/><Link href="/batch-download" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</Link></div>, {
           id: toastId,
           icon: (<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5a96ce"><path d="M444-288h72v-240h-72v240Zm61.5-322.29q10.5-10.29 10.5-25.5t-10.29-25.71q-10.29-10.5-25.5-10.5t-25.71 10.29q-10.5 10.29-10.5 25.5t10.29 25.71q10.29 10.5 25.5 10.5t25.71-10.29ZM480.28-96Q401-96 331-126t-122.5-82.5Q156-261 126-330.96t-30-149.5Q96-560 126-629.5q30-69.5 82.5-122T330.96-834q69.96-30 149.5-30t149.04 30q69.5 30 122 82.5T834-629.28q30 69.73 30 149Q864-401 834-331t-82.5 122.5Q699-156 629.28-126q-69.73 30-149 30Z"/></svg>),
         });
@@ -472,7 +473,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
                   const ename = ep.name ?? ep.title ?? `Episode ${ep.episode ?? ep.number ?? ""}`;
                   return (
                     <div key={eid} className="flex flex-col items-center">
-                      <a href={`/series/${encodeURIComponent(ep.id)}/${encodeURIComponent(ename)}`}>
+                      <Link href={`/series/${encodeURIComponent(ep.id)}/${encodeURIComponent(ename)}`}>
                       <div
                         onClick={(e) => {
                           e.stopPropagation();
@@ -485,10 +486,10 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
                       > 
                         <div className="relative">
                           <FallbackImage src={ep.thumbnail || ep.poster || ep.cover || "/no-poster-16-9.jpg"} fallback="/no-poster-16-9.jpg" alt={ename} />
-                          <img src="/check.svg" className={`absolute bg-white rounded-full top-1 right-1 w-5 h-5 ${ep.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`} />
+                          <img src="/downloader/check.svg" className={`absolute bg-white rounded-full top-1 right-1 w-5 h-5 ${ep.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-200`} />
                         </div>
                       </div>
-                      </a>
+                      </Link>
                       <p className="mt-2 text-sm font-medium"><span className="text-zinc-500">S{season.number.toString().padStart(2, '0')}E{ep.episode?.toString().padStart(2, '0') ?? ep.number?.toString().padStart(2, '0') ?? ""}</span> {ename}</p>
                       {(ep.description || ep.overview) && <p className="mt-1 text-xs text-zinc-400">{ep.description || ep.overview}</p>}
                     </div>

@@ -94,7 +94,7 @@ export default function SaveMediaButton({ ttid, name, year, type, poster_url, se
                 className="rounded hover:cursor-pointer hover:opacity-80 disabled:pointer-events-none disabled:opacity-50"
             >
                 <img
-                    src={saved ? "/delete-saved-media.svg" : "/savemedia.svg"}
+                    src={saved ? "/downloader/delete-saved-media.svg" : "/downloader/savemedia.svg"}
                     alt=""
                     className="h-6 w-6"
                 />

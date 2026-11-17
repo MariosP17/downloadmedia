@@ -59,7 +59,7 @@ export default function BookmarkButton({ infoHash, fileIdx, ttid, type, filename
   };
 
   // 3. Conditionally swap image paths based natively on local state
-  const currentIconSrc = isBookmarked ? "/bookmark_check.png" : "/bookmark_add.png";
+  const currentIconSrc = isBookmarked ? "/downloader/bookmark_check.png" : "/downloader/bookmark_add.png";
 
   return (
     <button

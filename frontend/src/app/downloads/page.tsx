@@ -5,6 +5,7 @@ import { useEffect, useState, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import { getApiUrl } from "../Actions/RestApiConfig";
+import Link from "next/link";
 
 // Define the shape of a single download item based on your API structure
 type DownloadItem = {
@@ -400,23 +401,23 @@ export default function DownloadsPage() {
 
                   {/* Content & Progress Bar Section */}
                   <div className="flex-1 min-w-0 w-full">
-                    <a
+                    <Link
                       href={handleNavigation(seriesOrMovieName, ttid.split(":")[0], type, type === "series" ? ttid.split(":")[1] : "")}
                       // --- FIXED: Removed 'truncate', added 'break-words' and 'whitespace-normal' so long titles wrap nicely ---
                       className="text-left cursor-pointer text-zinc-100 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
                     >
                       {seriesOrMovieName}
-                    </a>
+                    </Link>
                     <span className="text-zinc-400 text-xs">⚙️{torrentTitle}</span>
                     {(type === "series") && 
-                      <a
+                      <Link
                         href={handleNavigation(displayName, ttid, type)}
                         onClick={(e) => e.preventDefault()}
                         // --- FIXED: Removed 'truncate', added 'break-words' and 'whitespace-normal' so long titles wrap nicely ---
                         className="text-left cursor-pointer text-xs text-zinc-400 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
                       >
                       <span className="text-sm font-semibold">S{ttid.split(":")[1].padStart(2, '0')}E{ttid.split(":")[2].padStart(2, '0')} </span>{displayName} 
-                      </a>
+                      </Link>
                       
                     }
                     <div className="mt-2 flex items-center gap-3 w-full">

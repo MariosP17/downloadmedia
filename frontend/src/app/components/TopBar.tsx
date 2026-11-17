@@ -107,7 +107,7 @@ export default function TopBar({
     <div className="flex items-center gap-2 flex-shrink-0">
       <div>
         <Link href="/" className="flex items-center">
-          <img src="/stremio.png" alt="Stremio" className="h-8 w-8 object-contain" />
+          <img src="/downloader/stremio.png" alt="Stremio" className="h-8 w-8 object-contain" />
         </Link>
       </div>
       <button
@@ -156,7 +156,7 @@ export default function TopBar({
         className="p-1 rounded-md hover:bg-zinc-800 hover:cursor-pointer text-zinc-200"
       >
         <span className="relative inline-flex">
-          <img src="/bookmarks.svg" alt="Bookmarks" className="h-7 w-7 object-contain" />
+          <img src="/downloader/bookmarks.svg" alt="Bookmarks" className="h-7 w-7 object-contain" />
           <AnimatePresence>
             {savedMedia.length > 0 && (
               <motion.span

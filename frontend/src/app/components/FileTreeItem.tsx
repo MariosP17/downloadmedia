@@ -440,7 +440,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
   // Helper function to pick the correct asset token based on extensions
   const getIcon = () => {
     if (isFolder) {
-      return isOpen ? "/open-folder.png" : "/folder.png";
+      return isOpen ? "/downloader/open-folder.png" : "/downloader/folder.png";
     }
 
     const ext = cleanName.split(".").pop()?.toLowerCase() || "";
@@ -449,11 +449,11 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
     const videoExtensions = ["mp4", "mkv", "avi", "mov", "wmv", "flv", "webm"];
     const imageExtensions = ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"];
 
-    if (docExtensions.includes(ext)) return "/document.png";
-    if (videoExtensions.includes(ext)) return "/video.png";
-    if (imageExtensions.includes(ext)) return "/image.png";
+    if (docExtensions.includes(ext)) return "/downloader/document.png";
+    if (videoExtensions.includes(ext)) return "/downloader/video.png";
+    if (imageExtensions.includes(ext)) return "/downloader/image.png";
     
-    return "/unknown.png";
+    return "/downloader/unknown.png";
   };
 
 
@@ -608,10 +608,10 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
         }
       }
       if (blank) {
-        window.open(`/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(targetEpisodeName || title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : ""), "_blank");
+        window.open(`/downloader/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(targetEpisodeName || title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : ""), "_blank");
       }
       else {
-      window.location.href = `/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : "");
+      window.location.href = `/downloader/${type}/${encodeURIComponent(targetTtid)}/${encodeURIComponent(title)}`+(isSeasonFolder && season!==-1 ? `?season=${season}` : "");
       }
     } finally {
       setPageLoading(false);
@@ -685,7 +685,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                   }}
                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <img src="/download.png" alt="Download" className="w-4 h-4" />
+                <img src="/downloader/download.png" alt="Download" className="w-4 h-4" />
                 Download
               </button>
               {isFolder && (
@@ -696,7 +696,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                   }}
                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <img src="/refresh.svg" alt="Refresh" className="w-4 h-4" />
+                <img src="/downloader/refresh.svg" alt="Refresh" className="w-4 h-4" />
                 Refresh
               </button>
               )}
@@ -707,7 +707,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <img src="/edit.png" alt="Rename" className="w-4 h-4" />
+                <img src="/downloader/edit.png" alt="Rename" className="w-4 h-4" />
                 Rename
               </button>
 
@@ -730,7 +730,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                   }}
                   className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <img src="/subs.svg" alt="Subtitles" className="w-4 h-4" />
+                  <img src="/downloader/subs.svg" alt="Subtitles" className="w-4 h-4" />
                   Edit Subtitles
                 </button>
               )}
@@ -742,7 +742,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                   }}
                   className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <img src="/text.svg" alt="Edit Subtitles" className="w-4 h-4" />
+                  <img src="/downloader/text.svg" alt="Edit Subtitles" className="w-4 h-4" />
                   Edit
                 </button>
               )}
@@ -754,7 +754,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                   }}
                   className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <img src="/play.svg" alt="Edit Subtitles" className="w-4 h-4" />
+                  <img src="/downloader/play.svg" alt="Edit Subtitles" className="w-4 h-4" />
                   Play Video
                 </button>
               )}
@@ -765,7 +765,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
                 }}
                 className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-colors cursor-pointer flex items-center gap-1.5"
               >
-                <img src="/delete.png" alt="Delete" className="w-4 h-4" />
+                <img src="/downloader/delete.png" alt="Delete" className="w-4 h-4" />
                 Delete
               </button>
 

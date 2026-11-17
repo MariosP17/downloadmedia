@@ -486,7 +486,7 @@ export default function StreamActions({ hash, filename, title, id, ttid,data,opt
                   targetPath === "" ? "bg-green-600 text-white" : "hover:bg-zinc-800 text-zinc-200"
                 }`}
               >
-                <img src="/folder.png" alt="" className="w-4 h-4 object-contain" />
+                <img src="/downloader/folder.png" alt="" className="w-4 h-4 object-contain" />
                 <span className="text-sm">Libraries</span>
               </div>
               

@@ -9,6 +9,7 @@ import StreamScroller from "./StreamScroller";
 import { MediaType, qualityPriority } from "../../../../../Props";
 import SaveMediaButton from "../../../components/SaveMediaButton";
 import{ getApiUrl } from "../../../Actions/RestApiConfig";
+import Link from "next/link";
 
 type Props = {
   params: {
@@ -200,13 +201,13 @@ async function MediaInfo({ data, id }: { data: any; id: string }) {
     <div>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <div>
-        <span className={`text-2xl font-bold text-white`}><a href={(type === "series" && episodeData) ? `/series/${encodeURIComponent(decodedId.split(":")[0])}/${encodeURIComponent(name)}` : undefined} className={` ${(type === "series" && episodeData) && "hover:text-blue-400 transition-colors cursor-pointer"}`}>{name}</a> <span className="ml-2 text-sm text-zinc-400">{releaseYear}</span></span>
+        <span className={`text-2xl font-bold text-white`}><Link href={(type === "series" && episodeData) ? `/series/${encodeURIComponent(decodedId.split(":")[0])}/${encodeURIComponent(name)}` : ""} className={` ${(type === "series" && episodeData) && "hover:text-blue-400 transition-colors cursor-pointer"}`}>{name}</Link> <span className="ml-2 text-sm text-zinc-400">{releaseYear}</span></span>
         <h3 className="text-xl font-semibold text-white"><span className="text-zinc-300 italic text-lg">{seasonAndEpisode}</span> {episodeName}</h3>
         </div>
       </div>
       <div className="mt-2 flex flex-col flex-wrap gap-y-1 text-sm text-zinc-300">
         {cast.length > 0 && <span> <b>Cast:</b> {cast.join(", ")}</span>}
-        {((rating && rating >0) || duration) && <span className="flex">{rating && rating !=0 && <span className="flex"><a href={link} target="_blank" rel="noopener noreferrer"><img src='../../../../../../imdb.png' alt='IMDb' className={`w-10 h-5 mr-2 ${link ? 'cursor-pointer' : ''}`} /></a> {rating}</span>}{rating && duration &&<>&nbsp; • &nbsp;</>}{duration && <> <b>Duration:</b> &nbsp;{duration}</>}</span>}
+        {((rating && rating >0) || duration) && <span className="flex">{rating && rating !=0 && <span className="flex"><Link href={link} target="_blank" rel="noopener noreferrer"><img src='/downloader/imdb.png' alt='IMDb' className={`w-10 h-5 mr-2 ${link ? 'cursor-pointer' : ''}`} /></Link> {rating}</span>}{rating && duration &&<>&nbsp; • &nbsp;</>}{duration && <> <b>Duration:</b> &nbsp;{duration}</>}</span>}
         {description && <p className="mt-2 text-sm text-zinc-300">{description}</p>}
       </div>
       </div>

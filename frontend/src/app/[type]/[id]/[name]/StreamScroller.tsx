@@ -122,7 +122,7 @@ export default function StreamScroller({ streamsnames, counts, opts,config }: Pr
                 ))}
             </div>
             <div className={`absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-[600ms] ${expanded ? "pointer-events-none opacity-0" : "opacity-100"}`}>
-                {" "} <img src="/expand.svg" height="25px" width="25px" alt="scroller" /> {" "}
+                {" "} <img src="/downloader/expand.svg" height="25px" width="25px" alt="scroller" /> {" "}
             </div>
         </nav>
     );

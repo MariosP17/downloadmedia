@@ -70,7 +70,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/home.png"
+          src="/downloader/home.png"
           alt="Home"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />
@@ -86,7 +86,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/media.png"
+          src="/downloader/media.png"
           alt="Media"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />
@@ -101,7 +101,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/downloads.png"
+          src="/downloader/downloads.png"
           alt="Batch Download"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />
@@ -116,7 +116,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/downloading.png"
+          src="/downloader/downloading.png"
           alt="Downloads"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />
@@ -130,7 +130,7 @@ export default function Sidebar({
         className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-zinc-800 text-zinc-200 hover:text-white transition-colors group"
       >
         <img
-          src="/settings.svg"
+          src="/downloader/settings.svg"
           alt="Settings"
           className="h-7 w-7 object-contain opacity-80 group-hover:opacity-100 transition-opacity"
         />

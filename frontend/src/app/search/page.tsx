@@ -7,6 +7,7 @@ import { toast } from "react-hot-toast";
 import CustomContextMenu from "../components/CustomContextMenu";
 import { MediaType } from "../../../Props";
 import { SAVED_MEDIA_CHANNEL_NAME, SavedMediaEvent } from "../Utils/savedMediaEvents";
+import Link from "next/dist/client/link";
 
 
 // 1. Child Component: Performs data fetching and hooks into search parameters safely
@@ -216,7 +217,7 @@ function SearchResultsList() {
               ) : movies.length > 0 ? (
                 movies.map((movie: any) => (
                   <div key={movie.id}>
-                    <a href={`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`}>
+                    <Link href={`/movie/${encodeURIComponent(movie.id)}/${encodeURIComponent(movie.name)}`}>
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
@@ -235,10 +236,10 @@ function SearchResultsList() {
                           alt={movie.name}
                           className="poster"
                         />
-                        <img src="/check.svg" alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
+                        <img src="/downloader/check.svg" alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${movie.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
                       </div>
                     </div>
-                    </a>
+                    </Link>
                     <p className="mt-2">{movie.name}</p>
                   </div>
                 ))
@@ -282,7 +283,7 @@ function SearchResultsList() {
               ) : series.length > 0 ? (
                 series.map((show: any) => (
                   <div key={show.id}>
-                    <a href={`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`}>
+                    <Link href={`/series/${encodeURIComponent(show.id)}/${encodeURIComponent(show.name)}`}>
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
@@ -295,10 +296,10 @@ function SearchResultsList() {
                     > 
                       <div className="relative">
                         <FallbackImage src={show.poster} alt={show.name} className="poster object-cover rounded-lg" />
-                        <img src="/check.svg" alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
+                        <img src="/downloader/check.svg" alt="Saved" className={`bg-white rounded-full absolute top-2 right-2 w-6 h-6 ${show.isInSaved ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`} />
                       </div>
                     </div>
-                    </a>
+                    </Link>
                     <p className="mt-2">{show.name}</p>
                   </div>
                 ))

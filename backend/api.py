@@ -2512,7 +2512,7 @@ def performActionNoErrors(action, *args, **kwargs):
         print("DB connection string is not configured")
     try:
         result = action(db_connection_string, *args, **kwargs)
-        print(f"Action performed successfully: {result}")
+        print(f"Action performed successfully: {(action.__name__)} {" with result: " + str(result) if result is not None else ""}")
     except Exception as e:
         pass
 
@@ -2581,7 +2581,6 @@ def get_embedded_subtitles(file_path):
         return []
 
 def incrementOMDBCounter():
-    print("Incrementing OMDB API call counter...")
     performActionNoErrors(cut.check_and_increment_or_reset_counter, counter_key=hashlib.sha256(OMDB_API_KEY.encode("utf-8")).hexdigest())
 
 @app.route('/getCounter', methods=['GET'])
