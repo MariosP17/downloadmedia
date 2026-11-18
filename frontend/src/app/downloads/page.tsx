@@ -347,7 +347,8 @@ export default function DownloadsPage() {
               const isCompleted = progress >= 100;
               const isCancelled = progress == -1.0;
               const isFailed = progress == -2.0;
-              const isDownloading = !isCompleted && !isCancelled && !isFailed;
+              const isWaiting = progress == 0.0;
+              const isDownloading = !isCompleted && !isCancelled && !isFailed && !isWaiting;
               const displayName = name ?? `ID: ${decodeURIComponent(ttid)}`;
               const seriesOrMovieName = type === "movie" ? displayName : seriesNames[decodeURIComponent(ttid).split(":")[0]] ?? displayName;
               const thumbnailUrl = thumbnail;
@@ -375,7 +376,7 @@ export default function DownloadsPage() {
                     </div>
 
                     {/* Status Badge (Stays aligned on the top right corner on phones) */}
-                    <div className="flex-shrink-0 sm:order-last sm:ml-2">
+                    <div className="flex-shrink-0 sm:order-last sm:min-w-25 sm:justify-center sm:flex sm:ml-2">
                       {isCompleted ? (
                         <span className="px-2.5 py-1 text-xs font-semibold bg-green-500/10 text-green-400 rounded-full border border-green-500/20 whitespace-nowrap">
                           Finished
@@ -387,6 +388,10 @@ export default function DownloadsPage() {
                       ) : isFailed ? (
                         <span className="px-2.5 py-1 text-xs font-semibold bg-red-500/10 text-red-400 rounded-full border border-red-500/20 whitespace-nowrap">
                           Failed
+                        </span>
+                      ) : isWaiting ? (
+                        <span className="px-2.5 py-1 text-xs font-semibold bg-yellow-500/10 text-yellow-400 animate-pulse rounded-full border border-yellow-500/20 whitespace-nowrap">
+                          Waiting
                         </span>
                       ) : (
                         <span className="px-2.5 py-1 text-xs font-semibold bg-blue-500/10 text-blue-400 animate-pulse rounded-full border border-blue-500/20 whitespace-nowrap">
@@ -422,7 +427,7 @@ export default function DownloadsPage() {
                     }
                     <div className="mt-2 flex items-center gap-3 w-full">
                       {/* Visual Progress Bar track */}
-                      <div className={`flex-1 ${isDownloading ? 'bg-zinc-800' : 'bg-red-800'} rounded-full h-2 overflow-hidden`}>
+                      <div className={`flex-1 ${isDownloading || isWaiting ? 'bg-zinc-800' : 'bg-red-800'} rounded-full h-2 overflow-hidden`}>
                         <div 
                           className={`h-full transition-all duration-300 ${isCompleted ? 'bg-green-500' : 'bg-blue-500'}`}
                           style={{ width: `${Math.min(Math.max(progress, 0), 100)}%` }}

@@ -183,7 +183,7 @@ export default function BatchDownloadPage() {
               );
               if (matchingVideo) {
                 displayName = `${cached.name}`;
-                episodeTitle = `${matchingVideo.name || "Episode"} S${matchingVideo.season.toString().padStart(2, "0")}E${matchingVideo.number.toString().padStart(2, "0")}`;
+                episodeTitle = `S${matchingVideo.season.toString().padStart(2, "0")}E${matchingVideo.number.toString().padStart(2, "0")} ${matchingVideo.name || "Episode"} `;
                 posterUrl = matchingVideo.poster || matchingVideo.thumbnail || posterUrl;
               } else {
                 displayName = cached.name;
@@ -1019,7 +1019,7 @@ const handleRemoveItem = (e: React.MouseEvent<HTMLButtonElement>, infoHash: stri
                 <input
                   type="text"
                   readOnly
-                  value={targetPath === "" ? "No target directory path chosen..." : `/${configuration["MediaFolder"]}/${targetPath}`}
+                  value={targetPath === "" ? "No target directory path chosen..." : targetPath}
                   className={`w-full bg-zinc-950 border rounded-lg px-3 py-2 text-xs outline-none transition-colors ${
                     targetPath === "" ? "text-zinc-600 border-zinc-800 italic" : "text-green-400 border-green-900/60 font-semibold"
                   }`}

@@ -562,8 +562,8 @@ export default function RestApiConfiguration() {
             
         </div>
     {manageJellyfinUsers && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setManageJellyfinUsers(false)}>
-            <div className="bg-zinc-900 p-6 rounded-lg w-3/4 max-w-3xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-5 backdrop-blur-sm" onClick={() => setManageJellyfinUsers(false)}>
+            <div className="bg-zinc-900 p-3 rounded-lg w-[calc(100vw-2.5rem)] sm:w-3/4 max-w-3xl max-h-[calc(100vh-2.5rem)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Manage Jellyfin Users</h2>
                     <button 
