@@ -409,7 +409,7 @@ export default function DownloadsPage() {
                     <Link
                       href={handleNavigation(seriesOrMovieName, ttid.split(":")[0], type, type === "series" ? ttid.split(":")[1] : "")}
                       // --- FIXED: Removed 'truncate', added 'break-words' and 'whitespace-normal' so long titles wrap nicely ---
-                      className="text-left cursor-pointer text-zinc-100 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
+                      className="text-left w-fit cursor-pointer text-zinc-100 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
                     >
                       {seriesOrMovieName}
                     </Link>
@@ -419,7 +419,7 @@ export default function DownloadsPage() {
                         href={handleNavigation(displayName, ttid, type)}
                         onClick={(e) => e.preventDefault()}
                         // --- FIXED: Removed 'truncate', added 'break-words' and 'whitespace-normal' so long titles wrap nicely ---
-                        className="text-left cursor-pointer text-xs text-zinc-400 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
+                        className="text-left w-fit cursor-pointer text-xs text-zinc-400 hover:text-blue-400 hover:underline transition-colors block break-words whitespace-normal max-w-full leading-snug"
                       >
                       <span className="text-sm font-semibold">S{ttid.split(":")[1].padStart(2, '0')}E{ttid.split(":")[2].padStart(2, '0')} </span>{displayName} 
                       </Link>

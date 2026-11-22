@@ -43,8 +43,9 @@ export default function TopBar({
           window.clearTimeout(healthTimeout);
         }
       } catch (error) {
-        if (window.location.pathname !== "/settings") {
-          window.location.replace("/settings?apiUnavailable=true");
+        const base = process.env.NEXT_PUBLIC_BASE_PATH || "";
+        if (window.location.pathname !== `${base}/settings`) {
+          window.location.replace(`${base}/settings?apiUnavailable=true`);
           return;
         }
         const status = typeof error === "number" ? error : "Cannot connect";

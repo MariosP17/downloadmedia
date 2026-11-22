@@ -206,7 +206,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
       }
     }
     if (episodesadded == parseInt(episodesNum)) {
-      toast.success(<div>{episodesadded} episodes added to batch!<br/><Link href="/batch-download" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</Link></div>, { id: toastId });
+      toast.success(<div>{episodesadded} episodes added to batch!<br/><Link href="/batch-download" className="text-blue-500 underline" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</Link></div>, { id: toastId });
       setSvgPaths((prev) => ({
         ...prev,
         [seasonid]: SvgAddAllIcon.checked
@@ -214,7 +214,7 @@ export default function SeasonsAccordion({ seasons, type, ttid,series_name, opti
     }
     else 
     {
-        toast(<div>{episodesadded} episodes added to batch.{infoMessage}<br/><Link href="/batch-download" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</Link></div>, {
+        toast(<div>{episodesadded} episodes added to batch.{infoMessage}<br/><Link href="/batch-download" className="text-blue-500 underline" onClick={() => {toast.dismiss(toastId)}}>View Bookmarks</Link></div>, {
           id: toastId,
           icon: (<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#5a96ce"><path d="M444-288h72v-240h-72v240Zm61.5-322.29q10.5-10.29 10.5-25.5t-10.29-25.71q-10.29-10.5-25.5-10.5t-25.71 10.29q-10.5 10.29-10.5 25.5t10.29 25.71q10.29 10.5 25.5 10.5t25.71-10.29ZM480.28-96Q401-96 331-126t-122.5-82.5Q156-261 126-330.96t-30-149.5Q96-560 126-629.5q30-69.5 82.5-122T330.96-834q69.96-30 149.5-30t149.04 30q69.5 30 122 82.5T834-629.28q30 69.73 30 149Q864-401 834-331t-82.5 122.5Q699-156 629.28-126q-69.73 30-149 30Z"/></svg>),
         });
