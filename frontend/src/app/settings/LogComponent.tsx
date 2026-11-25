@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import ComponentLoader from "../componentLoader";
-import { getApiUrl } from "../Actions/RestApiConfig";
+import { getApiUrl, getApiServiceName } from "../Actions/RestApiConfig";
 const basepath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 export default function LogComponent() {
@@ -72,6 +72,7 @@ export default function LogComponent() {
 
       do {
         const url = new URL(`${await getApiUrl(window.location.hostname)}/getLogs`);
+        url.searchParams.set("service", await getApiServiceName());
         if (nextCursor) url.searchParams.set("cursor", nextCursor);
         if (effectiveDate) url.searchParams.set("date", effectiveDate);
         if (searchParam) url.searchParams.set("search", searchParam);

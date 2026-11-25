@@ -245,7 +245,7 @@ def download_subtitle():
             
             # Loop until an unused file name is found
             while os.path.exists(filepath):
-                filename = f"{base_name} ({counter}){extension}"
+                filename = f"{base_name}.{counter}{extension}"
                 filepath = os.path.join(os.path.dirname(filepath), filename)
                 counter += 1
 
@@ -1982,6 +1982,11 @@ def save_subtitles_content():
 EXCLUDED_LOG_ENTRIES = {"/getConfiguration", "/getOptions", "/getRefreshLibrariesLog", "/getLogs", "/getAllLogsLines", "/getProgressStore", "/getBatchProgressStore", "/archiveJobs", "/getOpenSubtitlesInfo"}
 @app.route('/getLogs', methods=['GET'])
 def get_logs():
+    serviccename = request.args.get('service', default=None, type=str)
+    if not serviccename:
+        return jsonify({"error": "Service name is required"}), 400
+    serviccename = serviccename.strip()
+    serviccename = serviccename if serviccename.endswith(".service") else serviccename + ".service"
     # Cursor-based pagination: each request walks backwards from where the previous
     # one stopped, so the query cost stays constant instead of growing with page number
     # (as it did when we asked journalctl for `-n page*50` lines every time).
@@ -1998,7 +2003,7 @@ def get_logs():
 
     cmd = [
         "journalctl",
-        "-u", "stremio-downloader-api.service",
+        "-u", serviccename,
         "--no-pager",
         "-r", "--show-cursor",
     ]

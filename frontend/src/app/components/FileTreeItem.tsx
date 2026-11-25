@@ -289,7 +289,7 @@ export default function FileTreeItem({ name, size, numberOfItems, numberOfFolder
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Deletion failed");
 
-      toast.success(`${isFolderInternal ? "Folder" : "File"} deleted successfully!`);
+      toast.success(`${cleanName} deleted successfully!`);
       
       // Execute parent structural array sync
       await onRefreshParent?.();

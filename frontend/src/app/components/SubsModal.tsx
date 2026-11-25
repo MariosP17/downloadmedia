@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { toast } from "react-hot-toast";
 import { isVideoExtension,cleanExtension } from "../../../Props";
 import { getApiUrl } from "../Actions/RestApiConfig";
+import  EditSubtitlesModal  from "./EditSubtitlesModal";
 
 type ExistingSubtitle = {
 	name: string;
@@ -43,12 +44,15 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 	const [loadingEmbeddedError, setLoadingEmbeddedError] = useState<boolean>(false);
 	const [searching, setSearching] = useState(false);
 	const [deleting, setDeleting] = useState<string | null>(null);
+	const [editModalOpen, setEditModalOpen] = useState(false);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+	const [subtitleToEdit, setSubtitleToEdit] = useState<string | null>(null);
     const [subtitleToDelete, setSubtitleToDelete] = useState<string | null>(null);
 	const [subtitleInfo, setSubtitleInfo] = useState<any>({});
 	const [embeddedSubs, setEmbeddedSubs] = useState<string[]>([]);
 
 	const isFile = isVideoExtension(pathname.split("/").pop() || "");
+	const isMovieItem = isFile && !isEpisodeInFolderOrFile
 
 
 	useEffect(() => {
@@ -172,7 +176,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 			const response = await fetch(await getApiUrl(window.location.hostname) + "/deleteFile", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ filePath: isEpisode ? `${pathname.split("/").slice(0, -1).join("/")}/${subtitleToDelete}` : `${pathname}/${subtitleToDelete}` }),
+				body: JSON.stringify({ filePath: isEpisode || isMovieItem ? `${pathname.split("/").slice(0, -1).join("/")}/${subtitleToDelete}` : `${pathname}/${subtitleToDelete}` }),
 			});
 			const data = await response.json();
 			if (!response.ok) throw new Error(data.error || "Could not delete subtitle");
@@ -225,7 +229,7 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
             return;
         }
 
-        const mediaName = isEpisode || isFile ? `${pathname.split("/").pop()}-${language}.srt` : `${cleanExtension(videoItem.name)}-${language}.srt`;
+        const mediaName = isEpisode || isFile ? `${cleanExtension(pathname.split("/").pop() || "")}.${language}.srt` : `${cleanExtension(videoItem.name)}.${language}.srt`;
         const filePath = isEpisode || isFile ? `${pathname.split("/").slice(0, -1).join("/")}/${mediaName}` : `${pathname}/${mediaName}`;
         try {
             const response = await fetch(await getApiUrl(window.location.hostname) + "/downloadSubtitle", {
@@ -297,9 +301,14 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
 											<p className="break-all text-sm text-zinc-200">{subtitle.name}</p>
 											<p className="text-xs text-zinc-500">{subtitle.size}</p>
 										</div>
-										<button type="button" onClick={() => { setSubtitleToDelete(subtitle.name); setDeleteModalOpen(true); }} disabled={deleting === subtitle.name} className="shrink-0 rounded-md px-2 py-1 text-xs text-red-400 hover:bg-red-950/40 disabled:opacity-50 cursor-pointer">
-											{deleting === subtitle.name ? "Deleting..." : "Delete"}
-										</button>
+										<div className="flex gap-2">
+											<button type="button" onClick={() => { setSubtitleToEdit(subtitle.name); setEditModalOpen(true); }} className="shrink-0 rounded-md px-2 py-1 text-xs text-blue-400 hover:bg-blue-950/40 disabled:opacity-50 cursor-pointer">
+												Edit
+											</button>
+											<button type="button" onClick={() => { setSubtitleToDelete(subtitle.name); setDeleteModalOpen(true); }} disabled={deleting === subtitle.name} className="shrink-0 rounded-md px-2 py-1 text-xs text-red-400 hover:bg-red-950/40 disabled:opacity-50 cursor-pointer">
+												{deleting === subtitle.name ? "Deleting..." : "Delete"}
+											</button>
+										</div>
 									</div>
 								))}
 							</div>
@@ -398,6 +407,14 @@ export default function SubsModal({ pathname, replacedPath, ttid, onClose, onCha
                         </div>
                     </div>
                     </div>
+                )}
+				{editModalOpen && (
+                    <EditSubtitlesModal
+						fullPath={isEpisode || isMovieItem ? `${pathname.split("/").slice(0, -1).join("/")}/${subtitleToEdit}` : `${pathname}/${subtitleToEdit}`}
+						cleanName={subtitleToEdit || ""}
+						onClose={() => {setEditModalOpen(false); setSubtitleToEdit(null);}}
+						onCancel={() => { setEditModalOpen(false); setSubtitleToEdit(null); }}
+					/>
                 )}
 			</div>
 		</div>
