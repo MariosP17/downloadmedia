@@ -222,6 +222,24 @@ def download_subtitle():
     print(f"Requesting download link for File ID: {file_id}...")
     response = requests.post(url, json=payload, headers=headers)
 
+    is_invalid_token = False
+    if response.status_code != 200:
+        try:
+            error_data = response.json()
+            is_invalid_token = "invalid" in str(error_data).lower()
+        except ValueError:
+            is_invalid_token = "invalid" in response.text.lower()
+
+    if is_invalid_token:
+        print("OpenSubtitles reported an invalid token. Refreshing and retrying...")
+        try:
+            token = refresh_login_token()
+            headers["Authorization"] = f"Bearer {token}"
+            response = requests.post(url, json=payload, headers=headers)
+        except Exception as e:
+            print(f"Failed to refresh OpenSubtitles token: {e}")
+            return {"error": "Failed to refresh OpenSubtitles token."}, 500
+
     # Handle any actual system/network errors
     if response.status_code != 200:
         print(f"Download endpoint error ({response.status_code}): {response.text}")
