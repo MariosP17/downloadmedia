@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_EXTRA_CA_CERTS=/etc/apache2/ssl/server-om.crt next dev -p 3001",
+    "dev": "NODE_EXTRA_CA_CERTS=/etc/apache2/ssl/server-om.gr.crt next dev -p 3001",
     "build": "next build",
-    "start": "NODE_EXTRA_CA_CERTS=/etc/apache2/ssl/server-om.crt next start",
+    "start": "NODE_EXTRA_CA_CERTS=/etc/apache2/ssl/server-om.gr.crt next start",
     "lint": "eslint"
   },
   "dependencies": {
